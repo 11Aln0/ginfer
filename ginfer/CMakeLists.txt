@@ -7,8 +7,8 @@ function(add_lib_from_path name path)
     message(STATUS "Added library ${name}")
 endfunction()
 
-add_lib_from_path(alloc alloc)
-target_link_libraries(alloc fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
-target_include_directories(alloc PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+add_lib_from_path(memory memory)
+target_link_libraries(memory fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
+target_include_directories(memory PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 add_subdirectory(tests)

@@ -1,7 +1,10 @@
-function(add_gtest test_name lib)
+function(add_gtest test_name)
+    set(lib ${ARGN})
     add_executable(${test_name} ${test_name}.cpp test_main.cpp)
     target_link_libraries(${test_name} ${lib} GTest::gtest)
     add_test(NAME ${test_name} COMMAND ${test_name})
+    message(STATUS "Added test ${test_name}")
 endfunction()
 
-add_gtest(test_3rd_party alloc)
+add_gtest(test_3rd_party fmt::fmt nlohmann_json::nlohmann_json glog::glog)
+add_gtest(test_memory memory)
