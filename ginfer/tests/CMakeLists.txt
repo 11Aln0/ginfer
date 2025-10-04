@@ -8,3 +8,4 @@ endfunction()
 
 add_gtest(test_3rd_party fmt::fmt nlohmann_json::nlohmann_json glog::glog)
 add_gtest(test_memory memory)
+add_gtest(test_tensor memory tensor)

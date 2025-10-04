@@ -23,7 +23,7 @@ TEST(MemoryTest, CUDABuffer) {
   auto allocator = ginfer::memory::CUDAAllocatorFactory::get_instance();
   ASSERT_NE(allocator, nullptr);
   ginfer::memory::Buffer buffer(1024, allocator);
-  ASSERT_EQ(buffer.dev_type(), ginfer::memory::DeviceType::kDeviceCUDA);
+  ASSERT_EQ(buffer.devType(), ginfer::memory::DeviceType::kDeviceCUDA);
   ASSERT_EQ(buffer.size(), 1024);
   ASSERT_NE(buffer.ptr(), nullptr);
 }
@@ -33,7 +33,7 @@ TEST(MemoryTest, CPUBuffer) {
   ASSERT_NE(allocator, nullptr);
   {
     ginfer::memory::Buffer buffer(1024, allocator);
-    ASSERT_EQ(buffer.dev_type(), ginfer::memory::DeviceType::kDeviceCPU);
+    ASSERT_EQ(buffer.devType(), ginfer::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(buffer.size(), 1024);
     ASSERT_NE(buffer.ptr(), nullptr);
   }
@@ -42,7 +42,7 @@ TEST(MemoryTest, CPUBuffer) {
     float* ptr = new float[32];
     ginfer::memory::Buffer ext_buffer(32 * sizeof(float), ptr,
                                       ginfer::memory::DeviceType::kDeviceCPU);
-    ASSERT_EQ(ext_buffer.dev_type(), ginfer::memory::DeviceType::kDeviceCPU);
+    ASSERT_EQ(ext_buffer.devType(), ginfer::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(ext_buffer.size(), 32 * sizeof(float));
     ASSERT_EQ(ext_buffer.ptr(), ptr);
     delete[] ptr;

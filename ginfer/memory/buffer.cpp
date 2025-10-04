@@ -8,7 +8,7 @@ Buffer::Buffer(size_t size, void* ptr, DeviceType dev_type)
 Buffer::Buffer(size_t size, std::shared_ptr<DeviceAllocator> allocator)
     : size_(size), external_(false), allocator_(allocator) {
   ptr_ = allocator_->alloc(size_);
-  dev_type_ = allocator_->dev_type();
+  dev_type_ = allocator_->devType();
 }
 
 Buffer::~Buffer() {

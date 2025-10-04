@@ -14,7 +14,7 @@ class DeviceAllocator {
  public:
   explicit DeviceAllocator(DeviceType dev_type) : dev_type_(dev_type){};
 
-  DeviceType dev_type() const { return dev_type_; }
+  DeviceType devType() const { return dev_type_; }
 
   virtual void* alloc(size_t size) const = 0;
 

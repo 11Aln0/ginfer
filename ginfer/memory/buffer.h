@@ -19,7 +19,7 @@ class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
  public:
   explicit Buffer() = default;
 
-  explicit Buffer(size_t size, void* ptr, DeviceType dev_type);
+  explicit Buffer(size_t size, void* ptr, DeviceType devType);
 
   explicit Buffer(size_t size, std::shared_ptr<DeviceAllocator> allocator);
 
@@ -27,7 +27,7 @@ class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
 
   size_t size() const { return size_; }
 
-  DeviceType dev_type() const { return dev_type_; }
+  DeviceType devType() const { return dev_type_; }
 
   void* ptr() const { return ptr_; }
 };
