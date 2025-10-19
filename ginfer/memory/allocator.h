@@ -2,13 +2,21 @@
 
 #include <cstddef>
 #include <memory>
+#include <stdexcept>
 #include <type_traits>
 
-#include "ginfer/memory/device.h"
+#include "ginfer/common/device.h"
 
 namespace ginfer::memory {
 
-enum class MemcpyKind { kMemcpyHostToDevice, kMemcpyDeviceToHost };
+using DeviceType = ginfer::common::DeviceType;
+
+enum class MemcpyKind {
+  kMemcpyHostToHost,
+  kMemcpyHostToDevice,
+  kMemcpyDeviceToHost,
+  kMemcpyDeviceToDevice,
+};
 
 class DeviceAllocator {
  public:
@@ -20,8 +28,8 @@ class DeviceAllocator {
 
   virtual void free(void* ptr) const = 0;
 
-  virtual void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream,
-                      bool sync) const = 0;
+  virtual void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind,
+                      void* stream = nullptr, bool sync = false) const = 0;
 
   // virtual void memset(void* ptr, size_t size, char c) {}
 
@@ -37,8 +45,8 @@ class CPUDeviceAllocator : public DeviceAllocator {
 
   void free(void* ptr) const override;
 
-  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream,
-              bool sync) const override;
+  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr,
+              bool sync = false) const override;
 };
 
 class CUDADeviceAllocator : public DeviceAllocator {
@@ -49,8 +57,8 @@ class CUDADeviceAllocator : public DeviceAllocator {
 
   void free(void* ptr) const override;
 
-  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream,
-              bool sync) const override;
+  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr,
+              bool sync = false) const override;
 };
 
 template <class T, typename = typename std::enable_if_t<std::is_base_of<DeviceAllocator, T>::value>>
@@ -69,5 +77,7 @@ class DeviceAllocatorFactory {
 
 using CUDAAllocatorFactory = DeviceAllocatorFactory<CUDADeviceAllocator>;
 using CPUAllocatorFactory = DeviceAllocatorFactory<CPUDeviceAllocator>;
+
+std::shared_ptr<DeviceAllocator> getDeviceAllocator(DeviceType dev_type);
 
 }  // namespace ginfer::memory

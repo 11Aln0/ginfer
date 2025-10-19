@@ -1,7 +1,7 @@
 #include <cuda_runtime_api.h>
 #include <glog/logging.h>
 
-#include "ginfer/memory/alloctor.h"
+#include "ginfer/memory/allocator.h"
 
 namespace ginfer::memory {
 CUDADeviceAllocator::CUDADeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCUDA) {}
@@ -46,6 +46,9 @@ void CUDADeviceAllocator::memcpy(const void* src, void* dst, size_t size, Memcpy
       break;
     case MemcpyKind::kMemcpyDeviceToHost:
       cu_kind = cudaMemcpyDeviceToHost;
+      break;
+    case MemcpyKind::kMemcpyDeviceToDevice:
+      cu_kind = cudaMemcpyDeviceToDevice;
       break;
     default:
       LOG(FATAL) << "Unsupported MemcpyKind.";

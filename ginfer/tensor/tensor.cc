@@ -1,6 +1,8 @@
-#include "ginfer/tensor/tensor.h"
-
+#include <glog/logging.h>
 #include <stdexcept>
+
+#include "ginfer/memory/allocator.h"
+#include "ginfer/tensor/tensor.h"
 
 namespace ginfer::tensor {
 
@@ -12,10 +14,9 @@ Tensor::Tensor(DType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
   }
 }
 
-Tensor::Tensor(DType dtype, Shape shape, std::shared_ptr<memory::DeviceAllocator> allocator)
-    : dtype_(dtype), shape_(shape) {
+Tensor::Tensor(DType dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
   size_ = shape_.numel();
-  buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), allocator);
+  buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), dev_type);
 }
 
 const Shape& Tensor::shape() const { return shape_; }
@@ -32,6 +33,17 @@ std::vector<size_t> Tensor::strides() const {
     strides[i] = strides[i + 1] * shape_[i + 1];
   }
   return strides;
+}
+
+void Tensor::toDev(DeviceType dev_type) {
+  CHECK_NE(buffer_, nullptr);
+  CHECK_NE(dev_type, DeviceType::kDeviceUnknown);
+  CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
+  if (buffer_->devType() != dev_type) {
+    auto new_buffer = std::make_shared<memory::Buffer>(buffer_->size(), dev_type);
+    new_buffer->copyFrom(buffer_.get());
+    buffer_ = new_buffer;
+  }
 }
 
 }  // namespace ginfer::tensor

@@ -3,12 +3,14 @@
 #include <memory>
 #include <vector>
 
-#include "ginfer/memory/alloctor.h"
+#include "ginfer/memory/allocator.h"
 #include "ginfer/memory/buffer.h"
 #include "ginfer/tensor/dtype.h"
 #include "ginfer/tensor/shape.h"
 
 namespace ginfer::tensor {
+
+using ginfer::memory::DeviceType;
 
 class Tensor {
  public:
@@ -16,7 +18,7 @@ class Tensor {
 
   explicit Tensor(DType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
 
-  explicit Tensor(DType dtype, Shape shape, std::shared_ptr<memory::DeviceAllocator> allocator);
+  explicit Tensor(DType dtype, Shape shape, DeviceType dev_type);
 
   const Shape& shape() const;
 
@@ -27,6 +29,8 @@ class Tensor {
   size_t nbytes() const;
 
   std::vector<size_t> strides() const;
+
+  void toDev(DeviceType dev_type);
 
  private:
   DType dtype_ = DType::kDTypeUnknown;

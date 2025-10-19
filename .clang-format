@@ -7,3 +7,4 @@ AllowShortIfStatementsOnASingleLine: true
 AllowShortLoopsOnASingleLine: true
 BreakBeforeBraces: Attach
 ColumnLimit: 100
+IncludeBlocks: Preserve

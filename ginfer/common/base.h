@@ -1,6 +1,6 @@
 #pragma once
 
-namespace ginfer::memory {
+namespace ginfer::common {
 
 class NoCopyable {
  protected:
@@ -10,4 +10,4 @@ class NoCopyable {
   NoCopyable& operator=(const NoCopyable&) = delete;
 };
 
-}  // namespace ginfer::memory
+}  // namespace ginfer::common

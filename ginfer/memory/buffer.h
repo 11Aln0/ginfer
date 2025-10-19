@@ -2,13 +2,13 @@
 
 #include <memory>
 
-#include "ginfer/memory/alloctor.h"
-#include "ginfer/memory/base.h"
-#include "ginfer/memory/device.h"
+#include "ginfer/common/base.h"
+#include "ginfer/common/device.h"
+#include "ginfer/memory/allocator.h"
 
 namespace ginfer::memory {
 
-class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
+class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<Buffer> {
  private:
   size_t size_ = 0;
   void* ptr_ = nullptr;
@@ -19,9 +19,15 @@ class Buffer : public NoCopyable, std::enable_shared_from_this<Buffer> {
  public:
   explicit Buffer() = default;
 
-  explicit Buffer(size_t size, void* ptr, DeviceType devType);
+  // create buffer from external memory，no need to manage memory release
+  explicit Buffer(size_t size, void* ptr, DeviceType dev_type);
 
-  explicit Buffer(size_t size, std::shared_ptr<DeviceAllocator> allocator);
+  // create buffer from allocator，need to manage memory release
+  explicit Buffer(size_t size, DeviceType dev_type);
+
+  void copyFrom(const Buffer& src);
+
+  void copyFrom(const Buffer* src);
 
   virtual ~Buffer();
 

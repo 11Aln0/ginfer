@@ -1,7 +1,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "ginfer/memory/alloctor.h"
+#include "ginfer/memory/allocator.h"
 
 namespace ginfer::memory {
 

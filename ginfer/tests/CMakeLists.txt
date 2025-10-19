@@ -1,6 +1,6 @@
 function(add_gtest test_name)
     set(lib ${ARGN})
-    add_executable(${test_name} ${test_name}.cpp test_main.cpp)
+    add_executable(${test_name} ${test_name}.cc test_main.cc)
     target_link_libraries(${test_name} ${lib} GTest::gtest)
     add_test(NAME ${test_name} COMMAND ${test_name})
     message(STATUS "Added test ${test_name}")
