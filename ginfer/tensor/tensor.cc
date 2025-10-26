@@ -35,15 +35,22 @@ std::vector<size_t> Tensor::strides() const {
   return strides;
 }
 
-void Tensor::toDev(DeviceType dev_type) {
+void Tensor::toDevice(DeviceType dev_type) {
   CHECK_NE(buffer_, nullptr);
   CHECK_NE(dev_type, DeviceType::kDeviceUnknown);
   CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
   if (buffer_->devType() != dev_type) {
     auto new_buffer = std::make_shared<memory::Buffer>(buffer_->size(), dev_type);
     new_buffer->copyFrom(buffer_.get());
-    buffer_ = new_buffer;
+    this->buffer_ = new_buffer;
   }
+}
+
+template <typename T>
+T* Tensor::data() {
+  CHECK_NE(buffer_, nullptr);
+  CHECK(buffer_->allocated());
+  return static_cast<T*>(buffer_->ptr());
 }
 
 }  // namespace ginfer::tensor

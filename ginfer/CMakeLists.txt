@@ -7,11 +7,13 @@ function(add_lib_from_path name path)
     message(STATUS "Added library ${name}")
 endfunction()
 
+add_lib_from_path(common common)
+target_link_libraries(common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
 
 set(PATH_LIB_LIST
     "memory|memory"
     "tensor|tensor"
-    "common|common"
+    "op|op"
 )
 
 foreach(PATH_LIB ${PATH_LIB_LIST})
@@ -19,7 +21,7 @@ foreach(PATH_LIB ${PATH_LIB_LIST})
     list(GET KV 0 LIB_NAME)
     list(GET KV 1 LIB_PATH)
     add_lib_from_path(${LIB_NAME} ${LIB_PATH})
-    target_link_libraries(${LIB_NAME} common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
+    target_link_libraries(${LIB_NAME} common)
     target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endforeach()
 

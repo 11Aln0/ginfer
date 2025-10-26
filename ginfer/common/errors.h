@@ -4,7 +4,7 @@
 
 #include <string>
 
-namespace ginfer::common {
+namespace ginfer::error {
 
 enum class StatusCode {
   kSuccess = 0,
@@ -59,4 +59,4 @@ class Result {
   E error_;
 };
 
-}  // namespace ginfer::common
+}  // namespace ginfer::error

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -10,7 +11,8 @@
 namespace ginfer::op {
 
 using ginfer::common::DeviceType;
-using ginfer::common::Status;
+using ginfer::error::Status;
+using ginfer::tensor::Tensor;
 
 enum class LayerType : uint8_t {
   kLayerUnknown = 0,
@@ -30,76 +32,76 @@ class BaseLayer {
  public:
   explicit BaseLayer(DeviceType dev_type, LayerType layer_type, std::string layer_name);
 
-  LayerType layerType() const { return layer_type_; }
+  LayerType layerType() const;
 
-  DeviceType devType() const { return dev_type_; }
+  DeviceType devType() const;
 
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) = 0;
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) = 0;
 
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& output1) = 0;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& output1) = 0;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& input4,
-                         const tensor::Tensor& output1) = 0;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& input4,
-                         const tensor::Tensor& input5, const tensor::Tensor& output1) = 0;
-
-  virtual Status to_dev(DeviceType dev_type) = 0;
+  virtual Status toDevice(DeviceType dev_type);
 
  protected:
-  virtual Status forward() = 0;
+  // virtual Status forward() = 0;
 
-  virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
+  // virtual void set_input(int32_t idx, const tensor::Tensor& input) = 0;
 
-  virtual void set_output(int32_t idx, const tensor::Tensor& output) = 0;
+  // virtual void set_output(int32_t idx, const tensor::Tensor& output) = 0;
 
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
   LayerType layer_type_ = LayerType::kLayerUnknown;
   std::string layer_name_ = "unknown";
-}
-
-class Layer : public BaseLayer {
- public:
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& output1) override;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& output1) override;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& output1) override;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& input4,
-                         const tensor::Tensor& output1) override;
-
-  virtual Status forward(const tensor::Tensor& input1, const tensor::Tensor& input2,
-                         const tensor::Tensor& input3, const tensor::Tensor& input4,
-                         const tensor::Tensor& input5, const tensor::Tensor& output1) override;
-
-  virtual Status to_dev(DeviceType dev_type) override;
-
- protected:
-  virtual Status forward() override;
-
-  virtual void set_input(int32_t idx, const tensor::Tensor& input) override;
-
-  virtual void set_output(int32_t idx, const tensor::Tensor& output) override;
-
- private:
-  std::vector<tensor::Tensor> inputs_;
-  std::vector<tensor::Tensor> outputs_;
 };
 
-class LayerWithParam : Layer {
+class Layer : public BaseLayer {
+  using BaseLayer::BaseLayer;
+  //  public:
+  // virtual Status forward(std::vector<const Tensor*> inputs, Tensor* output) override;
+
+  // virtual Status toDevice(DeviceType dev_type) override;
+
+  //  protected:
+  //   virtual Status forward() override;
+
+  // virtual void set_input(int32_t idx, const tensor::Tensor& input) override;
+  // virtual void set_output(int32_t idx, const tensor::Tensor& output) override;
+
+  //  private:
+  //   std::vector<tensor::Tensor> inputs_;
+  //   std::vector<tensor::Tensor> outputs_;
+};
+
+class LayerWithParam : public Layer {
+ public:
+  void resetWeightSize(size_t size);
+
+  void setWeight(int32_t idx, std::shared_ptr<Tensor> weight);
+
+  virtual Status toDevice(DeviceType dev_type) override;
+
+  std::shared_ptr<Tensor> getWeight(int32_t idx);
+
+  std::vector<std::shared_ptr<Tensor>> getWeights();
+
  private:
-  std::vector<tensor::Tensor> weights_;
+  std::vector<std::shared_ptr<Tensor>> weights_;
+};
+
+class MatmulLayer : public Layer {
+ public:
+  MatmulLayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+};
+
+class AddLayer : public Layer {
+ public:
+  AddLayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+
+ private:
+  Status checkParams(const std::vector<const Tensor*>& inputs, const Tensor* output);
 };
 
 }  // namespace ginfer::op

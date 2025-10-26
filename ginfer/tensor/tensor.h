@@ -30,7 +30,10 @@ class Tensor {
 
   std::vector<size_t> strides() const;
 
-  void toDev(DeviceType dev_type);
+  void toDevice(DeviceType dev_type);
+
+  template <typename T>
+  T* data();
 
  private:
   DType dtype_ = DType::kDTypeUnknown;

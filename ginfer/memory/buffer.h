@@ -36,6 +36,8 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
   DeviceType devType() const { return dev_type_; }
 
   void* ptr() const { return ptr_; }
+
+  bool allocated() const { return ptr_ != nullptr; }
 };
 
 }  // namespace ginfer::memory

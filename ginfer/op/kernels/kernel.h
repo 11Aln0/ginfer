@@ -1,0 +1,48 @@
+#pragma once
+
+#include <vector>
+#include "ginfer/common/device.h"
+#include "ginfer/tensor/dtype.h"
+#include "ginfer/tensor/tensor.h"
+
+namespace ginfer::op::kernel {
+
+template <common::DeviceType>
+struct KernelFuncType {
+  using type = void;
+};
+
+template <>
+struct KernelFuncType<common::DeviceType::kDeviceCPU> {
+  using type = void (*)(const std::vector<const tensor::Tensor*>& inputs, tensor::Tensor* output);
+};
+
+template <>
+struct KernelFuncType<common::DeviceType::kDeviceCUDA> {
+  using type = void (*)(const std::vector<const tensor::Tensor*>& inputs, tensor::Tensor* output,
+                        void* stream);
+};
+
+struct KernelInfo {
+  std::string name;
+  common::DeviceType dev_type;
+  tensor::DType input_dtype;
+  tensor::DType output_dtype;
+
+  KernelInfo()
+      : name("unknown_kernel"),
+        dev_type(common::DeviceType::kDeviceUnknown),
+        input_dtype(tensor::DType::kDTypeUnknown),
+        output_dtype(tensor::DType::kDTypeUnknown) {}
+
+  KernelInfo(const std::string& n, tensor::DType in_type, tensor::DType out_type, common::DeviceType device_type)
+      : name(n), dev_type(device_type), input_dtype(in_type), output_dtype(out_type) {}
+
+  bool operator==(const KernelInfo& other) const {
+    return name == other.name && input_dtype == other.input_dtype &&
+           output_dtype == other.output_dtype && dev_type == other.dev_type;
+  }
+};
+
+
+}  // namespace ginfer::op::kernel
