@@ -1,29 +1,29 @@
-function(add_lib_from_path name path)
+function(add_pathlib_from_path name path)
     file(GLOB SRC_LIST "${path}/*.cc")
     if(NOT SRC_LIST)
         message(FATAL_ERROR "No source files found in ${path}")
     endif()
     add_library(${name} ${SRC_LIST})
+    target_include_directories(${name} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
     message(STATUS "Added library ${name}")
 endfunction()
 
-add_lib_from_path(common common)
-target_link_libraries(common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
+function(add_pathlib_with_deps name path)
+    add_pathlib_from_path(${name} ${path})
+    target_link_libraries(${name} PUBLIC ${ARGN})
+endfunction()
 
-set(PATH_LIB_LIST
-    "memory|memory"
-    "tensor|tensor"
-    "op|op"
-)
-
-foreach(PATH_LIB ${PATH_LIB_LIST})
-    string(REPLACE "|" ";" KV ${PATH_LIB})
-    list(GET KV 0 LIB_NAME)
-    list(GET KV 1 LIB_PATH)
-    add_lib_from_path(${LIB_NAME} ${LIB_PATH})
-    target_link_libraries(${LIB_NAME} common)
-    target_include_directories(${LIB_NAME} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
-endforeach()
+function(add_lib_with_deps name files)
+    add_library(${name} ${files})
+    target_include_directories(${name} PUBLIC ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
+    target_link_libraries(${name} PUBLIC ${ARGN})
+    message(STATUS "Added library ${name}")
+endfunction()
 
 
+add_pathlib_with_deps(common ./common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
+add_pathlib_with_deps(memory ./memory common)
+add_pathlib_with_deps(tensor ./tensor memory)
+
+add_subdirectory(op)
 add_subdirectory(tests)

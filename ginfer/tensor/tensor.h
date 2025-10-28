@@ -16,13 +16,13 @@ class Tensor {
  public:
   explicit Tensor() = delete;
 
-  explicit Tensor(DType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
+  explicit Tensor(Dtype dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
 
-  explicit Tensor(DType dtype, Shape shape, DeviceType dev_type);
+  explicit Tensor(Dtype dtype, Shape shape, DeviceType dev_type);
 
   const Shape& shape() const;
 
-  DType dtype() const;
+  Dtype dtype() const;
 
   size_t size() const;
 
@@ -33,10 +33,17 @@ class Tensor {
   void toDevice(DeviceType dev_type);
 
   template <typename T>
-  T* data();
+  T* data() {
+    return static_cast<T*>(buffer_->ptr());
+  }
+
+  template <typename T>
+  const T* data() const {
+    return static_cast<const T*>(buffer_->ptr());
+  }
 
  private:
-  DType dtype_ = DType::kDTypeUnknown;
+  Dtype dtype_ = Dtype::kDtypeUnknown;
   std::shared_ptr<memory::Buffer> buffer_ = nullptr;
   Shape shape_;
   size_t size_ = 0;

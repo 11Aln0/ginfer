@@ -41,6 +41,8 @@ template<typename T, typename Context>
 void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor& b, tensor::Tensor& c) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "addKernel only supports CUDA device type.";
+  
+  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   int n = static_cast<int>(a.size());
   const T* a_data = a.data<T>();
   const T* b_data = b.data<T>();
@@ -48,18 +50,19 @@ void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor
 
   int blockSize = 256;
   int numBlocks = (n + blockSize - 1) / blockSize;
-  if(ctx.stream() == nullptr) {
+  if(cuda_ctx.getStream() == nullptr) {
     addKernelImpl<T><<<numBlocks, blockSize>>>(a_data, b_data, c_data, n);
   } else {
-    addKernelImpl<T><<<numBlocks, blockSize, 0, ctx.stream()>>>(a_data, b_data, c_data, n);
+    addKernelImpl<T><<<numBlocks, blockSize, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
   }
   
 }
 
 REGISTER_KERNEL(add, 
-                common::DeviceType::kDeviceCUDA, 
+                kDeviceCUDA, 
                 addKernel, 
-                tensor::DType::kDTypeFloat32, 
-                tensor::DType::kDTypeFloat16);
+                tensor::Dtype::kDtypeFloat32, 
+                tensor::Dtype::kDtypeFloat16);
+
 
 }  // namespace ginfer::op::kernel

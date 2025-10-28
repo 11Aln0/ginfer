@@ -1,6 +1,6 @@
 #pragma once
 
-#include <fmt/base.h>
+#include <fmt/core.h>
 
 #include <string>
 
@@ -18,6 +18,8 @@ class Status {
  public:
   explicit Status(StatusCode code, const std::string& msg) : code_(code), msg_(msg) {}
 
+  explicit Status(StatusCode code) : code_(code), msg_("") {}
+
   StatusCode code() const { return code_; }
 
   const std::string& msg() const { return msg_; }
@@ -29,10 +31,14 @@ class Status {
   std::string msg_ = "unknown";
 };
 
-#define REGISTER_STATUS(func, code)            \
-  template <typename... Args>                  \
-  Status func(Args... args) {                  \
-    return Status(code, fmt::format(args...)); \
+#define REGISTER_STATUS(func, code)              \
+  template <typename... Args>                    \
+  Status func(Args... args) {                    \
+    if constexpr (sizeof...(Args) == 0) {        \
+      return Status(code);                       \
+    } else {                                     \
+      return Status(code, fmt::format(args...)); \
+    }                                            \
   }
 
 REGISTER_STATUS(Success, StatusCode::kSuccess)

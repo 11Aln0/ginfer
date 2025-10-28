@@ -2,55 +2,56 @@
 
 #include <cuda_fp16.h>
 #include <cstdint>
+#include <iostream>
 #include "ginfer/common/device.h"
 
 namespace ginfer::tensor {
 
-enum class DType : uint8_t {
-  kDTypeUnknown = 0,
-  kDTypeFloat32 = 1,
-  kDTypeFloat16 = 2,
-  kDTypeInt32 = 3,
-  kDTypeInt8 = 4,
+enum class Dtype : uint8_t {
+  kDtypeUnknown = 0,
+  kDtypeFloat32 = 1,
+  kDtypeFloat16 = 2,
+  kDtypeInt32 = 3,
+  kDtypeInt8 = 4,
 };
 
-constexpr size_t dTypeSize(DType dtype) {
+constexpr size_t dTypeSize(Dtype dtype) {
   switch (dtype) {
-    case DType::kDTypeFloat32:
+    case Dtype::kDtypeFloat32:
       return 4;
-    case DType::kDTypeFloat16:
+    case Dtype::kDtypeFloat16:
       return 2;
-    case DType::kDTypeInt32:
+    case Dtype::kDtypeInt32:
       return 4;
-    case DType::kDTypeInt8:
+    case Dtype::kDtypeInt8:
       return 1;
     default:
       return 0;
   }
 }
 
-template <common::DeviceType dev_type, tensor::DType dtype>
+template <common::DeviceType dev_type, tensor::Dtype dtype>
 struct DeviceDtype {
   using type = void;
 };
 
 template <common::DeviceType dev_type>
-struct DeviceDtype<dev_type, tensor::DType::kDTypeFloat32> {
+struct DeviceDtype<dev_type, tensor::Dtype::kDtypeFloat32> {
   using type = float;
 };
 
 template <common::DeviceType dev_type>
-struct DeviceDtype<dev_type, tensor::DType::kDTypeInt32> {
+struct DeviceDtype<dev_type, tensor::Dtype::kDtypeInt32> {
   using type = int32_t;
 };
 
 template <common::DeviceType dev_type>
-struct DeviceDtype<dev_type, tensor::DType::kDTypeInt8> {
+struct DeviceDtype<dev_type, tensor::Dtype::kDtypeInt8> {
   using type = int8_t;
 };
 
 template <>
-struct DeviceDtype<common::DeviceType::kDeviceCUDA, tensor::DType::kDTypeFloat16> {
+struct DeviceDtype<common::DeviceType::kDeviceCUDA, tensor::Dtype::kDtypeFloat16> {
   using type = __half;
 };
 }  // namespace ginfer::tensor

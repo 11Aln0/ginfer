@@ -34,7 +34,7 @@ class BaseLayer {
 
   LayerType layerType() const;
 
-  DeviceType devType() const;
+  DeviceType getDeviceType() const;
 
   virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) = 0;
 

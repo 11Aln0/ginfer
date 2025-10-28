@@ -9,7 +9,7 @@ BaseLayer::BaseLayer(DeviceType dev_type, LayerType layer_type, std::string laye
 
 LayerType BaseLayer::layerType() const { return layer_type_; }
 
-DeviceType BaseLayer::devType() const { return dev_type_; }
+DeviceType BaseLayer::getDeviceType() const { return dev_type_; }
 
 Status BaseLayer::toDevice(DeviceType dev_type) {
   dev_type_ = dev_type;

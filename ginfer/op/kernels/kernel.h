@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <vector>
 #include "ginfer/common/device.h"
 #include "ginfer/tensor/dtype.h"
@@ -26,16 +27,17 @@ struct KernelFuncType<common::DeviceType::kDeviceCUDA> {
 struct KernelInfo {
   std::string name;
   common::DeviceType dev_type;
-  tensor::DType input_dtype;
-  tensor::DType output_dtype;
+  tensor::Dtype input_dtype;
+  tensor::Dtype output_dtype;
 
   KernelInfo()
       : name("unknown_kernel"),
         dev_type(common::DeviceType::kDeviceUnknown),
-        input_dtype(tensor::DType::kDTypeUnknown),
-        output_dtype(tensor::DType::kDTypeUnknown) {}
+        input_dtype(tensor::Dtype::kDtypeUnknown),
+        output_dtype(tensor::Dtype::kDtypeUnknown) {}
 
-  KernelInfo(const std::string& n, tensor::DType in_type, tensor::DType out_type, common::DeviceType device_type)
+  KernelInfo(const std::string& n, tensor::Dtype in_type, tensor::Dtype out_type,
+             common::DeviceType device_type)
       : name(n), dev_type(device_type), input_dtype(in_type), output_dtype(out_type) {}
 
   bool operator==(const KernelInfo& other) const {
@@ -44,5 +46,19 @@ struct KernelInfo {
   }
 };
 
-
 }  // namespace ginfer::op::kernel
+
+namespace std {
+
+template <>
+struct hash<ginfer::op::kernel::KernelInfo> {
+  size_t operator()(const ginfer::op::kernel::KernelInfo& k) const;
+
+ private:
+  template <class T>
+  static void hash_combine(size_t& seed, const T& v) {
+    seed ^= hash<T>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+  }
+};
+
+}  // namespace std

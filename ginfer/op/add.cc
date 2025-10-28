@@ -9,9 +9,20 @@ AddLayer::AddLayer(DeviceType dev_type, std::string layer_name)
 Status AddLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* output) {
   CHECK(inputs.size() == 2) << "AddLayer requires exactly 2 input tensors.";
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(devType())->getKernel<kernel::AddKernelFuncType>(
-          kernel::KernelInfo("add", inputs[0]->dtype(), output->dtype(), devType()));
+  // TODO broadcast add
+  tensor::Dtype dtype = inputs[0]->dtype();
+  CHECK(dtype == inputs[1]->dtype() && dtype == output->dtype())
+      << "Input tensors must have the same data type.";
+
+  common::DeviceType dev_type = getDeviceType();
+
+  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::AddKernelFuncType>(
+      kernel::KernelInfo("add", dtype, dtype, dev_type));
+
+  auto dev_ctx = common::DeviceContext::create(dev_type);
+
+  kernel(*dev_ctx, *inputs[0], *inputs[1], *output);
+
   return ginfer::error::Success();
 }
 

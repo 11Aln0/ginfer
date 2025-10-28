@@ -6,7 +6,7 @@
 
 namespace ginfer::tensor {
 
-Tensor::Tensor(DType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
+Tensor::Tensor(Dtype dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
     : dtype_(dtype), shape_(shape), buffer_(buffer) {
   size_ = shape_.numel();
   if (buffer->size() != size_ * dTypeSize(dtype)) {
@@ -14,14 +14,14 @@ Tensor::Tensor(DType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
   }
 }
 
-Tensor::Tensor(DType dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
+Tensor::Tensor(Dtype dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
   size_ = shape_.numel();
   buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), dev_type);
 }
 
 const Shape& Tensor::shape() const { return shape_; }
 
-DType Tensor::dtype() const { return dtype_; }
+Dtype Tensor::dtype() const { return dtype_; }
 
 size_t Tensor::size() const { return size_; }
 
@@ -44,13 +44,6 @@ void Tensor::toDevice(DeviceType dev_type) {
     new_buffer->copyFrom(buffer_.get());
     this->buffer_ = new_buffer;
   }
-}
-
-template <typename T>
-T* Tensor::data() {
-  CHECK_NE(buffer_, nullptr);
-  CHECK(buffer_->allocated());
-  return static_cast<T*>(buffer_->ptr());
 }
 
 }  // namespace ginfer::tensor
