@@ -35,7 +35,7 @@ TEST(LayerTest, AddLayerCUDA) {
 
   std::vector<const ginfer::tensor::Tensor*> inputs = {&a, &b};
   auto status = add_layer.forward(inputs, &c);
-  ASSERT_TRUE(status.code() == StatusCode::kSuccess);
+  ASSERT_TRUE(status.code() == StatusCode::kSuccess) << status.msg();
 
   c.toDevice(DeviceType::kDeviceCPU);
 

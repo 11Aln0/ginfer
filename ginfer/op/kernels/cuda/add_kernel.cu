@@ -55,6 +55,10 @@ void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor
   } else {
     addKernelImpl<T><<<numBlocks, blockSize, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
   }
+
+  cudaDeviceSynchronize();
+  cudaError_t err = cudaGetLastError();
+  CHECK(err == cudaSuccess) << "CUDA kernel launch failed: " << cudaGetErrorString(err);
   
 }
 

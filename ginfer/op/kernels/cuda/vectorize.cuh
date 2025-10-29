@@ -1,7 +1,6 @@
 #pragma once
 
 #include "ginfer/op/kernels/vectorize.h"
-#include "ginfer/op/kernels/cuda/prim.cuh"
 #include <cuda_fp16.h>
 
 namespace ginfer::op::kernel {
@@ -18,7 +17,7 @@ __device__ __forceinline__ AlignedVector<T, size> operator+(const AlignedVector<
 }
 
 template <int size>
-__device__ __forceinline__ AlignedVector<__half, size> operator+<__half, size>(const AlignedVector<__half, size>& a, const AlignedVector<__half, size>& b) {
+__device__ __forceinline__ AlignedVector<__half, size> operator+(const AlignedVector<__half, size>& a, const AlignedVector<__half, size>& b) {
   AlignedVector<__half, size> result;
   
 #pragma unroll

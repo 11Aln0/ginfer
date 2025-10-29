@@ -1,3 +1,4 @@
+#include <fmt/core.h>
 #include "ginfer/op/kernels/add_kernel.h"
 #include "ginfer/op/kernels/kernel_registry.h"
 #include "ginfer/op/layer.h"

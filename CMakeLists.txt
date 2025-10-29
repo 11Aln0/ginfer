@@ -9,7 +9,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-Og -g")
-set(CMAKE_CUDA_FLAGS_DEBUG "-G -lineinfo -O0")
+set(CMAKE_CUDA_FLAGS_DEBUG "-G -O1")
 
 enable_testing()
 
