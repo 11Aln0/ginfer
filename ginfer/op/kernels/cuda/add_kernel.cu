@@ -64,9 +64,10 @@ void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor
 
 REGISTER_KERNEL(add, 
                 kDeviceCUDA, 
-                addKernel, 
-                tensor::Dtype::kDtypeFloat32, 
-                tensor::Dtype::kDtypeFloat16);
+                addKernel,
+                tensor::DataType::kDataTypeInt32,
+                tensor::DataType::kDataTypeFloat32, 
+                tensor::DataType::kDataTypeFloat16);
 
 
 }  // namespace ginfer::op::kernel

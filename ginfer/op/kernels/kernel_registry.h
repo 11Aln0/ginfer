@@ -66,8 +66,9 @@ class KernelRegistry {
 #define _REGISTER_KERNEL_SAME_DTYPE(name, dev_type, func, dtype) \
   _REGISTER_KERNEL_DIFF_DTYPE(name, dev_type, func, dtype, dtype)
 
-#define INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype)                  \
-  (&tpl_func<typename ::ginfer::tensor::DeviceDtype<dev_type, dtype>::type, \
+#define INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype)                        \
+  (&tpl_func<typename ::ginfer::type::DeviceNativeTypeOf<                         \
+                 dev_type, typename ::ginfer::tensor::TypeOf<dtype>::type>::type, \
              ::ginfer::common::DeviceContext>)
 
 #define _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)                                     \

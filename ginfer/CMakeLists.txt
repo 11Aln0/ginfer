@@ -26,4 +26,4 @@ add_pathlib_with_deps(memory ./memory common)
 add_pathlib_with_deps(tensor ./tensor memory)
 
 add_subdirectory(op)
-add_subdirectory(tests)
+add_subdirectory(test)

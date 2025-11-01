@@ -6,17 +6,17 @@
 TEST(LayerTest, AddLayerCUDA) {
   using ginfer::common::DeviceType;
   using ginfer::error::StatusCode;
-  using ginfer::tensor::Dtype;
+  using ginfer::tensor::DataType;
 
   ginfer::op::AddLayer add_layer(DeviceType::kDeviceCUDA, "add_layer_cuda");
   EXPECT_EQ(add_layer.layerType(), ginfer::op::LayerType::kLayerAdd);
   EXPECT_EQ(add_layer.getDeviceType(), DeviceType::kDeviceCUDA);
 
-  ginfer::tensor::Tensor a(Dtype::kDtypeFloat32, ginfer::tensor::Shape({127, 127}),
+  ginfer::tensor::Tensor a(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
                            DeviceType::kDeviceCPU);
-  ginfer::tensor::Tensor b(Dtype::kDtypeFloat32, ginfer::tensor::Shape({127, 127}),
+  ginfer::tensor::Tensor b(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
                            DeviceType::kDeviceCPU);
-  ginfer::tensor::Tensor c(Dtype::kDtypeFloat32, ginfer::tensor::Shape({127, 127}),
+  ginfer::tensor::Tensor c(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
                            DeviceType::kDeviceCPU);
 
   auto a_data = a.data<float>();

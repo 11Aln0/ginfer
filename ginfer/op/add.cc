@@ -11,7 +11,7 @@ Status AddLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* outpu
   CHECK(inputs.size() == 2) << "AddLayer requires exactly 2 input tensors.";
 
   // TODO broadcast add
-  tensor::Dtype dtype = inputs[0]->dtype();
+  tensor::DataType dtype = inputs[0]->dtype();
   CHECK(dtype == inputs[1]->dtype() && dtype == output->dtype())
       << "Input tensors must have the same data type.";
 

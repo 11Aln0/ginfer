@@ -23,4 +23,6 @@ set(GINFER_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 include_directories("${GINFER_SRC_DIR}")
 
 option(WITH_CUDA "Build with CUDA" OFF)
+
 add_subdirectory(ginfer)
+add_subdirectory(python)

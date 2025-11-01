@@ -16,13 +16,13 @@ class Tensor {
  public:
   explicit Tensor() = delete;
 
-  explicit Tensor(Dtype dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
+  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
 
-  explicit Tensor(Dtype dtype, Shape shape, DeviceType dev_type);
+  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
 
   const Shape& shape() const;
 
-  Dtype dtype() const;
+  DataType dtype() const;
 
   size_t size() const;
 
@@ -43,7 +43,7 @@ class Tensor {
   }
 
  private:
-  Dtype dtype_ = Dtype::kDtypeUnknown;
+  DataType dtype_ = DataType::kDataTypeUnknown;
   std::shared_ptr<memory::Buffer> buffer_ = nullptr;
   Shape shape_;
   size_t size_ = 0;

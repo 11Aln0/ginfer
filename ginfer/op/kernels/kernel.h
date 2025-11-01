@@ -27,16 +27,16 @@ struct KernelFuncType<common::DeviceType::kDeviceCUDA> {
 struct KernelInfo {
   std::string name;
   common::DeviceType dev_type;
-  tensor::Dtype input_dtype;
-  tensor::Dtype output_dtype;
+  tensor::DataType input_dtype;
+  tensor::DataType output_dtype;
 
   KernelInfo()
       : name("unknown_kernel"),
         dev_type(common::DeviceType::kDeviceUnknown),
-        input_dtype(tensor::Dtype::kDtypeUnknown),
-        output_dtype(tensor::Dtype::kDtypeUnknown) {}
+        input_dtype(tensor::DataType::kDataTypeUnknown),
+        output_dtype(tensor::DataType::kDataTypeUnknown) {}
 
-  KernelInfo(const std::string& n, tensor::Dtype in_type, tensor::Dtype out_type,
+  KernelInfo(const std::string& n, tensor::DataType in_type, tensor::DataType out_type,
              common::DeviceType device_type)
       : name(n), dev_type(device_type), input_dtype(in_type), output_dtype(out_type) {}
 

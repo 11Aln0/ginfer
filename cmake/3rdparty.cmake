@@ -6,6 +6,7 @@ set(CPM_SOURCE_CACHE "$ENV{HOME}/.cache/CPM")
 CPMAddPackage("gh:nlohmann/json@3.12.0")
 CPMAddPackage("gh:fmtlib/fmt#11.2.0")
 CPMAddPackage("gh:google/googletest@1.15.0")
+CPMAddPackage("gh:pybind/pybind11@2.13.6")
 CPMAddPackage(
     URI "gh:google/glog@0.7.1"
     OPTIONS

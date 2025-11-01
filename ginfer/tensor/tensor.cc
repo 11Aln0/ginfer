@@ -6,7 +6,7 @@
 
 namespace ginfer::tensor {
 
-Tensor::Tensor(Dtype dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
+Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
     : dtype_(dtype), shape_(shape), buffer_(buffer) {
   size_ = shape_.numel();
   if (buffer->size() != size_ * dTypeSize(dtype)) {
@@ -14,14 +14,14 @@ Tensor::Tensor(Dtype dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
   }
 }
 
-Tensor::Tensor(Dtype dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
+Tensor::Tensor(DataType dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
   size_ = shape_.numel();
   buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), dev_type);
 }
 
 const Shape& Tensor::shape() const { return shape_; }
 
-Dtype Tensor::dtype() const { return dtype_; }
+DataType Tensor::dtype() const { return dtype_; }
 
 size_t Tensor::size() const { return size_; }
 
