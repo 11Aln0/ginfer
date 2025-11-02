@@ -18,16 +18,6 @@ using Float64 = double;
 using Int32 = int32_t;
 using Int8 = int8_t;
 
-template <typename T>
-struct NumpyType {
-  using type = T;
-};
-
-template <>
-struct NumpyType<Float16> {
-  using type = uint16_t;
-};
-
 template <DeviceType dev_type, typename T>
 struct DeviceNativeTypeOf {
   using type = T;

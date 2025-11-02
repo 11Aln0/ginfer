@@ -4,8 +4,8 @@
 
 namespace py = pybind11;
 
-namespace ginfer::test {
+namespace ginfer::test::pybind {
 
 py::object run_add_layer_cuda_test(py::array a_np, py::array b_np);
 
-}  // namespace ginfer::test
+}  // namespace ginfer::test::pybind
