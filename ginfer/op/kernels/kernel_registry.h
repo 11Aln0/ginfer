@@ -46,6 +46,17 @@ class KernelRegistry {
     return reinterpret_cast<FuncType>(entry.func_ptr);
   }
 
+  template <typename FuncType>
+  FuncType getKernel(const std::string& name, tensor::DataType in_dtype,
+                     tensor::DataType out_dtype) {
+    return getKernel<FuncType>(KernelInfo(name, in_dtype, out_dtype, dev_type_));
+  }
+
+  template <typename FuncType>
+  FuncType getKernel(const std::string& name, tensor::DataType dtype) {
+    return getKernel<FuncType>(KernelInfo(name, dtype, dtype, dev_type_));
+  }
+
  private:
   struct KernelRegistryEntry {
     void* func_ptr;

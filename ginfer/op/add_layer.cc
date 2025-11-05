@@ -4,6 +4,7 @@
 #include "ginfer/op/layer.h"
 
 namespace ginfer::op {
+
 AddLayer::AddLayer(DeviceType dev_type, std::string layer_name)
     : Layer(dev_type, LayerType::kLayerAdd, std::move(layer_name)) {}
 
@@ -18,7 +19,7 @@ Status AddLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* outpu
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::AddKernelFuncType>(
-      kernel::KernelInfo("add", dtype, dtype, dev_type));
+      "add", dtype);
 
   auto dev_ctx = common::DeviceContext::create(dev_type);
 

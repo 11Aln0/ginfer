@@ -6,5 +6,5 @@ TabWidth: 2
 AllowShortIfStatementsOnASingleLine: true
 AllowShortLoopsOnASingleLine: true
 BreakBeforeBraces: Attach
-ColumnLimit: 100
+ColumnLimit: 150
 IncludeBlocks: Preserve

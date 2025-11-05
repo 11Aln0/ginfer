@@ -72,6 +72,8 @@ class Layer : public BaseLayer {
 };
 
 class LayerWithParam : public Layer {
+  using Layer::Layer;
+
  public:
   void resetWeightSize(size_t size);
 
@@ -102,6 +104,16 @@ class AddLayer : public Layer {
 
  private:
   Status checkParams(const std::vector<const Tensor*>& inputs, const Tensor* output);
+};
+
+class RMSNormLayer : public LayerWithParam {
+ public:
+  RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+
+ private:
+  float epsilon_;
 };
 
 }  // namespace ginfer::op

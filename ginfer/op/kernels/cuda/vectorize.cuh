@@ -6,8 +6,7 @@
 namespace ginfer::op::kernel {
 
 template <typename T, int size>
-__device__ __forceinline__ AlignedVector<T, size> operator+(const AlignedVector<T, size>& a,
-                                                const AlignedVector<T, size>& b) {
+__device__ __forceinline__ AlignedVector<T, size> operator+(const AlignedVector<T, size>& a, const AlignedVector<T, size>& b) {
   AlignedVector<T, size> result;
   #pragma unroll
   for (int i = 0; i < size; ++i) {

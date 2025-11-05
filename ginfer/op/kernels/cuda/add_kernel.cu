@@ -10,9 +10,9 @@ namespace ginfer::op::kernel {
 
 template<typename T, int vec_size = DefaultVecSize<T>::value>
 __global__ void addKernelImpl(const T* __restrict__ a, 
-                           const T* __restrict__ b, 
-                           T* __restrict__ c, 
-                           int n) {
+                              const T* __restrict__ b, 
+                              T* __restrict__ c, 
+                              int n) {
 
   using AccessT = AlignedVector<T, vec_size>;
 
@@ -48,17 +48,17 @@ void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor
   const T* b_data = b.data<T>();
   T* c_data = c.data<T>();
 
-  int blockSize = 256;
-  int numBlocks = (n + blockSize - 1) / blockSize;
+  int block_dim = 256;
+  int grid_dim = (n + block_dim - 1) / block_dim;
   if(cuda_ctx.getStream() == nullptr) {
-    addKernelImpl<T><<<numBlocks, blockSize>>>(a_data, b_data, c_data, n);
+    addKernelImpl<T><<<grid_dim, block_dim>>>(a_data, b_data, c_data, n);
   } else {
-    addKernelImpl<T><<<numBlocks, blockSize, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
+    addKernelImpl<T><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
   }
 
-  cudaDeviceSynchronize();
-  cudaError_t err = cudaGetLastError();
-  CHECK(err == cudaSuccess) << "CUDA kernel launch failed: " << cudaGetErrorString(err);
+  // cudaDeviceSynchronize();
+  // cudaError_t err = cudaGetLastError();
+  // CHECK(err == cudaSuccess) << "CUDA kernel launch failed: " << cudaGetErrorString(err);
   
 }
 

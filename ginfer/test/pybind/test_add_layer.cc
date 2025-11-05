@@ -21,7 +21,7 @@ py::array_t<T> test_add_layer_cuda(py::array_t<T> a_np, py::array_t<T> b_np) {
   }
 
   size_t ndim = a_np.ndim();
-  std::vector<int64_t> shape_vec;
+  std::vector<int64_t> shape;
   size_t total = 1;
 
   for (size_t i = 0; i < ndim; i++) {
@@ -29,7 +29,7 @@ py::array_t<T> test_add_layer_cuda(py::array_t<T> a_np, py::array_t<T> b_np) {
       throw std::runtime_error("Input arrays must have the same shape");
     }
     int dim_size = static_cast<int>(a_np.shape(i));
-    shape_vec.push_back(dim_size);
+    shape.push_back(dim_size);
     total *= dim_size;
   }
 
@@ -40,9 +40,9 @@ py::array_t<T> test_add_layer_cuda(py::array_t<T> a_np, py::array_t<T> b_np) {
 
   constexpr DataType dtype = tensor::DataTypeOf<T>::dtype;
 
-  Tensor a_tensor(dtype, Shape(shape_vec), a_buf);
-  Tensor b_tensor(dtype, Shape(shape_vec), b_buf);
-  Tensor c_tensor(dtype, Shape(shape_vec), DeviceType::kDeviceCPU);
+  Tensor a_tensor(dtype, Shape(shape), a_buf);
+  Tensor b_tensor(dtype, Shape(shape), b_buf);
+  Tensor c_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
 
   ginfer::op::AddLayer add_layer(DeviceType::kDeviceCUDA, "add_layer_cuda");
 
@@ -62,23 +62,23 @@ py::array_t<T> test_add_layer_cuda(py::array_t<T> a_np, py::array_t<T> b_np) {
   c_tensor.toDevice(DeviceType::kDeviceCPU);
 
   // Convert result to NumPy array
-  py::array_t<T> c_np(shape_vec);
+  py::array_t<T> c_np(shape);
   std::memcpy(c_np.mutable_data(), c_tensor.data<T>(), bytes);
   return c_np;
 }
 
 template <typename T>
-py::object dispatch_test(py::array a_np, py::array b_np) {
+py::object dispatch_add_layer_test(py::array a_np, py::array b_np) {
   return test_add_layer_cuda<T>(py::array_t<T>(a_np.request()), py::array_t<T>(b_np.request()));
 }
 
 py::object run_add_layer_cuda_test(py::array a_np, py::array b_np) {
   const std::string dtype_str = py::str(a_np.dtype());
   const std::unordered_map<std::string, std::function<py::object()>> dispatcher = {
-      {"float32", [&]() { return dispatch_test<ginfer::type::Float32>(a_np, b_np); }},
-      {"float16", [&]() { return dispatch_test<ginfer::type::Float16>(a_np, b_np); }},
-      {"int32", [&]() { return dispatch_test<ginfer::type::Int32>(a_np, b_np); }},
-      {"int8", [&]() { return dispatch_test<ginfer::type::Int8>(a_np, b_np); }},
+      {"float32", [&]() { return dispatch_add_layer_test<ginfer::type::Float32>(a_np, b_np); }},
+      {"float16", [&]() { return dispatch_add_layer_test<ginfer::type::Float16>(a_np, b_np); }},
+      {"int32", [&]() { return dispatch_add_layer_test<ginfer::type::Int32>(a_np, b_np); }},
+      {"int8", [&]() { return dispatch_add_layer_test<ginfer::type::Int8>(a_np, b_np); }},
   };
   return dispatcher.at(dtype_str)();
 }
