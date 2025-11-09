@@ -77,7 +77,7 @@ class LayerWithParam : public Layer {
  public:
   void resetWeightSize(size_t size);
 
-  void setWeight(int32_t idx, std::shared_ptr<Tensor> weight);
+  void setWeight(int32_t idx, std::shared_ptr<Tensor> weight);  // TODO: avoid copy
 
   virtual Status toDevice(DeviceType dev_type) override;
 

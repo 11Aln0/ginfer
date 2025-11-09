@@ -1,13 +1,14 @@
 #pragma once
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
+#include "ginfer/test/pybind/auto_binding.h"
 
 namespace py = pybind11;
 
 namespace ginfer::test::pybind {
 
-py::object run_add_layer_cuda_test(py::array a_np, py::array b_np);
+Tensor test_add_layer_cuda(Tensor& a_tensor, Tensor& b_tensor);
 
-py::object run_rmsnorm_layer_cuda_test(py::array input_np, py::array gamma_np, float epsilon);
+Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float epsilon);
 
 }  // namespace ginfer::test::pybind
