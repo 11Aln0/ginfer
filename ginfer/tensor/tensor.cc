@@ -2,12 +2,12 @@
 #include <stdexcept>
 
 #include "ginfer/memory/allocator.h"
+#include "ginfer/memory/allocator_factory.h"
 #include "ginfer/tensor/tensor.h"
 
 namespace ginfer::tensor {
 
-Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer)
-    : dtype_(dtype), shape_(shape), buffer_(buffer) {
+Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer) : dtype_(dtype), shape_(shape), buffer_(buffer) {
   size_ = shape_.numel();
   if (buffer->size() != size_ * dTypeSize(dtype)) {
     throw std::invalid_argument("Buffer size does not match tensor size.");
@@ -35,15 +35,17 @@ std::vector<size_t> Tensor::strides() const {
   return strides;
 }
 
-void Tensor::toDevice(DeviceType dev_type) {
+void Tensor::toDevice(memory::DeviceAllocator* allocator) {
   CHECK_NE(buffer_, nullptr);
-  CHECK_NE(dev_type, DeviceType::kDeviceUnknown);
+  CHECK_NE(allocator, nullptr);
   CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
-  if (buffer_->devType() != dev_type) {
-    auto new_buffer = std::make_shared<memory::Buffer>(buffer_->size(), dev_type);
+  if (buffer_->devType() != allocator->devType()) {
+    auto new_buffer = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype_), allocator);
     new_buffer->copyFrom(buffer_.get());
     this->buffer_ = new_buffer;
   }
 }
+
+void Tensor::toDevice(DeviceType dev_type) { toDevice(memory::getDefaultDeviceAllocator(dev_type)); }
 
 }  // namespace ginfer::tensor

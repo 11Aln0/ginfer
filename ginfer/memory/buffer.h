@@ -9,21 +9,17 @@
 namespace ginfer::memory {
 
 class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<Buffer> {
- private:
-  size_t size_ = 0;
-  void* ptr_ = nullptr;
-  bool external_ = false;
-  DeviceType dev_type_ = DeviceType::kDeviceUnknown;
-  std::shared_ptr<DeviceAllocator> allocator_ = nullptr;
-
  public:
   explicit Buffer() = default;
 
   // create buffer from external memory，no need to manage memory release
   explicit Buffer(size_t size, void* ptr, DeviceType dev_type);
 
-  // create buffer from allocator，need to manage memory release
+  // create buffer by default allocator，need to manage memory release
   explicit Buffer(size_t size, DeviceType dev_type);
+
+  // create buffer by allocator, need to manage memory release
+  explicit Buffer(size_t size, DeviceAllocator* allocator);
 
   void copyFrom(const Buffer& src);
 
@@ -38,6 +34,13 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
   void* ptr() const { return ptr_; }
 
   bool allocated() const { return ptr_ != nullptr; }
+
+ private:
+  size_t size_ = 0;
+  void* ptr_ = nullptr;
+  bool external_ = false;
+  DeviceType dev_type_ = DeviceType::kDeviceUnknown;
+  DeviceAllocator* allocator_ = nullptr;
 };
 
 }  // namespace ginfer::memory

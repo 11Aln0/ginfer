@@ -2,7 +2,7 @@
 #include <pybind11/pybind11.h>
 #include <unordered_map>
 #include "ginfer/op/layer.h"
-#include "ginfer/test/pybind/auto_binding.h"
+#include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/type.h"
 
 namespace py = pybind11;

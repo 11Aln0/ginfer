@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
+#include <unordered_map>
 
 #include "ginfer/common/device.h"
 
@@ -24,12 +25,14 @@ class DeviceAllocator {
 
   DeviceType devType() const { return dev_type_; }
 
-  virtual void* alloc(size_t size) const = 0;
+  virtual void* alloc(size_t size) = 0;
 
-  virtual void free(void* ptr) const = 0;
+  // free should not have size argument, but like pooled allocator we need size to find the right pool
+  // in order not to maintain a map from ptr to size (introduce searching and locking overhead), we add size argument here
+  // might have a better way to implement it in future
+  virtual void free(void* ptr, size_t size) = 0;
 
-  virtual void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind,
-                      void* stream = nullptr, bool sync = false) const = 0;
+  virtual void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr, bool sync = false) const = 0;
 
   // virtual void memset(void* ptr, size_t size, char c) {}
 
@@ -41,43 +44,11 @@ class CPUDeviceAllocator : public DeviceAllocator {
  public:
   explicit CPUDeviceAllocator();
 
-  void* alloc(size_t size) const override;
+  void* alloc(size_t size) override;
 
-  void free(void* ptr) const override;
+  void free(void* ptr, size_t size) override;
 
-  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr,
-              bool sync = false) const override;
+  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr, bool sync = false) const override;
 };
-
-class CUDADeviceAllocator : public DeviceAllocator {
- public:
-  explicit CUDADeviceAllocator();
-
-  void* alloc(size_t size) const override;
-
-  void free(void* ptr) const override;
-
-  void memcpy(const void* src, void* dst, size_t size, MemcpyKind kind, void* stream = nullptr,
-              bool sync = false) const override;
-};
-
-template <class T, typename = typename std::enable_if_t<std::is_base_of<DeviceAllocator, T>::value>>
-class DeviceAllocatorFactory {
- public:
-  static std::shared_ptr<T> get_instance() {
-    if (!instance) {
-      instance = std::make_shared<T>();
-    }
-    return instance;
-  }
-
- private:
-  inline static std::shared_ptr<T> instance = nullptr;
-};
-
-using CUDAAllocatorFactory = DeviceAllocatorFactory<CUDADeviceAllocator>;
-using CPUAllocatorFactory = DeviceAllocatorFactory<CPUDeviceAllocator>;
-
-std::shared_ptr<DeviceAllocator> getDeviceAllocator(DeviceType dev_type);
 
 }  // namespace ginfer::memory

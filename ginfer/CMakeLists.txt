@@ -21,8 +21,8 @@ function(add_lib_with_deps name files)
 endfunction()
 
 
-add_pathlib_with_deps(common ./common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart)
-add_pathlib_with_deps(memory ./memory common)
+add_pathlib_with_deps(common ./common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart concurrentqueue)
+add_subdirectory(memory)
 add_pathlib_with_deps(tensor ./tensor memory)
 
 add_subdirectory(op)

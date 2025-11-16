@@ -25,9 +25,7 @@ Status LayerWithParam::toDevice(DeviceType dev_type) {
 
 void LayerWithParam::resetWeightSize(size_t size) { weights_.resize(size); }
 
-void LayerWithParam::setWeight(int32_t idx, std::shared_ptr<Tensor> weight) {
-  weights_[idx] = weight;
-}
+void LayerWithParam::setWeight(int32_t idx, std::shared_ptr<Tensor> weight) { weights_[idx] = weight; }
 
 std::shared_ptr<Tensor> LayerWithParam::getWeight(int32_t idx) {
   CHECK_GT(weights_.size(), idx);

@@ -20,6 +20,8 @@ class Tensor {
 
   explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
 
+  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
+
   const Shape& shape() const;
 
   DataType dtype() const;
@@ -31,6 +33,8 @@ class Tensor {
   std::vector<size_t> strides() const;
 
   void toDevice(DeviceType dev_type);
+
+  void toDevice(memory::DeviceAllocator* allocator);
 
   template <typename T>
   T* data() {

@@ -46,6 +46,13 @@ REGISTER_STATUS(InvalidArgument, StatusCode::kInvalidArgument)
 REGISTER_STATUS(NotFound, StatusCode::kNotFound)
 REGISTER_STATUS(NotImplemented, StatusCode::kNotImplemented)
 
+#define CHECK_THROW(expr, ...)                            \
+  do {                                                    \
+    if (!(expr)) {                                        \
+      throw std::runtime_error(fmt::format(__VA_ARGS__)); \
+    }                                                     \
+  } while (0);
+
 template <typename T, typename E>
 class Result {
  public:

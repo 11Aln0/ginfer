@@ -16,7 +16,7 @@ enum class DataType : uint8_t {
   kDataTypeInt8 = 4,
 };
 
-constexpr size_t dTypeSize(DataType dtype) {
+inline constexpr size_t dTypeSize(DataType dtype) {
   switch (dtype) {
     case DataType::kDataTypeFloat32:
       return 4;
