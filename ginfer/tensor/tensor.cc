@@ -1,4 +1,6 @@
 #include <glog/logging.h>
+#include <functional>
+#include <numeric>
 #include <stdexcept>
 
 #include "ginfer/memory/allocator.h"
@@ -7,17 +9,27 @@
 
 namespace ginfer::tensor {
 
-Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer) : dtype_(dtype), shape_(shape), buffer_(buffer) {
+Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer, Layout layout)
+    : dtype_(dtype), shape_(shape), buffer_(buffer), layout_(layout) {
   size_ = shape_.numel();
   if (buffer->size() != size_ * dTypeSize(dtype)) {
     throw std::invalid_argument("Buffer size does not match tensor size.");
   }
 }
 
-Tensor::Tensor(DataType dtype, Shape shape, DeviceType dev_type) : dtype_(dtype), shape_(shape) {
+Tensor::Tensor(DataType dtype, Shape shape, DeviceType dev_type, Layout layout)
+    : dtype_(dtype), shape_(shape), layout_(layout) {
   size_ = shape_.numel();
   buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), dev_type);
 }
+
+Tensor::Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator, Layout layout)
+    : dtype_(dtype), shape_(shape), layout_(layout) {
+  size_ = shape_.numel();
+  buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), allocator);
+}
+
+Layout Tensor::layout() const { return layout_; }
 
 const Shape& Tensor::shape() const { return shape_; }
 
@@ -29,8 +41,10 @@ size_t Tensor::nbytes() const { return buffer_->size(); }
 
 std::vector<size_t> Tensor::strides() const {
   std::vector<size_t> strides(shape_.ndim(), 1);
-  for (int i = shape_.ndim() - 2; i >= 0; --i) {
-    strides[i] = strides[i + 1] * shape_[i + 1];
+  if (layout_ == Layout::kLayoutRowMajor) {
+    std::partial_sum(shape_.rbegin(), shape_.rend() - 1, strides.rbegin() + 1, std::multiplies<size_t>());
+  } else {
+    std::partial_sum(shape_.begin(), shape_.end() - 1, strides.begin() + 1, std::multiplies<size_t>());
   }
   return strides;
 }

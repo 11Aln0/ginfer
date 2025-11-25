@@ -14,6 +14,7 @@ using common::DeviceType;
 using memory::Buffer;
 using tensor::DataType;
 using tensor::dTypeSize;
+using tensor::Layout;
 using tensor::Shape;
 using tensor::Tensor;
 
@@ -30,7 +31,12 @@ class NumpyToTensorConverter {
     int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) * dTypeSize(dtype);
     auto buf = std::make_shared<Buffer>(bytes, (void*)arr.mutable_data(), DeviceType::kDeviceCPU);
 
-    return tensor::Tensor(dtype, Shape(shape), buf);
+    Layout layout = Layout::kLayoutRowMajor;
+    if ((bool)(arr.flags() & py::array::f_style)) {
+      layout = Layout::kLayoutColMajor;
+    }
+
+    return tensor::Tensor(dtype, Shape(shape), buf, layout);
   }
 
   static py::array convert_back(const Tensor& tensor) {

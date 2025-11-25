@@ -102,8 +102,8 @@ class AddLayer : public Layer {
 
   virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
 
- private:
-  Status checkParams(const std::vector<const Tensor*>& inputs, const Tensor* output);
+  //  private:
+  //   Status checkParams(const std::vector<const Tensor*>& inputs, const Tensor* output);
 };
 
 class RMSNormLayer : public LayerWithParam {

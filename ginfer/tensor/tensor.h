@@ -6,6 +6,7 @@
 #include "ginfer/memory/allocator.h"
 #include "ginfer/memory/buffer.h"
 #include "ginfer/tensor/dtype.h"
+#include "ginfer/tensor/layout.h"
 #include "ginfer/tensor/shape.h"
 
 namespace ginfer::tensor {
@@ -16,15 +17,20 @@ class Tensor {
  public:
   explicit Tensor() = delete;
 
-  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
+  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer,
+                  Layout layout = Layout::kLayoutRowMajor);
 
-  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
+  // use default allocator to create buffer
+  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type, Layout layout = Layout::kLayoutRowMajor);
 
-  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
+  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator,
+                  Layout layout = Layout::kLayoutRowMajor);
 
   const Shape& shape() const;
 
   DataType dtype() const;
+
+  Layout layout() const;
 
   size_t size() const;
 
@@ -51,6 +57,7 @@ class Tensor {
   std::shared_ptr<memory::Buffer> buffer_ = nullptr;
   Shape shape_;
   size_t size_ = 0;
+  Layout layout_ = Layout::kLayoutRowMajor;
 };
 
 }  // namespace ginfer::tensor

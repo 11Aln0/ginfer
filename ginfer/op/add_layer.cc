@@ -13,16 +13,12 @@ Status AddLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* outpu
 
   // TODO broadcast add
   tensor::DataType dtype = inputs[0]->dtype();
-  CHECK(dtype == inputs[1]->dtype() && dtype == output->dtype())
-      << "Input tensors must have the same data type.";
+  CHECK(dtype == inputs[1]->dtype() && dtype == output->dtype()) << "Input tensors must have the same data type.";
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::AddKernelFuncType>(
-      "add", dtype);
-
+  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::AddKernelFuncType>("add", dtype);
   auto dev_ctx = common::DeviceContext::create(dev_type);
-
   kernel(*dev_ctx, *inputs[0], *inputs[1], *output);
 
   return ginfer::error::Success();

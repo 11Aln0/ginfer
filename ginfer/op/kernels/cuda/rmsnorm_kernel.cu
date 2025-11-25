@@ -5,7 +5,7 @@
 
 namespace ginfer::op::kernel {
 
-template <typename T, int vec_size = DefaultVecSize<T>::value, int BlockDim = 256>
+template <typename T, int vec_size = DefaultVecSize<T>::value, int thread_per_block = 256>
 __global__ void rmsNormKernelImpl(const T* __restrict__ in, 
                                   const T* __restrict__ gamma, 
                                   T* __restrict__ out, 
@@ -39,7 +39,7 @@ __global__ void rmsNormKernelImpl(const T* __restrict__ in,
   }
 
   // Block-wide reduction to compute the total sum
-  using BlockReduce = cub::BlockReduce<float, BlockDim>;
+  using BlockReduce = cub::BlockReduce<float, thread_per_block>;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   __shared__ float shared_sum;
   sum = BlockReduce(temp_storage).Sum(sum);

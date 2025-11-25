@@ -26,6 +26,11 @@ class Shape {
 
   int64_t operator[](size_t idx) const { return dims_[idx]; }
 
+  auto begin() const { return dims_.begin(); }
+  auto end() const { return dims_.end(); }
+  auto rbegin() const { return dims_.rbegin(); }
+  auto rend() const { return dims_.rend(); }
+
  private:
   std::vector<int64_t> dims_;
 };

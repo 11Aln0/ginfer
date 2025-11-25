@@ -1,8 +1,6 @@
-#include <pybind11/numpy.h>
-#include <pybind11/pybind11.h>
-#include <unordered_map>
 #include "ginfer/op/layer.h"
 #include "ginfer/test/pybind/func_wrap.h"
+#include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
 
 namespace py = pybind11;
@@ -39,5 +37,7 @@ Tensor test_add_layer_cuda(Tensor& a_tensor, Tensor& b_tensor) {
 
   return c_tensor;
 }
+
+REGISTER_PYBIND_TEST(test_add_layer_cuda);
 
 }  // namespace ginfer::test::pybind

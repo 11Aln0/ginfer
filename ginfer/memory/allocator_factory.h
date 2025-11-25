@@ -7,11 +7,11 @@
 
 namespace ginfer::memory {
 template <class T, typename = typename std::enable_if_t<std::is_base_of<DeviceAllocator, T>::value>>
-class DeviceAllocatorFactory {
+class GlobalDeviceAllocator {
  public:
-  DeviceAllocatorFactory() = delete;
-  DeviceAllocatorFactory(const DeviceAllocatorFactory&) = delete;
-  DeviceAllocatorFactory& operator=(const DeviceAllocatorFactory&) = delete;
+  GlobalDeviceAllocator() = delete;
+  GlobalDeviceAllocator(const GlobalDeviceAllocator&) = delete;
+  GlobalDeviceAllocator& operator=(const GlobalDeviceAllocator&) = delete;
 
   static T* get_instance() {
     if (instance == nullptr) {
@@ -25,11 +25,11 @@ class DeviceAllocatorFactory {
 };
 
 template <typename S>
-using CUDAAllocatorFactory = DeviceAllocatorFactory<cuda::CUDADeviceAllocator<S>>;
-using CPUAllocatorFactory = DeviceAllocatorFactory<CPUDeviceAllocator>;
+using GlobalCUDAAllocator = GlobalDeviceAllocator<cuda::CUDADeviceAllocator<S>>;
+using GlobalCPUAllocator = GlobalDeviceAllocator<CPUDeviceAllocator>;
 
-using DefaultCUDAAllocatorFactory = CUDAAllocatorFactory<cuda::DefaultAllocStrategy>;
-using DefaultCPUAllocatorFactory = CPUAllocatorFactory;
+using DefaultGlobalCUDAAllocator = GlobalCUDAAllocator<cuda::DefaultAllocStrategy>;
+using DefaultGlobalCPUAllocator = GlobalCPUAllocator;
 
 DeviceAllocator* getDefaultDeviceAllocator(DeviceType dev_type);
 }  // namespace ginfer::memory

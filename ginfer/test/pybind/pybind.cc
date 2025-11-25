@@ -1,11 +1,14 @@
 #include "ginfer/test/pybind/pybind.h"
+#include "ginfer/test/pybind/func_wrap.h"
+#include "ginfer/test/pybind/test_registry.h"
 
 namespace ginfer::test::pybind {
 
 PYBIND11_MODULE(ginfer_test, m) {
   m.doc() = "Pybind11 test for ginfer::op::AddLayer on CUDA";
-  m.def("run_add_layer_cuda_test", WRAP_TENSOR_FUNC(test_add_layer_cuda), "Run AddLayer on CUDA using pybind interface");
-  m.def("run_rmsnorm_layer_cuda_test", WRAP_TENSOR_FUNC(test_rmsnorm_layer_cuda), "Run RMSNormLayer on CUDA using pybind interface");
+  for (const auto& [name, func] : *PybindTestRegistry::getInstance()) {
+    m.def(name.c_str(), func);
+  }
 }
 
 }  // namespace ginfer::test::pybind

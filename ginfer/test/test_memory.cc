@@ -4,7 +4,7 @@
 #include "ginfer/memory/buffer.h"
 
 TEST(MemoryTest, DefaultCUDAAllocator) {
-  auto allocator = ginfer::memory::DefaultCUDAAllocatorFactory::get_instance();
+  auto allocator = ginfer::memory::DefaultGlobalCUDAAllocator::get_instance();
   ASSERT_NE(allocator, nullptr);
   void* ptr = allocator->alloc(1024);
   ASSERT_NE(ptr, nullptr);
@@ -12,8 +12,8 @@ TEST(MemoryTest, DefaultCUDAAllocator) {
 }
 
 TEST(MemoryTest, PooledCUDAAllocator) {
-  using PooledCUDAAllocatorFactory = ginfer::memory::CUDAAllocatorFactory<ginfer::memory::cuda::PooledAllocStrategy>;
-  auto allocator = PooledCUDAAllocatorFactory::get_instance();
+  using PooledGlobalCUDAAllocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>;
+  auto allocator = PooledGlobalCUDAAllocator::get_instance();
   ASSERT_NE(allocator, nullptr);
   void* ptr1 = allocator->alloc(1024);
   ASSERT_NE(ptr1, nullptr);
@@ -40,7 +40,7 @@ TEST(MemoryTest, PooledCUDAAllocator) {
 }
 
 TEST(MemoryTest, CPUAllocator) {
-  auto allocator = ginfer::memory::CPUAllocatorFactory::get_instance();
+  auto allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
   ASSERT_NE(allocator, nullptr);
   void* ptr = allocator->alloc(1024);
   ASSERT_NE(ptr, nullptr);
@@ -55,20 +55,20 @@ TEST(MemoryTest, CUDABuffer) {
   ASSERT_EQ(buf.size(), 1024);
   ASSERT_NE(buf.ptr(), nullptr);
 
-  using PooledCUDAAllocatorFactory = ginfer::memory::CUDAAllocatorFactory<ginfer::memory::cuda::PooledAllocStrategy>;
-  Buffer buf1 = Buffer(1024, PooledCUDAAllocatorFactory::get_instance());
+  using PooledGlobalCUDAAllocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>;
+  Buffer buf1 = Buffer(1024, PooledGlobalCUDAAllocator::get_instance());
   ASSERT_EQ(buf1.devType(), DeviceType::kDeviceCUDA);
   ASSERT_EQ(buf1.size(), 1024);
   ASSERT_NE(buf1.ptr(), nullptr);
 
-  Buffer buf2 = Buffer(2048, ginfer::memory::DefaultCUDAAllocatorFactory::get_instance());
+  Buffer buf2 = Buffer(2048, ginfer::memory::DefaultGlobalCUDAAllocator::get_instance());
   ASSERT_EQ(buf2.devType(), DeviceType::kDeviceCUDA);
   ASSERT_EQ(buf2.size(), 2048);
   ASSERT_NE(buf2.ptr(), nullptr);
 }
 
 TEST(MemoryTest, CPUBuffer) {
-  auto allocator = ginfer::memory::CPUAllocatorFactory::get_instance();
+  auto allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
   ASSERT_NE(allocator, nullptr);
   {
     ginfer::memory::Buffer buffer(1024, allocator);

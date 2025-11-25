@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "ginfer/memory/allocator_factory.h"
 #include "ginfer/op/layer.h"
+#include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
 
 namespace py = pybind11;
@@ -26,7 +27,7 @@ Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float
   rmsnorm_layer.toDevice(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  auto cu_allocator = ginfer::memory::CUDAAllocatorFactory<ginfer::memory::cuda::PooledAllocStrategy>::get_instance();
+  auto cu_allocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>::get_instance();
   input_tensor.toDevice(cu_allocator);
   output_tensor.toDevice(cu_allocator);
 
@@ -42,5 +43,7 @@ Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float
 
   return output_tensor;
 }
+
+REGISTER_PYBIND_TEST(test_rmsnorm_layer_cuda);
 
 }  // namespace ginfer::test::pybind
