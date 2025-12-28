@@ -16,6 +16,11 @@ struct alignas(sizeof(T) * size) AlignedVector {
   static_assert(size <= DefaultVecSize<T>::value, 
               "size exceeds the maximum vector size for type T");
   T val[size];
+
+  __device__ __forceinline__ AlignedVector() {
+  #pragma unroll
+      for (int i = 0; i < size; i++) val[i] = T(0);
+  }
 };
 
 
