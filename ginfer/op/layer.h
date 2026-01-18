@@ -23,9 +23,10 @@ enum class LayerType : uint8_t {
   kLayerMatmul = 5,
   kLayerROPE = 6,
   kLayerMHA = 7,
-  kLayerSoftmax = 8,
-  kLayerAdd = 9,
-  kLayerSwiGLU = 10,
+  kLayerGQA = 8,
+  kLayerSoftmax = 9,
+  kLayerAdd = 10,
+  kLayerSwiGLU = 11,
 };
 
 class BaseLayer {
@@ -114,6 +115,18 @@ class RMSNormLayer : public LayerWithParam {
 
  private:
   float epsilon_;
+};
+
+class GQALayer : public Layer {
+ public:
+  GQALayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+
+  void setSeqLen(int seq_len);
+
+ private:
+  int seq_len_;
 };
 
 }  // namespace ginfer::op

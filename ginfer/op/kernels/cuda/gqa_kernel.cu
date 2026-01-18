@@ -1,10 +1,11 @@
 #include <cuda_runtime.h>
+#include <glog/logging.h>
 #include "ginfer/op/kernels/kernel_registry.h"
 #include "ginfer/op/kernels/cuda/vectorize.cuh"
 #include "ginfer/op/kernels/gqa_kernel.h"
 
 namespace ginfer::op::kernel {
-template <int b, typename T, int vec_size = DefaultVecSize<T>::value>
+template <typename T, int vec_size = DefaultVecSize<T>::value>
 __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
                                           int block_seq_len,
                                           int head_dim,
@@ -21,10 +22,10 @@ __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
   int smem_col = tid % thread_per_row;
 
   T* sptr = p_smem + smem_row * head_dim + smem_col * vec_size;
-  const T* tptr = p_global + (b * blockIdx.x + smem_row) * seq_len_stride + smem_col * vec_size;
+  const T* tptr = p_global + smem_row * seq_len_stride + smem_col * vec_size;
   
   AccessT zero_vec;
-  for(int r = 0; r < b; r += rows_per_block) {
+  for(int r = 0; r < block_seq_len; r += rows_per_block) {
     if(r + smem_row < block_seq_len) {
       *reinterpret_cast<AccessT*>(sptr) = *reinterpret_cast<const AccessT*>(tptr);
     } else {
@@ -162,64 +163,85 @@ __device__ __forceinline__ void computeSTile(const T* p_Q,
 
 // S[br, bc] -> P[br, bc]; 
 // r_new_l = r_l * exp(r_m - new_m) + sum(exp(S - new_m))
-template <typename T, int br, int bc>
+template <typename T, int br, int bc, int head_dim>
 __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
                                              const T* p_m, /** old max smem */
                                              T* p_new_m, /** new max smem */
-                                             float* r_l /** sum reg */
-                                            ) {
-
-  int tid = threadIdx.x;
-  int thread_per_row = blockDim.x / br;
-  int thread_stride = bc / thread_per_row;
-  
-  int smem_row = tid / thread_per_row;
-  int smem_col = tid % thread_per_row * thread_stride;
-
-  T* sptr = p_SP + smem_row * bc + smem_col;
+                                             float* p_l /** sum smem **/,
+                                             int seq_len,
+                                             int global_r_base,
+                                             int global_c_base) {
   
   constexpr int vec_size = DefaultVecSize<T>::value;
-  using AccessType = AlignedVector<T, vec_size>;
-  
-  T old_max = p_m[smem_row];
-  T new_max = old_max;
-  for(int i = 0; i < thread_stride; i += vec_size) {
-    AccessType vec = *reinterpret_cast<const AccessType*>(sptr); // TODO bank conflict
-    #pragma unroll
-    for(int j = 0; j < vec_size; j++) {
-      new_max = max(new_max, vec.val[j]);
-    }
-    sptr += vec_size;
-  }
-  
-  int lane_id = tid % 32;
-  // reduce within row
-  T tmp = __shfl_sync(0xFFFFFFFF, new_max, lane_id ^ 1);
-  new_max = max(tmp, new_max);
+  using AccessType = AlignedVector<T, vec_size>; 
 
-  float partial_sum = 0.0f;
-  sptr = p_SP + smem_row * bc + smem_col;
-  for(int i = 0; i < thread_stride; i += vec_size) {
+  constexpr int thread_per_row = bc / vec_size;
+  static_assert(thread_per_row <= WARP_SIZE, "thread_per_row must be <= WARP_SIZE");
+  static_assert((thread_per_row & (thread_per_row - 1)) == 0, "thread_per_row must be power of 2");
+  
+  int tid = threadIdx.x;
+  int row_per_iter = blockDim.x / thread_per_row;
+  
+  int smem_row_offset = tid / thread_per_row; 
+  int smem_col = tid % thread_per_row * vec_size;
+  
+  int bound = min(br, seq_len - global_r_base);
+  for(int r = 0; r < bound; r += row_per_iter) {
+    T* sptr = p_SP + (smem_row_offset + r) * bc + smem_col;
     AccessType vec = *reinterpret_cast<const AccessType*>(sptr); 
+
+    int global_r = global_r_base + smem_row_offset + r;
+    T rsqrt_head_dim = __half2float(rsqrtf(static_cast<float>(head_dim)));
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
-      vec.val[j] = expf(vec.val[j] - new_max);
-      partial_sum += vec.val[j];
+      int global_c = global_c_base + smem_col + j;
+      bool is_valid = global_c <= global_r && global_c < seq_len; // casual mask and seq_len mask
+      vec.val[j] = is_valid ? vec.val[j] * rsqrt_head_dim : __float2half(-INFINITY); // div sqrt(head_dim)
     }
-    *reinterpret_cast<AccessType*>(sptr) = vec;
-    sptr += vec_size;
-  }
+    
+    float old_max = __half2float(p_m[smem_row_offset + r]);
+    float partial_max = old_max;
+    
+    #pragma unroll
+    for(int j = 0; j < vec_size; j++) {
+      partial_max = max(partial_max, __half2float(vec.val[j]));
+    }
+    
+    float partial_sum = 0.0f;
+    #pragma unroll
+    for(int j = 0; j < vec_size; j++) {
+      float val = __half2float(vec.val[j]);
+      float diff = __isinf(vec.val[j]) && __isinf(partial_max) ? -INFINITY : val - partial_max;
+      partial_sum += expf(diff);
+    }
 
-  partial_sum += __shfl_sync(0xFFFFFFFF, partial_sum, lane_id ^ 1);
-  
-  // update row new sum
-  *r_l = *r_l * expf(old_max - new_max) + partial_sum;
-  p_new_m[smem_row] = new_max;
+    #pragma unroll
+    for(int mask = thread_per_row >> 1; mask >= 1; mask >>= 1) {
+      float new_max = max(__shfl_xor_sync(0xFFFFFFFF, partial_max, mask), partial_max);
+      float diff = __isinf(partial_max) && __isinf(new_max) ? -INFINITY : partial_max - new_max;
+      partial_sum = partial_sum * expf(diff);
+      partial_sum += __shfl_xor_sync(0xFFFFFFFF, partial_sum, mask);
+      partial_max = new_max;
+    }
+
+    // re-scale P
+    #pragma unroll
+    for(int j = 0; j < vec_size; j++) {
+      vec.val[j] = expf(__half2float(vec.val[j]) - partial_max);
+    }
+
+    // write back P
+    *reinterpret_cast<AccessType*>(sptr) = vec;
+    if((tid % thread_per_row) == 0) {
+      p_new_m[smem_row_offset + r] = __float2half(partial_max);
+      p_l[smem_row_offset + r] = p_l[smem_row_offset + r] * expf(old_max - partial_max) + partial_sum;
+    }
+  }
 }
 
 // P[br, bc] @ V[bc, head_dim] -> O[br, head_dim]
 template <typename T, int br, int bc, int head_dim>
-__global__ void updateOTile(const T* p_P,
+__device__ void updateOTile(const T* p_P,
                             const T* p_V,
                             const T* p_old_m,
                             const T* p_new_m,
@@ -248,7 +270,7 @@ __global__ void updateOTile(const T* p_P,
       int warp_smem_P_m = warp_m * (WARP_TILE_M * MMA_M) + wi * MMA_M;
       int lane_smem_P_m = warp_smem_P_m + lane_id % 16;
       int lane_smem_P_k = (lane_id / 16) * 8 + k;
-      uint32_t lane_smem_P_addr = __cvta_generic_to_shared(p_P + lane_smem_P_m * head_dim + lane_smem_P_k);
+      uint32_t lane_smem_P_addr = __cvta_generic_to_shared(p_P + lane_smem_P_m * bc + lane_smem_P_k);
       LDMATRIX_X4_B16(reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3], lane_smem_P_addr);
     }
 
@@ -258,7 +280,7 @@ __global__ void updateOTile(const T* p_P,
       int warp_smem_V_n = warp_n * (WARP_TILE_N * MMA_N) + wj * MMA_N;
       int lane_smem_V_n = warp_smem_V_n;
       int lane_smem_V_k = lane_id % 16 + k;
-      uint32_t lane_smem_V_addr = __cvta_generic_to_shared(p_V + lane_smem_V_n * head_dim + lane_smem_V_k);
+      uint32_t lane_smem_V_addr = __cvta_generic_to_shared(p_V + lane_smem_V_k * head_dim + lane_smem_V_n);
       LDMATRIX_X2_TRANS_B16(reg_b[wj][0], reg_b[wj][1], lane_smem_V_addr);
     }
 
@@ -302,14 +324,14 @@ __global__ void updateOTile(const T* p_P,
       float scale1 = expf(old_max1 - new_max1);
 
       auto old_O = *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr0]);
-      old_O.val[0] = old_O.val[0] * scale0;
-      old_O.val[1] = old_O.val[1] * scale0; 
+      old_O.val[0] = __half2float(old_O.val[0]) * scale0;
+      old_O.val[1] = __half2float(old_O.val[1]) * scale0; 
       old_O = old_O + *reinterpret_cast<AccessT*>(&reg_c[wi][wj][0]);
       *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr0]) = old_O;
       
       old_O = *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr1]);
-      old_O.val[0] = old_O.val[0] * scale1;
-      old_O.val[1] = old_O.val[1] * scale1; 
+      old_O.val[0] = __half2float(old_O.val[0]) * scale1;
+      old_O.val[1] = __half2float(old_O.val[1]) * scale1; 
       old_O = old_O + *reinterpret_cast<AccessT*>(&reg_c[wi][wj][1]);
       *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr1]) = old_O;
     }
@@ -317,91 +339,216 @@ __global__ void updateOTile(const T* p_P,
 }
 
 
-template<typename T, int br, int bc, int head_dim>
+template<typename T, int head_dim>
 __device__ void storeOTile(const T* p_o_block_smem,
-                           float reg_l,
-                           T* p_output) {
+                           T* p_output,
+                           float* p_l,
+                           int block_seq_len,
+                           int seq_len_stride) {
 
   constexpr int vec_size = DefaultVecSize<T>::value;
   using AccessType = AlignedVector<T, vec_size>;
 
   int tid = threadIdx.x;
-  int thread_per_row = blockDim.x / br;
-  int thread_stride = head_dim / thread_per_row;
+  int thread_per_row = head_dim / vec_size;
+  int row_per_iter = blockDim.x / thread_per_row;
   
-  int smem_row = tid / thread_per_row;
-  int smem_col = tid % thread_per_row * thread_stride;
+  int start_row = tid / thread_per_row;
+  int col = tid % thread_per_row * vec_size;
+
+  #pragma unroll
+  for(int row = start_row; row < block_seq_len; row+=row_per_iter) {
+    const T* sptr = p_o_block_smem + row * head_dim + col;
+    T* gptr = p_output + row * seq_len_stride + col;
+
+    auto vec = *reinterpret_cast<const AccessType*>(sptr);
+    float inv_l = __fdividef(1.0f, p_l[row]);
+    #pragma unroll
+    for(int i = 0; i < vec_size; i++) {
+      vec.val[i] = __half2float(vec.val[i]) * inv_l;
+    }
+
+    *reinterpret_cast<AccessType*>(gptr) = vec;
+  }
+}
+
+template<typename T, int br, int head_dim>
+__device__ void initOTile(T* p_o_block_smem) {
+
+  constexpr int vec_size = DefaultVecSize<T>::value;
+  using AccessType = AlignedVector<T, vec_size>;
+
+  int tid = threadIdx.x;
+  int thread_per_row = head_dim / vec_size;
+  int row_per_iter = blockDim.x / thread_per_row;
+  
+  int start_row = tid / thread_per_row;
+  int col = tid % thread_per_row * vec_size;
+
+  AccessType zero_vec;
+  #pragma unroll
+  for(int row = start_row; row < br; row+=row_per_iter) {
+    T* sptr = p_o_block_smem + row * head_dim + col;
+    *reinterpret_cast<AccessType*>(sptr) = zero_vec;
+  }
+}
+
+template<typename T, int br>
+__device__ void initReduceVal(T* p_m0_smem, T* p_m1_smem, float* p_l_smem) {
+  if(threadIdx.x < br) {
+    p_m0_smem[threadIdx.x] = -INFINITY;
+    p_m1_smem[threadIdx.x] = -INFINITY;
+    p_l_smem[threadIdx.x] = 0.0f;
+  }
 }
 
 
-// q: [batch, seq_len, num_heads, head_dim]
+// q: [batch, seq_len, num_heads, head_dim] padded to [batch, context_size, num_heads, head_dim]
 template <typename T, int br, int bc, int head_dim>
-__global__ void gqaKernelImpl(const T* __restrict__ q,
+__global__ void GQAKernelImpl(const T* __restrict__ q,
                               const T* __restrict__ k,
                               const T* __restrict__ v,
                               T* __restrict__ output,
                               const int num_heads,
                               const int kv_heads,
-                              const int seq_len) {
+                              const int seq_len,
+                              const int pad_seq_len) {
+  
+  static_assert(head_dim % 64 == 0, "head_dim must be multiple of 64");
 
   extern __shared__ T smem[];
 
   int batch_id = blockIdx.x;
   int head_id = blockIdx.y;
   int q_block_id = blockIdx.z;
-  int tid = threadIdx.x;
   
   int q_seq_len_stride = num_heads * head_dim;
   int kv_seq_len_stride = kv_heads * head_dim;
+  int out_seq_len_stride = q_seq_len_stride;
+
   int kv_head_id = head_id / (num_heads / kv_heads);
                                 
-  int q_offset = batch_id * seq_len * q_seq_len_stride + q_block_id * br * q_seq_len_stride + head_id * head_dim;
-  int k_offset = batch_id * seq_len * kv_seq_len_stride + kv_head_id * head_dim;
+  int q_offset = batch_id * pad_seq_len * q_seq_len_stride + q_block_id * br * q_seq_len_stride + head_id * head_dim;
+  int k_offset = batch_id * pad_seq_len * kv_seq_len_stride + kv_head_id * head_dim;
   int v_offset = k_offset;
   int out_offset = q_offset;
   
-  // TODO init O, max
   T* p_q_block_smem = smem;
   T* p_k_block_smem = p_q_block_smem + br * head_dim;
   T* p_v_block_smem = p_k_block_smem + bc * head_dim;
   T* p_o_block_smem = p_v_block_smem + bc * head_dim;
   T* p_s_block_smem = p_o_block_smem + br * head_dim;
   T* p_m_smem = p_s_block_smem + br * bc; // 2 x br, one for old max, one for new max
-  T* p_l_smem = p_m_smem + 2 * br; 
+  float* p_l_smem = reinterpret_cast<float*>(p_m_smem + 2 * br);
 
-  float reg_l = 0.0f; // 128x128 S, 256 thread, each two thread has same value
+  initOTile<T, br, head_dim>(p_o_block_smem);
+  initReduceVal<T, br>(p_m_smem, p_m_smem + br, p_l_smem);
+  __syncthreads();
 
   // load Q block
-  loadQKVTile<br, T>(q + q_offset, min(br, seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
+  loadQKVTile<T>(q + q_offset, min(br, seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
 
   for(int c = 0; c < seq_len; c += bc) {
+    if(c >= (q_block_id + 1) * br) break; // causal
     int block_seq_len = min(bc, seq_len - c);
     // load K,V block
     
-    loadQKVTile<bc, T>(k + k_offset, block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
-    loadQKVTile<bc, T>(v + v_offset, block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
+    loadQKVTile<T>(k + k_offset, block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
+    loadQKVTile<T>(v + v_offset, block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
     __syncthreads();
     // compute S = Q * K^T
     computeSTile<T, br, bc>(p_q_block_smem, p_k_block_smem, p_s_block_smem, head_dim);
     __syncthreads();
-    T* p_old_m = p_m_smem + (c & 1) * br;
-    T* p_new_m = p_m_smem + ((c & 1) ^ 1) * br;
-    computePTile<T, br, bc>(p_s_block_smem, p_old_m, p_new_m, &reg_l);
+    T* p_old_m = p_m_smem + ((c/ bc) & 1) * br;
+    T* p_new_m = p_m_smem + (((c/ bc) & 1) ^ 1) * br;
+    int global_r_base = q_block_id * br, global_c_base = c; // for causal
+    computePTile<T, br, bc, head_dim>(p_s_block_smem, p_old_m, p_new_m, p_l_smem, seq_len, global_r_base, global_c_base);
+    if(threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x ==0) {
+      printf("P[0, 0]: %f, %f, %f, %f\n", __half2float(p_s_block_smem[0]), __half2float(p_s_block_smem[1]), __half2float(p_s_block_smem[bc]), __half2float(p_s_block_smem[bc + 1]));
+    }
     __syncthreads();
     // compute O += P * V
     updateOTile<T, br, bc, head_dim>(p_s_block_smem, p_v_block_smem, p_old_m, p_new_m, p_o_block_smem);
+    if(threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x ==0) {
+      printf("O[0, 0]: %f, %f, %f, %f\n", __half2float(p_o_block_smem[0]), __half2float(p_o_block_smem[1]), __half2float(p_o_block_smem[head_dim]), __half2float(p_o_block_smem[head_dim + 1]));
+    }
     __syncthreads();
 
     k_offset += kv_seq_len_stride * bc;
     v_offset += kv_seq_len_stride * bc;
   }
   
+  storeOTile<T, head_dim>(p_o_block_smem, output + out_offset, p_l_smem, min(br, seq_len - q_block_id * br), out_seq_len_stride);
   // store O block
-  storeOTile<T, br, bc, head_dim>(p_o_block_smem, reg_l, output + out_offset);
 }
 
-// TODO assert head_dim % 64 == 0
-// TODO assert bc==br==128, for my life
-// TODO assert threadDim == 256
+// q: [batch, seq_len, num_heads, head_dim] padded to [batch, context_size, num_heads, head_dim]
+template <typename T, typename Context>
+void GQAKernel(const Context& ctx,
+              const tensor::Tensor& q,
+              const tensor::Tensor& k,
+              const tensor::Tensor& v,
+              tensor::Tensor& output,
+              const int seq_len) {
+  
+  CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
+      << "addKernel only supports CUDA device type.";
+  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+
+  const auto& shape = q.shape();
+  const int batch = shape[0];
+  const int pad_seq_len = shape[1]; // context window
+  const int num_heads = shape[2];
+  const int head_dim = shape[3];
+  const int kv_heads = k.shape()[2];
+
+  const T* p_q = q.data<T>();
+  const T* p_k = k.data<T>();
+  const T* p_v = v.data<T>();
+  T* p_output = output.data<T>();
+  
+  constexpr int br = 64, bc = 64;
+
+  const int block_dim = 256;
+  dim3 grid_dim(batch, num_heads, (seq_len + br -1) / br);
+  size_t smem_size = (br * head_dim * 2 + // Q, O 
+                      bc * head_dim * 2 + // K, V
+                      br * bc +          // S/P
+                      2 * br) * sizeof(T) + br * sizeof(float);
+
+  auto dispatcher = [&] () {                 
+    DLOG(INFO) << "GQA kernel smem size: " << smem_size;
+    cudaError_t err;
+    switch(head_dim) {
+      case 64:
+        err = cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 64>, 
+                                               cudaFuncAttributeMaxDynamicSharedMemorySize, 
+                                               smem_size);
+        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        GQAKernelImpl<T, br, bc, 64><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
+                p_q, p_k, p_v, p_output, num_heads, kv_heads, seq_len, pad_seq_len);
+        break;
+      case 128:
+        err = cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 128>, 
+                                               cudaFuncAttributeMaxDynamicSharedMemorySize, 
+                                               smem_size);
+        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        GQAKernelImpl<T, br, bc, 128><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
+                p_q, p_k, p_v, p_output, num_heads, kv_heads, seq_len, pad_seq_len);
+        break;
+      default:
+        throw std::runtime_error("Unsupported head_dim in gqaKernel dispatcher");
+    }
+  };
+
+  dispatcher();
+
+}
+
+REGISTER_KERNEL(GQA,
+                kDeviceCUDA,
+                GQAKernel,
+                tensor::DataType::kDataTypeFloat16);
+
 
 } // namespace ginfer::op::kernel
