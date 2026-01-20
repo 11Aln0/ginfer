@@ -3,6 +3,8 @@
 if(WITH_CUDA)
     file(GLOB CUDA_SRC_LIST "kernels/cuda/*.cu")
     list(APPEND LIB_SRC_LIST ${CUDA_SRC_LIST})
+    file(GLOB CUDA_GEMM_SRC_LIST "kernels/cuda/gemm_kernel/*.cu")
+    list(APPEND LIB_SRC_LIST ${CUDA_GEMM_SRC_LIST})
 endif()
 
 if(WITH_CPU)

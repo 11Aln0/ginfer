@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "ginfer/op/kernels/gemm_kernel.h"
 #include "ginfer/op/kernels/gemv_kernel.h"
 #include "ginfer/op/kernels/kernel_registry.h"
 #include "ginfer/op/layer.h"
@@ -22,7 +23,9 @@ Status MatmulLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* ou
         kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemvKernelFuncType>("gemv", A->dtype());
     gemv_kernel(*dev_ctx, *B, *A, *output);
   } else {
-    LOG(FATAL) << "MatmulLayer only supports Gemv (A is 1-D tensor) for now, got A ndim = " << A->shape().ndim();
+    auto gemm_kernel =
+        kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemmKernelFuncType>("gemm", A->dtype());
+    gemm_kernel(*dev_ctx, *A, *B, *output);
   }
 
   return ginfer::error::Success();

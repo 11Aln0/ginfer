@@ -63,7 +63,7 @@ void gemvKernel(const Context& ctx,
                 const tensor::Tensor& vec,
                 tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
-      << "addKernel only supports CUDA device type.";
+      << "gemvKernel only supports CUDA device type.";
   CHECK(mat.layout() == tensor::Layout::kLayoutColMajor)
       << "gemvKernel only supports col-major matrix layout.";
   

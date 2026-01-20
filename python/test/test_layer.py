@@ -4,8 +4,8 @@ import pytest
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int32])
 def test_add_layer_cuda(dtype):
-    a = np.random.rand(3, 127, 127).astype(dtype)
-    b = np.random.rand(3, 127, 127).astype(dtype)
+    a = np.random.rand(3, 127, 128).astype(dtype)
+    b = np.random.rand(3, 127, 128).astype(dtype)
     out = ginfer_test.test_add_layer_cuda(a, b)
     rtol = 1e-2 if dtype == np.float16 else 1e-5
     atol = 1e-1 if dtype == np.float16 else 1e-5
@@ -25,11 +25,30 @@ def test_rmsnorm_layer_cuda(dtype):
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16])
 def test_matmul_layer_gemv_cuda(dtype):
-    a = np.random.rand(64).astype(dtype)
-    b = np.random.rand(64, 64).astype(dtype, order='F') # col-major
+    a = np.random.rand(1024).astype(dtype)
+    b = np.random.rand(1024, 1000).astype(dtype, order='F') # col-major
     out = ginfer_test.test_matmul_layer_cuda(a, b)
     ref = np.matmul(a, b)
     atol = 1e-3 if dtype == np.float16 else 1e-5
+    rtol = 1e-2 if dtype == np.float16 else 1e-5
+    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
+
+GEMM_CONFIG = [
+    # (2, 8, 10)
+    (1031, 2000, 408),
+    (512, 1024, 256),
+    (4090, 1000, 1000)
+]
+
+@pytest.mark.parametrize("dtype", [np.float16])
+@pytest.mark.parametrize("m,n,k", GEMM_CONFIG)
+def test_matmul_layer_gemm_cuda(dtype, m, n, k):
+    # currently n/k must be 16 bytes alignment
+    a = np.ones((m, k)).astype(dtype)
+    b = np.ones((k, n)).astype(dtype)
+    out = ginfer_test.test_matmul_layer_cuda(a, b)
+    ref = np.matmul(a, b)
+    atol = 1e-2 if dtype == np.float16 else 1e-5
     rtol = 1e-2 if dtype == np.float16 else 1e-5
     np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
 

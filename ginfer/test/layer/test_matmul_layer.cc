@@ -15,8 +15,9 @@ using tensor::Tensor;
 
 Tensor test_matmul_layer_cuda(Tensor& a_tensor, Tensor& b_tensor) {
   DataType dtype = a_tensor.dtype();
-  const Shape& shape = a_tensor.shape();
-  Tensor c_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
+  const Shape& a_shape = a_tensor.shape();
+  const Shape& b_shape = b_tensor.shape();
+  Tensor c_tensor(dtype, Shape({a_shape[0], b_shape[1]}), DeviceType::kDeviceCPU);
 
   ::ginfer::op::MatmulLayer matmul_layer(DeviceType::kDeviceCUDA, "matmul_layer_cuda");
 

@@ -3,8 +3,10 @@
 #include "ginfer/op/kernels/kernel_registry.h"
 #include "ginfer/op/kernels/cuda/vectorize.cuh"
 #include "ginfer/op/kernels/gqa_kernel.h"
+#include "ginfer/op/kernels/cuda/intrinsic.cuh"
 
 namespace ginfer::op::kernel {
+
 template <typename T, int vec_size = DefaultVecSize<T>::value>
 __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
                                           int block_seq_len,
@@ -40,43 +42,9 @@ __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
 #define MMA_N 8
 #define MMA_K 16
 
-#define WARP_SIZE 32
 #define BLOCK_TILE_M 2
 #define BLOCK_TILE_N 4
 
-#define LDMATRIX_X2_B16(R0, R1, addr) \
-    asm volatile(                                 \
-        "ldmatrix.sync.aligned.m8n8.x2.shared.b16 {%0, %1}, [%2];\n" \
-        : "=r"(R0), "=r"(R1)                      \
-        : "r"(addr)                               \
-    )
-
-#define LDMATRIX_X2_TRANS_B16(R0, R1, addr) \
-    asm volatile(                                 \
-        "ldmatrix.sync.aligned.m8n8.x2.trans.shared.b16 {%0, %1}, [%2];\n" \
-        : "=r"(R0), "=r"(R1)                      \
-        : "r"(addr)                               \
-    )
-
-#define LDMATRIX_X4_B16(R0, R1, R2, R3, addr) \
-    asm volatile(                                 \
-        "ldmatrix.sync.aligned.m8n8.x4.shared.b16 {%0, %1, %2, %3}, [%4];\n" \
-        : "=r"(R0), "=r"(R1), "=r"(R2), "=r"(R3)  \
-        : "r"(addr)                               \
-    )
-
-#define MMA_FP16_ACCFP16(RD0, RD1, RA0, RA1, RA2, RA3, RB0, RB1, RC0, RC1) \
-  asm volatile(                                                    \
-      "mma.sync.aligned.m16n8k16.row.col.f16.f16.f16.f16 "         \
-      "{%0, %1}, " \
-      "{%2, %3, %4, %5}, " \
-      "{%6, %7}, " \
-      "{%8, %9};\n" \
-      : "=r"(RD0), "=r"(RD1) \
-      : "r"(RA0), "r"(RA1), "r"(RA2), "r"(RA3), \
-        "r"(RB0), "r"(RB1), \
-        "r"(RC0), "r"(RC1) \
-  )
 
 // Q[br, head_dim] @ K^T[head_dim, bc] -> S[br, bc]
 template <typename T, int br, int bc>
@@ -463,15 +431,9 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
     T* p_new_m = p_m_smem + (((c/ bc) & 1) ^ 1) * br;
     int global_r_base = q_block_id * br, global_c_base = c; // for causal
     computePTile<T, br, bc, head_dim>(p_s_block_smem, p_old_m, p_new_m, p_l_smem, seq_len, global_r_base, global_c_base);
-    if(threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x ==0) {
-      printf("P[0, 0]: %f, %f, %f, %f\n", __half2float(p_s_block_smem[0]), __half2float(p_s_block_smem[1]), __half2float(p_s_block_smem[bc]), __half2float(p_s_block_smem[bc + 1]));
-    }
     __syncthreads();
     // compute O += P * V
     updateOTile<T, br, bc, head_dim>(p_s_block_smem, p_v_block_smem, p_old_m, p_new_m, p_o_block_smem);
-    if(threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x ==0) {
-      printf("O[0, 0]: %f, %f, %f, %f\n", __half2float(p_o_block_smem[0]), __half2float(p_o_block_smem[1]), __half2float(p_o_block_smem[head_dim]), __half2float(p_o_block_smem[head_dim + 1]));
-    }
     __syncthreads();
 
     k_offset += kv_seq_len_stride * bc;
