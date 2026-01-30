@@ -1,6 +1,8 @@
 import ginfer_test
 import numpy as np
 import pytest
+import torch
+import torch.nn.functional as F
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int32])
 def test_add_layer_cuda(dtype):
@@ -34,7 +36,7 @@ def test_matmul_layer_gemv_cuda(dtype):
     np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
 
 GEMM_CONFIG = [
-    # (2, 8, 10)
+    # (2, 8, 9),
     (1031, 2000, 408),
     (512, 1024, 256),
     (4090, 1000, 1000)
@@ -44,16 +46,18 @@ GEMM_CONFIG = [
 @pytest.mark.parametrize("m,n,k", GEMM_CONFIG)
 def test_matmul_layer_gemm_cuda(dtype, m, n, k):
     # currently n/k must be 16 bytes alignment
-    a = np.ones((m, k)).astype(dtype)
-    b = np.ones((k, n)).astype(dtype)
+    a = np.random.randn(m, k).astype(dtype)
+    b = np.random.rand(k, n).astype(dtype)
     out = ginfer_test.test_matmul_layer_cuda(a, b)
-    ref = np.matmul(a, b)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    a_t = torch.from_numpy(a).to(device)
+    b_t = torch.from_numpy(b).to(device)
+    ref = torch.matmul(a_t, b_t).cpu().numpy()
     atol = 1e-2 if dtype == np.float16 else 1e-5
     rtol = 1e-2 if dtype == np.float16 else 1e-5
     np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
 
-import torch
-import torch.nn.functional as F
 
 def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
     device = "cuda" if torch.cuda.is_available() else "cpu"

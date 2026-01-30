@@ -38,9 +38,9 @@ asm volatile(                                         \
     "[%0], [%1], %2, %3;\n"                           \
     :                                                 \
     : "r"(dst),                                       \
-        "l"(src),                                       \
-        "n"(cp_bytes),                                  \
-        "r"(src_bytes)                                  \
+      "l"(src),                                       \
+      "n"(cp_bytes),                                  \
+      "r"(src_bytes)                                  \
 )
 
 // matrix load instructions
