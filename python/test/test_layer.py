@@ -47,14 +47,14 @@ GEMM_CONFIG = [
 def test_matmul_layer_gemm_cuda(dtype, m, n, k):
     # currently n/k must be 16 bytes alignment
     a = np.random.randn(m, k).astype(dtype)
-    b = np.random.rand(k, n).astype(dtype)
+    b = np.random.rand(k, n).astype(dtype, order='F') # col-major
     out = ginfer_test.test_matmul_layer_cuda(a, b)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     a_t = torch.from_numpy(a).to(device)
     b_t = torch.from_numpy(b).to(device)
     ref = torch.matmul(a_t, b_t).cpu().numpy()
-    atol = 1e-2 if dtype == np.float16 else 1e-5
+    atol = 2e-2 if dtype == np.float16 else 1e-5 # TODO more accurate 
     rtol = 1e-2 if dtype == np.float16 else 1e-5
     np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
 

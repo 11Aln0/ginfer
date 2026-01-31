@@ -114,3 +114,7 @@ asm volatile(                                         \
 
 
 #define WARP_SIZE 32
+
+#define HALF8(x) (reinterpret_cast<float4*>(&(x))[0])
+#define FLOAT2(x) (reinterpret_cast<float2*>(&(x))[0])
+#define HALF2(x) (reinterpret_cast<half2*>(&(x))[0])

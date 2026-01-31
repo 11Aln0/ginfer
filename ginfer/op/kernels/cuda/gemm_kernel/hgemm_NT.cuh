@@ -7,7 +7,8 @@
 #include <stdint.h>
 
 
-__device__ __forceinline__ int swizzle_a_offset(int offset) {
+__device__ __forceinline__ int swizzle_offset(int offset) {
+  // NT layout, A swizzle == B swizzle
   // swizzle smem_a addr to avoid bank conflict
   // m(0-8) is used by mma concurrently, only consider that block(8x16) 
   // swizle: B=1, M=3(vector size), S=3(64half=128byte=bank_layer, 64/vector_size=8) 
@@ -16,17 +17,6 @@ __device__ __forceinline__ int swizzle_a_offset(int offset) {
   int bit_msk = (1 << 1) - 1; // B=1
   int yyy_msk = bit_msk << (3 + 3); // M=3, S=3
   int msk_sft = 3; // S=3
-  return offset ^ ((offset & yyy_msk) >> msk_sft);
-}
-
-__device__ __forceinline__ int swizzle_b_offset(int offset) {
-  // swizle: B=3, M=3(vector size), S=4(128half=256byte=2bank_layer, 128/vector_size=16)
-  // 2 bank_layer are access seperately
-
-  // cutlass implementation
-  int bit_msk = (1 << 3) - 1; // B=3
-  int yyy_msk = bit_msk << (3 + 4); // M=3, S=4
-  int msk_sft = 4; // S=4
   return offset ^ ((offset & yyy_msk) >> msk_sft);
 }
 
@@ -72,16 +62,17 @@ __global__ void __launch_bounds__(256)
   int load_smem_logical_a_m = tid / 2; 
   int load_smem_logical_a_k = (tid % 2) * 8;
 
-  int load_smem_logical_b_k = tid / (BN / 8);
-  int load_smem_logical_b_n = (tid % (BN / 8)) * 8;
+  int load_smem_logical_b_k = (tid % 2) * 8;
+  int load_smem_logical_b_n = tid / 2; 
 
   int load_gmem_a_m = by * BM + load_smem_logical_a_m;
   int load_gmem_b_n = bx * BN + load_smem_logical_b_n;
 
-  int load_smem_a_offset = swizzle_a_offset(load_smem_logical_a_m * BK + load_smem_logical_a_k);
-  int load_smem_b_offset = swizzle_b_offset(load_smem_logical_b_k * BN + load_smem_logical_b_n);
+  int load_smem_a_offset = swizzle_offset(load_smem_logical_a_m * BK + load_smem_logical_a_k);
+  int load_smem_b_offset = swizzle_offset(load_smem_logical_b_n * BK + load_smem_logical_b_k);
 
-  uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  // uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  float reg_c[WARP_TILE_M][WARP_TILE_N][4] = {0.0f};
 
   // load A/B to smem
   #define CP_ASYNC_AB_BUFFER(load_stage, load_gmem_a_m, load_gmem_a_k, load_gmem_b_k, load_gmem_b_n) \
@@ -89,8 +80,8 @@ __global__ void __launch_bounds__(256)
     int src_size_a = get_cpasync_src_size<half, 16>(load_gmem_a_m, M, load_gmem_a_k, K); \
     CP_ASYNC_CG_GUARDED(load_smem_a_ptr, &A[load_gmem_a_m * K + load_gmem_a_k], 16, src_size_a); \
     uint32_t load_smem_b_ptr = __cvta_generic_to_shared(&smem_b[load_stage][load_smem_b_offset]); \
-    int src_size_b = get_cpasync_src_size<half, 16>(load_gmem_b_k, K, load_gmem_b_n, N); \
-    CP_ASYNC_CG_GUARDED(load_smem_b_ptr, &B[load_gmem_b_k * N + load_gmem_b_n], 16, src_size_b); \
+    int src_size_b = get_cpasync_src_size<half, 16>(load_gmem_b_n, N, load_gmem_b_k, K); \
+    CP_ASYNC_CG_GUARDED(load_smem_b_ptr, &B[load_gmem_b_n * K + load_gmem_b_k], 16, src_size_b); \
     CP_ASYNC_COMMIT_GROUP();
 
   #define COMPUTE_ON_SMEM(compute_stage) \
@@ -102,7 +93,7 @@ __global__ void __launch_bounds__(256)
       int warp_smem_a_m = warp_m * (MMA_M * WARP_TILE_M) + wi * MMA_M; \
       int lane_smem_a_m = warp_smem_a_m + lane_id % 16; \
       int lane_smem_a_k = (lane_id / 16) * 8; \
-      int lane_smem_a_offset = swizzle_a_offset(lane_smem_a_m * BK + lane_smem_a_k); \
+      int lane_smem_a_offset = swizzle_offset(lane_smem_a_m * BK + lane_smem_a_k); \
       uint32_t lane_smem_a_ptr = __cvta_generic_to_shared(&smem_a[compute_stage][lane_smem_a_offset]); \
       LDMATRIX_X4_B16(reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3], lane_smem_a_ptr); \
     } \
@@ -110,21 +101,20 @@ __global__ void __launch_bounds__(256)
     _Pragma("unroll") \
     for(int wj = 0; wj < WARP_TILE_N; wj++) { \
       int warp_smem_b_n = warp_n * (MMA_N * WARP_TILE_N) + wj * MMA_N; \
-      int lane_smem_b_n = warp_smem_b_n; \
-      int lane_smem_b_k = lane_id % 16; \
-      int lane_smem_b_offset = swizzle_b_offset(lane_smem_b_k * BN + lane_smem_b_n); \
+      int lane_smem_b_n = warp_smem_b_n + lane_id % 8; \
+      int lane_smem_b_k = lane_id / 8 * 8; \
+      int lane_smem_b_offset = swizzle_offset(lane_smem_b_n * BK + lane_smem_b_k); \
       uint32_t lane_smem_b_ptr = __cvta_generic_to_shared(&smem_b[compute_stage][lane_smem_b_offset]); \
-      LDMATRIX_X2_TRANS_B16(reg_b[wj][0], reg_b[wj][1], lane_smem_b_ptr); \
+      LDMATRIX_X2_B16(reg_b[wj][0], reg_b[wj][1], lane_smem_b_ptr); \
     } \
     \
     _Pragma("unroll") \
     for(int wi = 0; wi < WARP_TILE_M; wi++) { \
       for(int wj = 0; wj < WARP_TILE_N; wj++) { \
-        MMA_FP16_ACCFP16( \
-          reg_c[wi][wj][0], reg_c[wi][wj][1], \
+        MMA_FP16_ACCFP32( \
+          reg_c[wi][wj][0], reg_c[wi][wj][1], reg_c[wi][wj][2], reg_c[wi][wj][3], \
           reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3], \
-          reg_b[wj][0], reg_b[wj][1], \
-          reg_c[wi][wj][0], reg_c[wi][wj][1] \
+          reg_b[wj][0], reg_b[wj][1] \
         ); \
       } \
     } 
@@ -192,8 +182,10 @@ __global__ void __launch_bounds__(256)
 
       bool bound0 = (store_gmem_c_m0 < M) && (store_gmem_c_n < N);
       bool bound1 = (store_gmem_c_m1 < M) && (store_gmem_c_n < N);
-      ST_GLOBAL_PRED_U32(C + store_gmem_c_addr0, reg_c[wi][wj][0], bound0);
-      ST_GLOBAL_PRED_U32(C + store_gmem_c_addr1, reg_c[wi][wj][1], bound1);
+      half2 acc0 = __float22half2_rn(FLOAT2(reg_c[wi][wj][0]));
+      half2 acc1 = __float22half2_rn(FLOAT2(reg_c[wi][wj][2]));
+      ST_GLOBAL_PRED_U32(C + store_gmem_c_addr0, acc0, bound0);
+      ST_GLOBAL_PRED_U32(C + store_gmem_c_addr1, acc1, bound1);
     }
   }
 }

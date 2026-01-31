@@ -1,4 +1,4 @@
-#include "hgemm.cuh"
+#include "hgemm_NT.cuh"
 #include "ginfer/op/kernels/cuda/intrinsic.cuh"
 #include "ginfer/tensor/tensor.h"
 #include "ginfer/common/device.h"
@@ -15,6 +15,8 @@ void gemmKernel(const Context& ctx,
 
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "gemvKernel only supports CUDA device type.";
+  CHECK(b.layout() == tensor::Layout::kLayoutColMajor)
+      << "gemvKernel only supports col-major matrix layout.";
 
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   
