@@ -10,24 +10,19 @@
 namespace ginfer::tensor {
 
 Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer, Layout layout)
-    : dtype_(dtype), shape_(shape), buffer_(buffer), layout_(layout) {
+    : dtype_(dtype), shape_(shape), buffer_(buffer), layout_(layout), offset_(0) {
   size_ = shape_.numel();
-  if (buffer->size() != size_ * dTypeSize(dtype)) {
-    throw std::invalid_argument("Buffer size does not match tensor size.");
+  if (buffer->size() < size_ * dTypeSize(dtype)) {
+    throw std::invalid_argument("Buffer size is smaller than tensor size.");
   }
+  calcStrides();
 }
 
 Tensor::Tensor(DataType dtype, Shape shape, DeviceType dev_type, Layout layout)
-    : dtype_(dtype), shape_(shape), layout_(layout) {
-  size_ = shape_.numel();
-  buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), dev_type);
-}
+    : Tensor(dtype, shape, std::make_shared<memory::Buffer>(shape.numel() * dTypeSize(dtype), dev_type), layout) {}
 
 Tensor::Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator, Layout layout)
-    : dtype_(dtype), shape_(shape), layout_(layout) {
-  size_ = shape_.numel();
-  buffer_ = std::make_shared<memory::Buffer>(size_ * dTypeSize(dtype), allocator);
-}
+    : Tensor(dtype, shape, std::make_shared<memory::Buffer>(shape.numel() * dTypeSize(dtype), allocator), layout) {}
 
 Layout Tensor::layout() const { return layout_; }
 
@@ -39,15 +34,7 @@ size_t Tensor::size() const { return size_; }
 
 size_t Tensor::nbytes() const { return buffer_->size(); }
 
-std::vector<size_t> Tensor::strides() const {
-  std::vector<size_t> strides(shape_.ndim(), 1);
-  if (layout_ == Layout::kLayoutRowMajor) {
-    std::partial_sum(shape_.rbegin(), shape_.rend() - 1, strides.rbegin() + 1, std::multiplies<size_t>());
-  } else {
-    std::partial_sum(shape_.begin(), shape_.end() - 1, strides.begin() + 1, std::multiplies<size_t>());
-  }
-  return strides;
-}
+std::vector<ptrdiff_t> Tensor::strides() const { return strides_; }
 
 void Tensor::toDevice(memory::DeviceAllocator* allocator) {
   CHECK_NE(buffer_, nullptr);
@@ -61,5 +48,38 @@ void Tensor::toDevice(memory::DeviceAllocator* allocator) {
 }
 
 void Tensor::toDevice(DeviceType dev_type) { toDevice(memory::getDefaultDeviceAllocator(dev_type)); }
+
+std::shared_ptr<Tensor> Tensor::slice(int dim, int64_t start, int64_t end) const {
+  CHECK(dim >= 0 && dim < static_cast<int>(shape_.ndim())) << "Slice failed: dimension out of range.";
+  CHECK(start >= 0 && end <= shape_[dim] && start < end) << "Slice failed: invalid start or end indices.";
+
+  Shape new_shape = shape_;
+  new_shape[dim] = end - start;
+  // TODO more tidy way to implement this
+  auto new_tensor = std::make_shared<Tensor>(dtype_, new_shape, buffer_, layout_);
+  size_t new_offset = start * strides_[dim] + offset_;
+  new_tensor->offset_ = new_offset;
+  new_tensor->strides_ = strides_;
+  return new_tensor;
+}
+
+std::shared_ptr<Tensor> Tensor::reshape(const Shape& new_shape) const {
+  CHECK_EQ(shape_.numel(), new_shape.numel()) << "Reshape failed: number of elements does not match.";
+  auto new_tensor = std::make_shared<Tensor>(dtype_, new_shape, buffer_, layout_);
+  new_tensor->offset_ = offset_;
+  return new_tensor;
+}
+
+void Tensor::calcStrides() {
+  size_t ndim = shape_.ndim();
+  strides_.resize(ndim);
+  if (layout_ == Layout::kLayoutRowMajor) {
+    strides_[ndim - 1] = 1;
+    std::partial_sum(shape_.rbegin(), shape_.rend() - 1, strides_.rbegin() + 1, std::multiplies<ptrdiff_t>());
+  } else {
+    strides_[0] = 1;
+    std::partial_sum(shape_.begin(), shape_.end() - 1, strides_.begin() + 1, std::multiplies<ptrdiff_t>());
+  }
+}
 
 }  // namespace ginfer::tensor

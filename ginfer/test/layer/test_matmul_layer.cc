@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include "ginfer/op/layer.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -17,7 +18,11 @@ Tensor test_matmul_layer_cuda(Tensor& a_tensor, Tensor& b_tensor) {
   DataType dtype = a_tensor.dtype();
   const Shape& a_shape = a_tensor.shape();
   const Shape& b_shape = b_tensor.shape();
-  Tensor c_tensor(dtype, Shape({a_shape[0], b_shape[1]}), DeviceType::kDeviceCPU);
+  auto shape = Shape({a_shape[0], b_shape[1]});
+  if (a_shape.ndim() == 1) {
+    shape = Shape({b_shape[1]});
+  }
+  Tensor c_tensor(dtype, shape, DeviceType::kDeviceCPU);
 
   ::ginfer::op::MatmulLayer matmul_layer(DeviceType::kDeviceCUDA, "matmul_layer_cuda");
 
@@ -29,10 +34,7 @@ Tensor test_matmul_layer_cuda(Tensor& a_tensor, Tensor& b_tensor) {
   // Run forward computation
   std::vector<const Tensor*> inputs = {&a_tensor, &b_tensor};
   auto status = matmul_layer.forward(inputs, &c_tensor);
-  if (status.code() != ::ginfer::error::StatusCode::kSuccess) {
-    throw std::runtime_error("MatmulLayer forward failed: " + status.msg());
-  }
-
+  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "MatmulLayer forward failed: " << status.msg();
   // Copy result back to CPU
   c_tensor.toDevice(DeviceType::kDeviceCPU);
 

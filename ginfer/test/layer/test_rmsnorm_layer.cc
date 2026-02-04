@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <execution>
@@ -34,9 +35,7 @@ Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float
   // Run forward computation
   std::vector<const Tensor*> inputs = {&input_tensor};
   auto status = rmsnorm_layer.forward(inputs, &output_tensor);
-  if (status.code() != ::ginfer::error::StatusCode::kSuccess) {
-    throw std::runtime_error("RMSNormLayer forward failed: " + status.msg());
-  }
+  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "RMSNormLayer forward failed: " << status.msg();
 
   // Copy result back to CPU
   output_tensor.toDevice(DeviceType::kDeviceCPU);

@@ -12,18 +12,14 @@ TEST(LayerTest, AddLayerCUDA) {
   EXPECT_EQ(add_layer.layerType(), ginfer::op::LayerType::kLayerAdd);
   EXPECT_EQ(add_layer.getDeviceType(), DeviceType::kDeviceCUDA);
 
-  ginfer::tensor::Tensor a(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
-                           DeviceType::kDeviceCPU);
-  ginfer::tensor::Tensor b(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
-                           DeviceType::kDeviceCPU);
-  ginfer::tensor::Tensor c(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 127}),
-                           DeviceType::kDeviceCPU);
+  ginfer::tensor::Tensor a(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
+  ginfer::tensor::Tensor b(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
+  ginfer::tensor::Tensor c(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
 
   auto a_data = a.data<float>();
   auto b_data = b.data<float>();
-  auto c_ref = std::vector<float>(127 * 127);
-
-  for (int i = 0; i < 127 * 127; ++i) {
+  auto c_ref = std::vector<float>(127 * 128);
+  for (int i = 0; i < 127 * 128; ++i) {
     a_data[i] = static_cast<float>(i % 100) * 0.1f;
     b_data[i] = static_cast<float>(i % 50) * 0.2f;
     c_ref[i] = a_data[i] + b_data[i];
@@ -41,7 +37,7 @@ TEST(LayerTest, AddLayerCUDA) {
 
   auto c_data = c.data<float>();
 
-  for (int i = 0; i < 127 * 127; ++i) {
+  for (int i = 0; i < 127 * 128; ++i) {
     EXPECT_FLOAT_EQ(c_data[i], c_ref[i]) << " at index " << i;
   }
 }

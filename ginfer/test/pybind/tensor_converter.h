@@ -3,6 +3,7 @@
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <array>
+#include <cstddef>
 #include "ginfer/tensor/tensor.h"
 #include "ginfer/test/pybind/type.h"
 
@@ -29,7 +30,7 @@ class NumpyToTensorConverter {
 
     DataType dtype = type::numpyDtypeToTensorDtype(arr.dtype());
     int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) * dTypeSize(dtype);
-    auto buf = std::make_shared<Buffer>(bytes, (void*)arr.mutable_data(), DeviceType::kDeviceCPU);
+    auto buf = std::make_shared<Buffer>(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU);
 
     Layout layout = Layout::kLayoutRowMajor;
     if ((bool)(arr.flags() & py::array::f_style)) {

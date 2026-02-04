@@ -24,6 +24,7 @@ inline tensor::DataType numpyDtypeToTensorDtype(py::dtype np_dtype) {
   static std::unordered_map<std::string, tensor::DataType> dtype_map = {
       {"float32", tensor::DataType::kDataTypeFloat32},
       {"float16", tensor::DataType::kDataTypeFloat16},
+      {"int64", tensor::DataType::kDataTypeInt64},
       {"int32", tensor::DataType::kDataTypeInt32},
       {"int8", tensor::DataType::kDataTypeInt8},
   };
@@ -35,6 +36,7 @@ inline py::dtype tensorDtypeToNumpyDtype(tensor::DataType dtype) {
   static std::unordered_map<tensor::DataType, py::dtype> dtype_map = {
       {tensor::DataType::kDataTypeFloat32, py::dtype("float32")},
       {tensor::DataType::kDataTypeFloat16, py::dtype("float16")},
+      {tensor::DataType::kDataTypeInt64, py::dtype("int64")},
       {tensor::DataType::kDataTypeInt32, py::dtype("int32")},
       {tensor::DataType::kDataTypeInt8, py::dtype("int8")},
   };

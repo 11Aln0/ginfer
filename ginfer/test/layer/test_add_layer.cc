@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include "ginfer/op/layer.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -28,9 +29,7 @@ Tensor test_add_layer_cuda(Tensor& a_tensor, Tensor& b_tensor) {
   // Run forward computation
   std::vector<const Tensor*> inputs = {&a_tensor, &b_tensor};
   auto status = add_layer.forward(inputs, &c_tensor);
-  if (status.code() != ::ginfer::error::StatusCode::kSuccess) {
-    throw std::runtime_error("AddLayer forward failed: " + status.msg());
-  }
+  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "AddLayer forward failed: " << status.msg();
 
   // Copy result back to CPU
   c_tensor.toDevice(DeviceType::kDeviceCPU);

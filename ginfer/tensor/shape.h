@@ -25,6 +25,7 @@ class Shape {
   }
 
   int64_t operator[](size_t idx) const { return dims_[idx]; }
+  int64_t& operator[](size_t idx) { return dims_[idx]; }
 
   auto begin() const { return dims_.begin(); }
   auto end() const { return dims_.end(); }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 #include "ginfer/common/base.h"
@@ -13,7 +14,7 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
   explicit Buffer() = default;
 
   // create buffer from external memory，no need to manage memory release
-  explicit Buffer(size_t size, void* ptr, DeviceType dev_type);
+  explicit Buffer(size_t size, std::byte* ptr, DeviceType dev_type);
 
   // create buffer by default allocator，need to manage memory release
   explicit Buffer(size_t size, DeviceType dev_type);
@@ -31,13 +32,13 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
 
   DeviceType devType() const { return dev_type_; }
 
-  void* ptr() const { return ptr_; }
+  std::byte* ptr() const { return ptr_; }
 
   bool allocated() const { return ptr_ != nullptr; }
 
  private:
   size_t size_ = 0;
-  void* ptr_ = nullptr;
+  std::byte* ptr_ = nullptr;
   bool external_ = false;
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
   DeviceAllocator* allocator_ = nullptr;

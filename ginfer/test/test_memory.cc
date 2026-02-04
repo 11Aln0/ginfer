@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
+#include <cstddef>
 
 #include "ginfer/memory/allocator_factory.h"
 #include "ginfer/memory/buffer.h"
+
+namespace ginfer::test::memory {
+
+using std::byte;
 
 TEST(MemoryTest, DefaultCUDAAllocator) {
   auto allocator = ginfer::memory::DefaultGlobalCUDAAllocator::get_instance();
@@ -43,7 +48,7 @@ TEST(MemoryTest, CPUAllocator) {
   auto allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
   ASSERT_NE(allocator, nullptr);
   void* ptr = allocator->alloc(1024);
-  ASSERT_NE(ptr, nullptr);
+  ASSERT_NE((byte*)ptr, nullptr);
   allocator->free(ptr, 1024);
 }
 
@@ -79,10 +84,12 @@ TEST(MemoryTest, CPUBuffer) {
 
   {
     float* ptr = new float[32];
-    ginfer::memory::Buffer ext_buffer(32 * sizeof(float), ptr, ginfer::memory::DeviceType::kDeviceCPU);
+    ginfer::memory::Buffer ext_buffer(32 * sizeof(float), (byte*)ptr, ginfer::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(ext_buffer.devType(), ginfer::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(ext_buffer.size(), 32 * sizeof(float));
-    ASSERT_EQ(ext_buffer.ptr(), ptr);
+    ASSERT_EQ(ext_buffer.ptr(), (byte*)ptr);
     delete[] ptr;
   }
 }
+
+}  // namespace ginfer::test::memory

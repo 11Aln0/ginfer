@@ -15,6 +15,7 @@ struct Float16 {
 
 using Float32 = float;
 using Float64 = double;
+using Int64 = int64_t;
 using Int32 = int32_t;
 using Int8 = int8_t;
 

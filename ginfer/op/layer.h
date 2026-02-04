@@ -27,6 +27,7 @@ enum class LayerType : uint8_t {
   kLayerSoftmax = 9,
   kLayerAdd = 10,
   kLayerSwiGLU = 11,
+  kLayerArgmax = 12,
 };
 
 class BaseLayer {
@@ -127,6 +128,43 @@ class GQALayer : public Layer {
 
  private:
   int seq_len_;
+};
+
+class ArgmaxLayer : public Layer {
+ public:
+  ArgmaxLayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+};
+
+class EmbeddingLayer : public LayerWithParam {
+ public:
+  EmbeddingLayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+};
+
+class ROPELayer : public Layer {
+ public:
+  ROPELayer(DeviceType dev_type, std::string layer_name, int head_dim, int max_seq_len, float rope_theta = 10000.0f);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
+
+  void updateCache(int start_pos, int end_pos);
+
+ private:
+  int head_dim_;
+  int max_seq_len_;
+  float rope_theta_;
+  std::shared_ptr<Tensor> sin_cache_;
+  std::shared_ptr<Tensor> cos_cache_;
+};
+
+class SwiGLULayer : public Layer {
+ public:
+  SwiGLULayer(DeviceType dev_type, std::string layer_name);
+
+  virtual Status forward(const std::vector<const Tensor*>& inputs, Tensor* output) override;
 };
 
 }  // namespace ginfer::op

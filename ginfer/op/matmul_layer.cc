@@ -21,7 +21,7 @@ Status MatmulLayer::forward(const std::vector<const Tensor*>& inputs, Tensor* ou
   if (A->shape().ndim() == 1) {
     auto gemv_kernel =
         kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemvKernelFuncType>("gemv", A->dtype());
-    gemv_kernel(*dev_ctx, *B, *A, *output);
+    gemv_kernel(*dev_ctx, *A, *B, *output);
   } else {
     auto gemm_kernel =
         kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemmKernelFuncType>("gemm", A->dtype());

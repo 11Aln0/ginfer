@@ -1,3 +1,4 @@
+#include <glog/logging.h>
 #include "ginfer/op/layer.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -30,9 +31,7 @@ Tensor test_gqa_layer_cuda(Tensor& q_tensor, Tensor& k_tensor, Tensor& v_tensor,
   // Run forward computation
   std::vector<const Tensor*> inputs = {&q_tensor, &k_tensor, &v_tensor};
   auto status = gqa_layer.forward(inputs, &output_tensor);
-  if (status.code() != ::ginfer::error::StatusCode::kSuccess) {
-    throw std::runtime_error("GQALayer forward failed: " + status.msg());
-  }
+  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "GQALayer forward failed: " << status.msg();
 
   // Copy result back to CPU
   output_tensor.toDevice(DeviceType::kDeviceCPU);

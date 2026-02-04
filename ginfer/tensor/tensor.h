@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <memory>
 #include <vector>
 
@@ -36,7 +37,7 @@ class Tensor {
 
   size_t nbytes() const;
 
-  std::vector<size_t> strides() const;
+  std::vector<ptrdiff_t> strides() const;
 
   void toDevice(DeviceType dev_type);
 
@@ -44,18 +45,26 @@ class Tensor {
 
   template <typename T>
   T* data() {
-    return static_cast<T*>(buffer_->ptr());
+    return reinterpret_cast<T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));
   }
 
   template <typename T>
   const T* data() const {
-    return static_cast<const T*>(buffer_->ptr());
+    return reinterpret_cast<const T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));
   }
+
+  std::shared_ptr<Tensor> slice(int dim, int64_t start, int64_t end) const;
+  std::shared_ptr<Tensor> reshape(const Shape& new_shape) const;
+
+ private:
+  void calcStrides();
 
  private:
   DataType dtype_ = DataType::kDataTypeUnknown;
   std::shared_ptr<memory::Buffer> buffer_ = nullptr;
   Shape shape_;
+  std::vector<ptrdiff_t> strides_;
+  int64_t offset_ = 0;
   size_t size_ = 0;
   Layout layout_ = Layout::kLayoutRowMajor;
 };

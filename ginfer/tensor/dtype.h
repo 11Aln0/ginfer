@@ -12,8 +12,9 @@ enum class DataType : uint8_t {
   kDataTypeUnknown = 0,
   kDataTypeFloat32 = 1,
   kDataTypeFloat16 = 2,
-  kDataTypeInt32 = 3,
-  kDataTypeInt8 = 4,
+  kDataTypeInt64 = 3,
+  kDataTypeInt32 = 4,
+  kDataTypeInt8 = 5,
 };
 
 inline constexpr size_t dTypeSize(DataType dtype) {
@@ -22,6 +23,8 @@ inline constexpr size_t dTypeSize(DataType dtype) {
       return 4;
     case DataType::kDataTypeFloat16:
       return 2;
+    case DataType::kDataTypeInt64:
+      return 8;
     case DataType::kDataTypeInt32:
       return 4;
     case DataType::kDataTypeInt8:
@@ -46,6 +49,11 @@ struct TypeOf<DataType::kDataTypeFloat16> {
 };
 
 template <>
+struct TypeOf<DataType::kDataTypeInt64> {
+  using type = type::Int64;
+};
+
+template <>
 struct TypeOf<DataType::kDataTypeInt32> {
   using type = type::Int32;
 };
@@ -67,6 +75,11 @@ struct DataTypeOf<type::Float32> {
 template <>
 struct DataTypeOf<type::Float16> {
   static constexpr DataType dtype = DataType::kDataTypeFloat16;
+};
+
+template <>
+struct DataTypeOf<type::Int64> {
+  static constexpr DataType dtype = DataType::kDataTypeInt64;
 };
 
 template <>
