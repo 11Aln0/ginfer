@@ -67,7 +67,8 @@ REGISTER_KERNEL(add,
                 addKernel,
                 tensor::DataType::kDataTypeInt32,
                 tensor::DataType::kDataTypeFloat32, 
-                tensor::DataType::kDataTypeFloat16);
+                tensor::DataType::kDataTypeFloat16,
+                tensor::DataType::kDataTypeBFloat16);
 
 
 }  // namespace ginfer::op::kernel

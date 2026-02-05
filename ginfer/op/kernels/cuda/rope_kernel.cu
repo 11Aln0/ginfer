@@ -127,6 +127,7 @@ REGISTER_KERNEL(ROPE,
                 kDeviceCUDA,
                 ROPEKernel,
                 tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16);
+                tensor::DataType::kDataTypeFloat16,
+                tensor::DataType::kDataTypeBFloat16);
 
 } // namespace ginfer::op::kernel

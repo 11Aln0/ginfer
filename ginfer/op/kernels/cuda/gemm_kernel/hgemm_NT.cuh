@@ -29,16 +29,18 @@ __device__ __forceinline__ int get_cpasync_src_size(int dim0, int dim0_extent, i
 
 // bank conflict elimination by swizzle
 // stage n pipeline
-template<int BM = 128, int BN = 128, int BK = 16,
+template<typename T,
+         int BM = 128, int BN = 128, int BK = 16,
          int K_STAGE = 2,
          int MMA_M = 16, int MMA_N = 8, int MMA_K = 16,
          int BLOCK_TILE_M = 2, int BLOCK_TILE_N = 4,
          int WARP_TILE_M = 4, int WARP_TILE_N = 4
         >
 __global__ void __launch_bounds__(256)
-  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel(const size_t M, const size_t N, const size_t K, const half *A, const half *B, half *C) {
+  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel(const size_t M, const size_t N, const size_t K, const T *A, const T *B, T *C) {
   // attention: N/K must be 16 bytes alignment
-
+  
+  using MmaTraits = MmaTraits<T, float>;
   const int bx = blockIdx.x;
   const int by = blockIdx.y;
 
@@ -46,8 +48,8 @@ __global__ void __launch_bounds__(256)
   static_assert(BN == MMA_N * BLOCK_TILE_N * WARP_TILE_N, "BN mismatch");
   static_assert(BK == MMA_K, "BK mismatch");
 
-  __shared__ half smem_a [K_STAGE][BM * BK]; // (128, 16)
-  __shared__ half smem_b [K_STAGE][BK * BN]; // (16, 128)
+  __shared__ T smem_a [K_STAGE][BM * BK]; // (128, 16)
+  __shared__ T smem_b [K_STAGE][BK * BN]; // (16, 128)
 
   const int tid = threadIdx.y * blockDim.x + threadIdx.x;
   const int warp_id = tid / 32;
@@ -77,10 +79,10 @@ __global__ void __launch_bounds__(256)
   // load A/B to smem
   #define CP_ASYNC_AB_BUFFER(load_stage, load_gmem_a_m, load_gmem_a_k, load_gmem_b_k, load_gmem_b_n) \
     uint32_t load_smem_a_ptr = __cvta_generic_to_shared(&smem_a[load_stage][load_smem_a_offset]); \
-    int src_size_a = get_cpasync_src_size<half, 16>(load_gmem_a_m, M, load_gmem_a_k, K); \
+    int src_size_a = get_cpasync_src_size<T, 16>(load_gmem_a_m, M, load_gmem_a_k, K); \
     CP_ASYNC_CG_GUARDED(load_smem_a_ptr, &A[load_gmem_a_m * K + load_gmem_a_k], 16, src_size_a); \
     uint32_t load_smem_b_ptr = __cvta_generic_to_shared(&smem_b[load_stage][load_smem_b_offset]); \
-    int src_size_b = get_cpasync_src_size<half, 16>(load_gmem_b_n, N, load_gmem_b_k, K); \
+    int src_size_b = get_cpasync_src_size<T, 16>(load_gmem_b_n, N, load_gmem_b_k, K); \
     CP_ASYNC_CG_GUARDED(load_smem_b_ptr, &B[load_gmem_b_n * K + load_gmem_b_k], 16, src_size_b); \
     CP_ASYNC_COMMIT_GROUP();
 
@@ -111,7 +113,7 @@ __global__ void __launch_bounds__(256)
     _Pragma("unroll") \
     for(int wi = 0; wi < WARP_TILE_M; wi++) { \
       for(int wj = 0; wj < WARP_TILE_N; wj++) { \
-        MMA_FP16_ACCFP32( \
+        MmaTraits::compute( \
           reg_c[wi][wj][0], reg_c[wi][wj][1], reg_c[wi][wj][2], reg_c[wi][wj][3], \
           reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3], \
           reg_b[wj][0], reg_b[wj][1] \
@@ -158,6 +160,8 @@ __global__ void __launch_bounds__(256)
     COMPUTE_ON_SMEM(compute_stage);
   }
 
+  using NumericTraits = NumericTraits<T>;
+
   // store reg 
   #pragma unroll
   for(int wi = 0; wi < WARP_TILE_M; wi++) {
@@ -182,8 +186,8 @@ __global__ void __launch_bounds__(256)
 
       bool bound0 = (store_gmem_c_m0 < M) && (store_gmem_c_n < N);
       bool bound1 = (store_gmem_c_m1 < M) && (store_gmem_c_n < N);
-      half2 acc0 = __float22half2_rn(FLOAT2(reg_c[wi][wj][0]));
-      half2 acc1 = __float22half2_rn(FLOAT2(reg_c[wi][wj][2]));
+      auto acc0 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][0]));
+      auto acc1 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][2]));
       ST_GLOBAL_PRED_U32(C + store_gmem_c_addr0, acc0, bound0);
       ST_GLOBAL_PRED_U32(C + store_gmem_c_addr1, acc1, bound1);
     }

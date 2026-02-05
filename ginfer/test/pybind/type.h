@@ -22,11 +22,9 @@ struct NumpyStorageType<ginfer::type::Float16> {
 
 inline tensor::DataType numpyDtypeToTensorDtype(py::dtype np_dtype) {
   static std::unordered_map<std::string, tensor::DataType> dtype_map = {
-      {"float32", tensor::DataType::kDataTypeFloat32},
-      {"float16", tensor::DataType::kDataTypeFloat16},
-      {"int64", tensor::DataType::kDataTypeInt64},
-      {"int32", tensor::DataType::kDataTypeInt32},
-      {"int8", tensor::DataType::kDataTypeInt8},
+      {"float32", tensor::DataType::kDataTypeFloat32},   {"float16", tensor::DataType::kDataTypeFloat16},
+      {"bfloat16", tensor::DataType::kDataTypeBFloat16}, {"int64", tensor::DataType::kDataTypeInt64},
+      {"int32", tensor::DataType::kDataTypeInt32},       {"int8", tensor::DataType::kDataTypeInt8},
   };
   auto it = dtype_map.find(py::str(np_dtype));
   return (it != dtype_map.end()) ? it->second : tensor::DataType::kDataTypeUnknown;
@@ -36,6 +34,7 @@ inline py::dtype tensorDtypeToNumpyDtype(tensor::DataType dtype) {
   static std::unordered_map<tensor::DataType, py::dtype> dtype_map = {
       {tensor::DataType::kDataTypeFloat32, py::dtype("float32")},
       {tensor::DataType::kDataTypeFloat16, py::dtype("float16")},
+      {tensor::DataType::kDataTypeBFloat16, py::dtype("bfloat16")},
       {tensor::DataType::kDataTypeInt64, py::dtype("int64")},
       {tensor::DataType::kDataTypeInt32, py::dtype("int32")},
       {tensor::DataType::kDataTypeInt8, py::dtype("int8")},

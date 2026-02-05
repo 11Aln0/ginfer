@@ -13,6 +13,10 @@ struct Float16 {
   uint16_t data;
 };
 
+struct BFloat16 {
+  uint16_t data;
+};
+
 using Float32 = float;
 using Float64 = double;
 using Int64 = int64_t;
@@ -32,6 +36,16 @@ struct DeviceNativeTypeOf<DeviceType::kDeviceCUDA, Float16> {
 template <>
 struct DeviceNativeTypeOf<DeviceType::kDeviceCPU, Float16> {
   using type = void;  // no native float16 type on CPU
+};
+
+template <>
+struct DeviceNativeTypeOf<DeviceType::kDeviceCUDA, BFloat16> {
+  using type = __nv_bfloat16;
+};
+
+template <>
+struct DeviceNativeTypeOf<DeviceType::kDeviceCPU, BFloat16> {
+  using type = void;  // no native bfloat16 type on CPU
 };
 
 }  // namespace ginfer::type

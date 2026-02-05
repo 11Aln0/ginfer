@@ -1,6 +1,7 @@
 #include "ginfer/op/kernels/rmsnorm_kernel.h"
 #include "ginfer/op/kernels/kernel_registry.h"
 #include "ginfer/op/kernels/cuda/vectorize.cuh"
+#include "ginfer/op/kernels/cuda/intrinsic.cuh"
 #include <cub/block/block_reduce.cuh>
 
 namespace ginfer::op::kernel {
@@ -12,6 +13,7 @@ __global__ void rmsNormKernelImpl(const T* __restrict__ in,
                                   const int hidden_dim, 
                                   const float eps) {
   using AccessT = AlignedVector<T, vec_size>;
+  using NumericTraits = NumericTraits<T>;
 
   const int row = blockIdx.x;
   const int tid = threadIdx.x;
@@ -28,13 +30,13 @@ __global__ void rmsNormKernelImpl(const T* __restrict__ in,
     AccessT in_vec = in_vec_ptr[i];
     #pragma unroll
     for(int j = 0; j < vec_size; ++j) {
-      float v = static_cast<float>(in_vec.val[j]);
+      float v = NumericTraits::toFloat(in_vec.val[j]);
       sum += v * v;
     }
   }
 
   for(int i = pack_dim*vec_size + tid; i < hidden_dim; i += blockDim.x) {
-    float v = static_cast<float>(in[offset + i]);
+    float v = NumericTraits::toFloat(in[offset + i]);
     sum += v * v;
   }
 
@@ -49,24 +51,24 @@ __global__ void rmsNormKernelImpl(const T* __restrict__ in,
   __syncthreads();
   sum = shared_sum;
 
-  float rms = rsqrtf(sum / static_cast<float>(hidden_dim) + eps);
+  float rms = sqrtf(sum / static_cast<float>(hidden_dim) + eps);
   for(int i = tid; i < pack_dim; i += blockDim.x) {
     AccessT in_vec = in_vec_ptr[i];
     AccessT gamma_vec = gamma_vec_ptr[i];
     AccessT out_vec;
     #pragma unroll
     for(int j = 0; j < vec_size; ++j) {
-      float v = static_cast<float>(in_vec.val[j]);
-      float g = static_cast<float>(gamma_vec.val[j]);
-      out_vec.val[j] = static_cast<T>(v * rms * g);
+      float v = NumericTraits::toFloat(in_vec.val[j]);
+      float g = NumericTraits::toFloat(gamma_vec.val[j]);
+      out_vec.val[j] = NumericTraits::fromFloat(v * g / rms);
     }
     out_vec_ptr[i] = out_vec;
   }
 
   for(int i = pack_dim*vec_size + tid; i < hidden_dim; i += blockDim.x) {
-    float v = static_cast<float>(in[offset + i]);
-    float g = static_cast<float>(gamma[i]);
-    out[offset + i] = static_cast<T>(v * rms * g);
+    float v = NumericTraits::toFloat(in[offset + i]);
+    float g = NumericTraits::toFloat(gamma[i]);
+    out[offset + i] = NumericTraits::fromFloat(v * g / rms);
   }
 }
 
@@ -101,6 +103,7 @@ REGISTER_KERNEL(rmsNorm,
                 kDeviceCUDA,
                 rmsNormKernel,
                 tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16);
+                tensor::DataType::kDataTypeFloat16,
+                tensor::DataType::kDataTypeBFloat16);
 
 } // namespace ginfer::op::kernel

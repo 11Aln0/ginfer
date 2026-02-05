@@ -1,39 +1,58 @@
 import ginfer_test
 import numpy as np
+import ml_dtypes
 import pytest
 import torch
 import torch.nn.functional as F
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float16, np.int32])
-def test_add_layer_cuda(dtype):
+# ==================== Add ====================
+
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float32, 1e-5, 1e-5),
+    (np.float16, 1e-3, 1e-3),
+    (np.int32, 0, 0),
+    (ml_dtypes.bfloat16, 1e-3, 1e-3)
+])
+def test_add_layer_cuda(dtype, atol, rtol):
+
     a = np.random.rand(3, 127, 128).astype(dtype)
     b = np.random.rand(3, 127, 128).astype(dtype)
     out = ginfer_test.test_add_layer_cuda(a, b)
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    atol = 1e-1 if dtype == np.float16 else 1e-5
     np.testing.assert_allclose(out, a + b, rtol=rtol, atol=atol)
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_rmsnorm_layer_cuda(dtype):
+# ==================== RMSNorm ====================
+
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float32, 1e-5, 1e-5),
+    (np.float16, 1e-3, 1e-3),
+    (ml_dtypes.bfloat16, 1e-2, 1e-2)
+])
+def test_rmsnorm_layer_cuda(dtype, atol, rtol):
     input = np.random.rand(3, 127, 128).astype(dtype)
     gamma = np.random.rand(128).astype(dtype)
     epsilon = 1e-5
     out = ginfer_test.test_rmsnorm_layer_cuda(input, gamma, epsilon)
-    ref = input * gamma / np.sqrt(np.mean(input**2, axis=-1, keepdims=True) + epsilon)
-    atol = 1e-3 if dtype == np.float16 else 1e-5
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
-    
+    input_f = input.astype(np.float32)
+    gamma_f = gamma.astype(np.float32)
+    ref = input_f * gamma_f / np.sqrt(np.mean(input_f**2, axis=-1, keepdims=True) + epsilon)
+    np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)
+
+# ==================== GEMV ====================
+
 @pytest.mark.parametrize("k, n", [(128, 1000), (512, 256), (4216, 197)])
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_matmul_layer_gemv_cuda(dtype, k, n):
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float32, 5e-5, 5e-5), # kernel 累加顺序不同，float32 误差略大
+    (np.float16, 1e-3, 1e-3),
+    (ml_dtypes.bfloat16, 1e-2, 1e-2)
+])
+def test_matmul_layer_gemv_cuda(dtype, atol, rtol, k, n):
     a = np.random.randn(k).astype(dtype)
     b = np.random.randn(k, n).astype(dtype, order='F') # col-major
     out = ginfer_test.test_matmul_layer_cuda(a, b)
-    ref = np.matmul(a, b)
-    atol = 2e-2 if dtype == np.float16 else 5e-5
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
+    ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
+    np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)
+
+# ==================== GEMM ====================
 
 GEMM_CONFIG = [
     # (2, 8, 9),
@@ -42,30 +61,28 @@ GEMM_CONFIG = [
     (4090, 1000, 1000)
 ]
 
-@pytest.mark.parametrize("dtype", [np.float16])
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float16, 1e-3, 1e-3),
+    (ml_dtypes.bfloat16, 1e-2, 1e-2)
+])
 @pytest.mark.parametrize("m,n,k", GEMM_CONFIG)
-def test_matmul_layer_gemm_cuda(dtype, m, n, k):
+def test_matmul_layer_gemm_cuda(dtype, atol, rtol, m, n, k):
     # currently n/k must be 16 bytes alignment
     a = np.random.randn(m, k).astype(dtype)
     b = np.random.randn(k, n).astype(dtype, order='F') # col-major
     out = ginfer_test.test_matmul_layer_cuda(a, b)
+    ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
+    np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    a_t = torch.from_numpy(a).to(device)
-    b_t = torch.from_numpy(b).to(device)
-    ref = torch.matmul(a_t, b_t).cpu().numpy()
-    atol = 3e-2 if dtype == np.float16 else 1e-5 # TODO more accurate 
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
-
+# ==================== GQA ====================
 
 def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # 注意：为了做 Golden Check，使用 float32 避免累积误差
-    q = torch.from_numpy(q_np).to(device).float()
-    k = torch.from_numpy(k_np).to(device).float()
-    v = torch.from_numpy(v_np).to(device).float()
+    q = torch.from_numpy(q_np.astype(np.float32)).to(device)
+    k = torch.from_numpy(k_np.astype(np.float32)).to(device)
+    v = torch.from_numpy(v_np.astype(np.float32)).to(device)
 
     q = q[:, :seq_len, :, :]
     k = k[:, :seq_len, :, :]
@@ -100,8 +117,11 @@ MODEL_CONFIGS = [
 
 @pytest.mark.parametrize("name, num_heads, kv_heads, head_dim, max_seq_len", MODEL_CONFIGS)
 @pytest.mark.parametrize("seq_len", [127, 258, 500, 1125, 2000, 5000])
-@pytest.mark.parametrize("dtype", [np.float16])
-def test_attention_layer_suite(name, num_heads, kv_heads, head_dim, max_seq_len, seq_len, dtype):
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float16, 2e-3, 2e-3),
+    (ml_dtypes.bfloat16, 2e-2, 2e-2)
+])
+def test_gqa_layer(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, max_seq_len, seq_len):
     
     seq_len = min(max_seq_len, seq_len) 
     batch_size = 2
@@ -119,20 +139,20 @@ def test_attention_layer_suite(name, num_heads, kv_heads, head_dim, max_seq_len,
     # PyTorch Reference
     ref_out = torch_gqa_sdpa_reference(q, k, v, seq_len, is_causal=True)
 
-
     np.testing.assert_allclose(
         out_cuda_valid.astype(np.float32), 
-        ref_out.astype(np.float32), 
-        rtol=5e-3, 
-        atol=5e-3,
+        ref_out, 
+        rtol=rtol, 
+        atol=atol,
         err_msg=f"Logic error in {name} config!"
     )
     
 # ==================== Argmax ====================
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_argmax_layer_cuda(dtype):
-    data = np.random.randn(4096).astype(dtype)
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, ml_dtypes.bfloat16])
+@pytest.mark.parametrize("size", [128, 1024, 4096])
+def test_argmax_layer_cuda(dtype, size):
+    data = np.random.randn(size).astype(dtype)
     out = ginfer_test.test_argmax_layer_cuda(data)
     idx = int(out[0])
     expected = int(np.argmax(data))
@@ -141,18 +161,18 @@ def test_argmax_layer_cuda(dtype):
 
 # ==================== Embedding ====================
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_embedding_layer_cuda(dtype):
-    vocab_size = 1000
-    embedding_dim = 128
-    seq_len = 32
+@pytest.mark.parametrize("dtype", [np.float32, np.float16, ml_dtypes.bfloat16])
+@pytest.mark.parametrize("seq_len, vocab_size, embedding_dim", [
+    (32, 1000, 128),
+    (64, 5000, 256),
+    (127, 10000, 512)
+])
+def test_embedding_layer_cuda(dtype, seq_len, vocab_size, embedding_dim):
     indices = np.random.randint(0, vocab_size, size=(seq_len,)).astype(np.int64)
     weight = np.random.randn(vocab_size, embedding_dim).astype(dtype)
     out = ginfer_test.test_embedding_layer_cuda(indices, weight)
     ref = weight[indices]
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    atol = 1e-3 if dtype == np.float16 else 1e-5
-    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
+    np.testing.assert_allclose(out, ref, rtol=1e-5, atol=1e-5)
 
 
 # ==================== ROPE ====================
@@ -188,28 +208,39 @@ ROPE_CONFIGS = [
 ]
 
 @pytest.mark.parametrize("seq_len, nhead, head_dim, rope_theta", ROPE_CONFIGS)
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_rope_layer_cuda(dtype, seq_len, nhead, head_dim, rope_theta):
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float32, 1e-4, 1e-4),
+    (np.float16, 1e-3, 1e-3),
+    (ml_dtypes.bfloat16, 1e-2, 1e-2)
+])
+def test_rope_layer_cuda(dtype, atol, rtol, seq_len, nhead, head_dim, rope_theta):
     x = np.random.randn(seq_len, nhead, head_dim).astype(dtype)
     start_pos = 0
     end_pos = seq_len
     out = ginfer_test.test_rope_layer_cuda(x, head_dim, start_pos, end_pos, rope_theta)
     ref = rope_reference(x, start_pos, rope_theta).astype(dtype)
-    np.testing.assert_allclose(out, ref, rtol=1e-3, atol=1e-3)
+    np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)
 
 
 # ==================== SwiGLU ====================
 
-@pytest.mark.parametrize("dtype", [np.float32, np.float16])
-def test_swiglu_layer_cuda(dtype):
-    gate = np.random.randn(4, 128, 256).astype(dtype)
-    up = np.random.randn(4, 128, 256).astype(dtype)
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float32, 1e-5, 1e-5),
+    (np.float16, 1e-3, 1e-3),
+    (ml_dtypes.bfloat16, 1e-2, 1e-2)
+])
+@pytest.mark.parametrize("batch_size, seq_len, hidden_dim", [
+    (4, 128, 256),
+    (2, 511, 1024),
+    (1, 1023, 2048)
+])
+def test_swiglu_layer_cuda(dtype, atol, rtol, batch_size, seq_len, hidden_dim):
+    gate = np.random.randn(batch_size, seq_len, hidden_dim).astype(dtype)
+    up = np.random.randn(batch_size, seq_len, hidden_dim).astype(dtype)
     out = ginfer_test.test_swiglu_layer_cuda(gate, up)
     # SwiGLU(gate, up) = silu(gate) * up = (gate * sigmoid(gate)) * up
     gate_f = gate.astype(np.float32)
     up_f = up.astype(np.float32)
     sigmoid_gate = 1.0 / (1.0 + np.exp(-gate_f))
     ref = gate_f * sigmoid_gate * up_f
-    rtol = 1e-2 if dtype == np.float16 else 1e-5
-    atol = 1e-2 if dtype == np.float16 else 1e-5
     np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)

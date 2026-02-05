@@ -1,3 +1,4 @@
+#include <fmt/core.h>
 #include <glog/logging.h>
 #include <functional>
 #include <numeric>
@@ -13,7 +14,9 @@ Tensor::Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buff
     : dtype_(dtype), shape_(shape), buffer_(buffer), layout_(layout), offset_(0) {
   size_ = shape_.numel();
   if (buffer->size() < size_ * dTypeSize(dtype)) {
-    throw std::invalid_argument("Buffer size is smaller than tensor size.");
+    throw std::invalid_argument(
+        fmt::format("Buffer size is smaller than tensor size. Buffer size: {}, required size: {}", buffer->size(),
+                    size_ * dTypeSize(dtype)));
   }
   calcStrides();
 }

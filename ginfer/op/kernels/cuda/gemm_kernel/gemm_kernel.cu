@@ -32,7 +32,7 @@ void gemmKernel(const Context& ctx,
   constexpr int BM = 128, BN = 128;
   dim3 grid_dim((N + BN - 1) / BN, (M + BM - 1) / BM);
 
-  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel<BM, BN, 16, 2><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(
+  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel<T, BM, BN, 16, 2><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(
       M, N, K, a_data, b_data, c_data);
 
 }
@@ -40,6 +40,7 @@ void gemmKernel(const Context& ctx,
 REGISTER_KERNEL(gemm,
                 kDeviceCUDA,
                 gemmKernel,
-                tensor::DataType::kDataTypeFloat16);  
+                tensor::DataType::kDataTypeFloat16,
+                tensor::DataType::kDataTypeBFloat16);  
 
 } // namespace ginfer::op::kernel

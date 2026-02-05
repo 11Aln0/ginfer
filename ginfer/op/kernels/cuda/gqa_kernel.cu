@@ -53,6 +53,8 @@ __device__ __forceinline__ void computeSTile(const T* p_Q,
                                              T* p_S,
                                              int head_dim) {
 
+  using MmaTraits = MmaTraits<T, float>;
+
   constexpr int WARP_TILE_M = br / (BLOCK_TILE_M * MMA_M);
   constexpr int WARP_TILE_N = bc / (BLOCK_TILE_N * MMA_N);
 
@@ -66,7 +68,8 @@ __device__ __forceinline__ void computeSTile(const T* p_Q,
 
   uint32_t reg_a[WARP_TILE_M][4];
   uint32_t reg_b[WARP_TILE_N][2];
-  uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  // uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  float reg_c[WARP_TILE_M][WARP_TILE_N][4] = {0.0f};
   
   #pragma unroll
   for(int k = 0; k < head_dim; k += MMA_K) {
@@ -94,15 +97,17 @@ __device__ __forceinline__ void computeSTile(const T* p_Q,
     for(int wi = 0; wi < WARP_TILE_M; wi++) {
       #pragma unroll
       for(int wj = 0; wj < WARP_TILE_N; wj++) {
-        MMA_FP16_ACCFP16(
-          reg_c[wi][wj][0], reg_c[wi][wj][1],
+        MmaTraits::compute(
+          reg_c[wi][wj][0], reg_c[wi][wj][1], reg_c[wi][wj][2], reg_c[wi][wj][3],
           reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3],
-          reg_b[wj][0], reg_b[wj][1],
-          reg_c[wi][wj][0], reg_c[wi][wj][1]
-        );
+          reg_b[wj][0], reg_b[wj][1]
+        ); 
       }
     }
   }
+
+  using NumericTraits = NumericTraits<T>;
+
   #pragma unroll
   for(int wi = 0; wi < WARP_TILE_M; wi++) {
     #pragma unroll
@@ -121,10 +126,12 @@ __device__ __forceinline__ void computeSTile(const T* p_Q,
       int lane_smem_S_addr1 = lane_smem_S_m1 * bc + lane_smem_S_n;
 
       using AccessT = AlignedVector<T, 2>;
+      auto acc0 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][0]));
+      auto acc1 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][2]));
       *reinterpret_cast<AccessT*>(&p_S[lane_smem_S_addr0]) =
-          *reinterpret_cast<AccessT*>(&reg_c[wi][wj][0]);
+          *reinterpret_cast<AccessT*>(&acc0);
       *reinterpret_cast<AccessT*>(&p_S[lane_smem_S_addr1]) =
-          *reinterpret_cast<AccessT*>(&reg_c[wi][wj][1]);
+          *reinterpret_cast<AccessT*>(&acc1);
     }
   }          
 }
@@ -139,7 +146,8 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
                                              int seq_len,
                                              int global_r_base,
                                              int global_c_base) {
-  
+                                              
+  using NumericTraits = NumericTraits<T>;
   constexpr int vec_size = DefaultVecSize<T>::value;
   using AccessType = AlignedVector<T, vec_size>; 
 
@@ -159,26 +167,26 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
     AccessType vec = *reinterpret_cast<const AccessType*>(sptr); 
 
     int global_r = global_r_base + smem_row_offset + r;
-    T rsqrt_head_dim = __half2float(rsqrtf(static_cast<float>(head_dim)));
+    T rsqrt_head_dim = NumericTraits::fromFloat(rsqrtf(static_cast<float>(head_dim)));
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
       int global_c = global_c_base + smem_col + j;
       bool is_valid = global_c <= global_r && global_c < seq_len; // casual mask and seq_len mask
-      vec.val[j] = is_valid ? vec.val[j] * rsqrt_head_dim : __float2half(-INFINITY); // div sqrt(head_dim)
+      vec.val[j] = is_valid ? vec.val[j] * rsqrt_head_dim : NumericTraits::fromFloat(-INFINITY); // div sqrt(head_dim)
     }
     
-    float old_max = __half2float(p_m[smem_row_offset + r]);
+    float old_max = NumericTraits::toFloat(p_m[smem_row_offset + r]);
     float partial_max = old_max;
     
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
-      partial_max = max(partial_max, __half2float(vec.val[j]));
+      partial_max = max(partial_max, NumericTraits::toFloat(vec.val[j]));
     }
     
     float partial_sum = 0.0f;
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
-      float val = __half2float(vec.val[j]);
+      float val = NumericTraits::toFloat(vec.val[j]);
       float diff = __isinf(vec.val[j]) && __isinf(partial_max) ? -INFINITY : val - partial_max;
       partial_sum += expf(diff);
     }
@@ -195,13 +203,13 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
     // re-scale P
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
-      vec.val[j] = expf(__half2float(vec.val[j]) - partial_max);
+      vec.val[j] = expf(NumericTraits::toFloat(vec.val[j]) - partial_max);
     }
 
     // write back P
     *reinterpret_cast<AccessType*>(sptr) = vec;
     if((tid % thread_per_row) == 0) {
-      p_new_m[smem_row_offset + r] = __float2half(partial_max);
+      p_new_m[smem_row_offset + r] = NumericTraits::fromFloat(partial_max);
       p_l[smem_row_offset + r] = p_l[smem_row_offset + r] * expf(old_max - partial_max) + partial_sum;
     }
   }
@@ -214,7 +222,10 @@ __device__ void updateOTile(const T* p_P,
                             const T* p_old_m,
                             const T* p_new_m,
                             T *p_O) {
-                        
+  
+  using MmaTraits = MmaTraits<T, float>;
+  using NumericTraits = NumericTraits<T>;
+
   constexpr int WARP_TILE_M = br / (BLOCK_TILE_M * MMA_M);
   constexpr int WARP_TILE_N = head_dim / (BLOCK_TILE_N * MMA_N);
 
@@ -228,7 +239,8 @@ __device__ void updateOTile(const T* p_P,
 
   uint32_t reg_a[WARP_TILE_M][4];
   uint32_t reg_b[WARP_TILE_N][2];
-  uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  // uint32_t reg_c[WARP_TILE_M][WARP_TILE_N][2] = {0};
+  float reg_c[WARP_TILE_M][WARP_TILE_N][4] = {0.0f};
   
   #pragma unroll
   for(int k = 0; k < bc; k += MMA_K) {
@@ -256,12 +268,11 @@ __device__ void updateOTile(const T* p_P,
     for(int wi = 0; wi < WARP_TILE_M; wi++) {
       #pragma unroll
       for(int wj = 0; wj < WARP_TILE_N; wj++) {
-        MMA_FP16_ACCFP16(
-          reg_c[wi][wj][0], reg_c[wi][wj][1],
+        MmaTraits::compute(
+          reg_c[wi][wj][0], reg_c[wi][wj][1], reg_c[wi][wj][2], reg_c[wi][wj][3],
           reg_a[wi][0], reg_a[wi][1], reg_a[wi][2], reg_a[wi][3],
-          reg_b[wj][0], reg_b[wj][1],
-          reg_c[wi][wj][0], reg_c[wi][wj][1]
-        );
+          reg_b[wj][0], reg_b[wj][1]
+        ); 
       }
     }
   }
@@ -292,15 +303,17 @@ __device__ void updateOTile(const T* p_P,
       float scale1 = expf(old_max1 - new_max1);
 
       auto old_O = *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr0]);
-      old_O.val[0] = __half2float(old_O.val[0]) * scale0;
-      old_O.val[1] = __half2float(old_O.val[1]) * scale0; 
-      old_O = old_O + *reinterpret_cast<AccessT*>(&reg_c[wi][wj][0]);
+      old_O.val[0] = NumericTraits::toFloat(old_O.val[0]) * scale0;
+      old_O.val[1] = NumericTraits::toFloat(old_O.val[1]) * scale0;
+      auto acc0 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][0]));
+      old_O = old_O + *reinterpret_cast<AccessT*>(&acc0);
       *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr0]) = old_O;
       
       old_O = *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr1]);
-      old_O.val[0] = __half2float(old_O.val[0]) * scale1;
-      old_O.val[1] = __half2float(old_O.val[1]) * scale1; 
-      old_O = old_O + *reinterpret_cast<AccessT*>(&reg_c[wi][wj][1]);
+      old_O.val[0] = NumericTraits::toFloat(old_O.val[0]) * scale1;
+      old_O.val[1] = NumericTraits::toFloat(old_O.val[1]) * scale1;
+      auto acc1 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][2]));
+      old_O = old_O + *reinterpret_cast<AccessT*>(&acc1);
       *reinterpret_cast<AccessT*>(&p_O[lane_smem_S_addr1]) = old_O;
     }
   }  
@@ -314,6 +327,7 @@ __device__ void storeOTile(const T* p_o_block_smem,
                            int block_seq_len,
                            int seq_len_stride) {
 
+  using NumericTraits = NumericTraits<T>;
   constexpr int vec_size = DefaultVecSize<T>::value;
   using AccessType = AlignedVector<T, vec_size>;
 
@@ -333,7 +347,7 @@ __device__ void storeOTile(const T* p_o_block_smem,
     float inv_l = __fdividef(1.0f, p_l[row]);
     #pragma unroll
     for(int i = 0; i < vec_size; i++) {
-      vec.val[i] = __half2float(vec.val[i]) * inv_l;
+      vec.val[i] = NumericTraits::toFloat(vec.val[i]) * inv_l;
     }
 
     *reinterpret_cast<AccessType*>(gptr) = vec;
@@ -384,7 +398,7 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
   
   static_assert(head_dim % 64 == 0, "head_dim must be multiple of 64");
 
-  extern __shared__ T smem[];
+  extern __shared__ char smem[];
 
   int batch_id = blockIdx.x;
   int head_id = blockIdx.y;
@@ -401,7 +415,7 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
   int v_offset = k_offset;
   int out_offset = q_offset;
   
-  T* p_q_block_smem = smem;
+  T* p_q_block_smem = reinterpret_cast<T*>(smem);
   T* p_k_block_smem = p_q_block_smem + br * head_dim;
   T* p_v_block_smem = p_k_block_smem + bc * head_dim;
   T* p_o_block_smem = p_v_block_smem + bc * head_dim;
@@ -510,7 +524,8 @@ void GQAKernel(const Context& ctx,
 REGISTER_KERNEL(GQA,
                 kDeviceCUDA,
                 GQAKernel,
-                tensor::DataType::kDataTypeFloat16);
+                tensor::DataType::kDataTypeFloat16,
+                tensor::DataType::kDataTypeBFloat16);
 
 
 } // namespace ginfer::op::kernel

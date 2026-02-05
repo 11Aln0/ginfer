@@ -11,6 +11,8 @@ set(CMAKE_C_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
 set(CMAKE_CUDA_FLAGS_DEBUG "-G -O1")
 
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 enable_testing()
 
 include(cmake/3rdparty.cmake)

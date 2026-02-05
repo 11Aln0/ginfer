@@ -53,7 +53,8 @@ REGISTER_KERNEL(embedding,
                 kDeviceCUDA,
                 embeddingKernel,
                 tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeFloat32);
+                tensor::DataType::kDataTypeFloat32,
+                tensor::DataType::kDataTypeBFloat16);
 
 
 } // namespace ginfer::op::kernel
