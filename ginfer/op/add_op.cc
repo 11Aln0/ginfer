@@ -5,13 +5,14 @@
 
 namespace ginfer::op {
 
-AddOp::AddOp(DeviceType dev_type) : Op(dev_type, OpType::kOpAdd) {}
+AddOp::AddOp(DeviceType dev_type) : Op(dev_type, OpType::kOpAdd, "add") {}
 
 Status AddOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "AddOp requires exactly 2 input tensors.";
   CHECK(outputs.size() == 1) << "AddOp requires exactly 1 output tensor.";
 
   // TODO broadcast add
+
   tensor::DataType dtype = inputs[0]->dtype();
   CHECK(dtype == inputs[1]->dtype() && dtype == outputs[0]->dtype()) << "Input tensors must have the same data type.";
 

@@ -5,7 +5,7 @@
 
 namespace ginfer::op {
 
-GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA), seq_len_(0) {}
+GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA, "gqa"), seq_len_(0) {}
 
 Status GQAOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "GQAOp requires exactly 3 input tensors.";

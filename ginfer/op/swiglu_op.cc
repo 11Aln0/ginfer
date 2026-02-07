@@ -4,7 +4,7 @@
 
 namespace ginfer::op {
 
-SwiGLUOp::SwiGLUOp(DeviceType dev_type) : Op(dev_type, OpType::kOpSwiGLU) {}
+SwiGLUOp::SwiGLUOp(DeviceType dev_type) : Op(dev_type, OpType::kOpSwiGLU, "swiglu") {}
 
 Status SwiGLUOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "SwiGLUOp requires exactly 2 input tensors (gate, up).";

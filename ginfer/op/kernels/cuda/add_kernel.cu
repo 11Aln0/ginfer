@@ -12,7 +12,7 @@ template<typename T, int vec_size = DefaultVecSize<T>::value>
 __global__ void addKernelImpl(const T* __restrict__ a, 
                               const T* __restrict__ b, 
                               T* __restrict__ c, 
-                              int n) {
+                              size_t n) {
 
   using AccessT = AlignedVector<T, vec_size>;
 
@@ -43,18 +43,14 @@ void addKernel(const Context& ctx, const tensor::Tensor& a, const tensor::Tensor
       << "addKernel only supports CUDA device type.";
   
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
-  int n = static_cast<int>(a.size());
+  size_t n = a.size();
   const T* a_data = a.data<T>();
   const T* b_data = b.data<T>();
   T* c_data = c.data<T>();
 
   int block_dim = 256;
   int grid_dim = (n + block_dim - 1) / block_dim;
-  if(cuda_ctx.getStream() == nullptr) {
-    addKernelImpl<T><<<grid_dim, block_dim>>>(a_data, b_data, c_data, n);
-  } else {
-    addKernelImpl<T><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
-  }
+  addKernelImpl<T><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(a_data, b_data, c_data, n);
 
   // cudaDeviceSynchronize();
   // cudaError_t err = cudaGetLastError();

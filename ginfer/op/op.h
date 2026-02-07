@@ -34,8 +34,7 @@ enum class OpType : uint8_t {
 
 class BaseOp {
  public:
-  explicit BaseOp(DeviceType dev_type, OpType op_type);
-
+  explicit BaseOp(DeviceType dev_type, OpType op_type, std::string name);
   OpType opType() const;
   DeviceType getDeviceType() const;
 
@@ -44,6 +43,7 @@ class BaseOp {
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
   OpType op_type_ = OpType::kOpUnknown;
+  std::string name_ = "unknown";
 };
 
 class Op : public BaseOp {
@@ -55,6 +55,9 @@ class MatmulOp : public Op {
   MatmulOp(DeviceType dev_type);
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+
+ private:
+  bool isGemvMode(const Tensor* A);
 };
 
 class AddOp : public Op {
@@ -62,6 +65,9 @@ class AddOp : public Op {
   AddOp(DeviceType dev_type);
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+
+ private:
+  bool checkBroadcastable(const tensor::Shape& shapeA, const tensor::Shape& shapeB);
 
   //  private:
   //   Status checkParams(const std::vector<const Tensor*>& inputs, const std::vector<Tensor*> outputs);

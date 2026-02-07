@@ -8,9 +8,10 @@
 namespace ginfer::op::kernel {
 
 
-template <typename T, int vec_size = DefaultVecSize<T>::value, int thread_per_block = 128>
+template <typename T, int vec_size = DefaultVecSize<T>::value, int thread_per_block = 128, bool has_bias = false>
 __global__ void gemvKernelImpl(const T* __restrict__ vec,
                                const T* __restrict__ mat,
+                               const T* __restrict__ bias,
                                T* __restrict__  output,
                                const int K,
                                const int N) {
@@ -49,9 +50,11 @@ __global__ void gemvKernelImpl(const T* __restrict__ vec,
     float block_sum = BlockReduce(temp).Sum(thread_sum);
 
     if(threadIdx.x == 0) {
+      if constexpr (has_bias) {
+        block_sum += static_cast<float>(bias[c % N]);
+      }
       output[c] = static_cast<T>(block_sum);
     }
-
   }
 }
 
@@ -60,6 +63,7 @@ template <typename T, typename Context>
 void gemvKernel(const Context& ctx,
                 const tensor::Tensor& vec,
                 const tensor::Tensor& mat,
+                std::optional<std::reference_wrapper<const tensor::Tensor>> bias,
                 tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "gemvKernel only supports CUDA device type.";
@@ -78,8 +82,12 @@ void gemvKernel(const Context& ctx,
   const int block_dim = 128;
   const int grid_dim = std::min(N, 512L);
 
-  gemvKernelImpl<T><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(vec_data, mat_data, output_data, K, N);
-
+  if(bias.has_value()) {
+    const T* bias_data = bias->get().data<T>();
+    gemvKernelImpl<T, DefaultVecSize<T>::value, block_dim, true><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(vec_data, mat_data, bias_data, output_data, K, N);
+  } else {
+    gemvKernelImpl<T, DefaultVecSize<T>::value, block_dim, false><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(vec_data, mat_data, nullptr, output_data, K, N);
+  }
 }
 
 REGISTER_KERNEL(gemv,

@@ -5,7 +5,7 @@
 namespace ginfer::op {
 
 RMSNormOp::RMSNormOp(DeviceType dev_type, float epsilon)
-    : Op(dev_type, OpType::kOpRMSNorm), epsilon_(epsilon) {}
+    : Op(dev_type, OpType::kOpRMSNorm, "rmsnorm"), epsilon_(epsilon) {}
 
 Status RMSNormOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "RMSNormOp requires exactly 2 input tensors.";

@@ -5,7 +5,9 @@
 #include <cuda_fp16.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "ginfer/op/kernels/cuda/vectorize.cuh"
 
+namespace ginfer::op::kernel {
 
 __device__ __forceinline__ int swizzle_offset(int offset) {
   // NT layout, A swizzle == B swizzle
@@ -30,6 +32,7 @@ __device__ __forceinline__ int get_cpasync_src_size(int dim0, int dim0_extent, i
 // bank conflict elimination by swizzle
 // stage n pipeline
 template<typename T,
+         bool with_bias = false,
          int BM = 128, int BN = 128, int BK = 16,
          int K_STAGE = 2,
          int MMA_M = 16, int MMA_N = 8, int MMA_K = 16,
@@ -37,7 +40,7 @@ template<typename T,
          int WARP_TILE_M = 4, int WARP_TILE_N = 4
         >
 __global__ void __launch_bounds__(256)
-  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel(const size_t M, const size_t N, const size_t K, const T *A, const T *B, T *C) {
+  mma2x4_warp4x4_bce_swizzle_stagen_hgemm_kernel(const size_t M, const size_t N, const size_t K, const T *A, const T *B, const T *bias, T *C) {
   // attention: N/K must be 16 bytes alignment
   
   using MmaTraits = MmaTraits<T, float>;
@@ -160,8 +163,6 @@ __global__ void __launch_bounds__(256)
     COMPUTE_ON_SMEM(compute_stage);
   }
 
-  using NumericTraits = NumericTraits<T>;
-
   // store reg 
   #pragma unroll
   for(int wi = 0; wi < WARP_TILE_M; wi++) {
@@ -186,6 +187,21 @@ __global__ void __launch_bounds__(256)
 
       bool bound0 = (store_gmem_c_m0 < M) && (store_gmem_c_n < N);
       bool bound1 = (store_gmem_c_m1 < M) && (store_gmem_c_n < N);
+
+      using NumericTraits = NumericTraits<T>;
+      using VecT = AlignedVector<T, 2>;
+      using AccVecT = AlignedVector<float, 2>;
+
+      if constexpr (with_bias) {
+        VecT bias_vec;
+        LD_GLOBAL_PRED_U32(bias_vec, bias + store_gmem_c_n, store_gmem_c_n < N);
+        #pragma unroll
+        for(int i = 0; i < 2; i++) {
+          reg_c[wi][wj][i] += NumericTraits::toFloat(bias_vec.val[i]);
+          reg_c[wi][wj][2 + i] += NumericTraits::toFloat(bias_vec.val[i]);
+        }
+      }
+
       auto acc0 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][0]));
       auto acc1 = NumericTraits::fromFloat2(FLOAT2(reg_c[wi][wj][2]));
       ST_GLOBAL_PRED_U32(C + store_gmem_c_addr0, acc0, bound0);
@@ -193,3 +209,5 @@ __global__ void __launch_bounds__(256)
     }
   }
 }
+
+} // namespace ginfer::op::kernel

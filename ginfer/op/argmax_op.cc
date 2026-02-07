@@ -4,7 +4,7 @@
 
 namespace ginfer::op {
 
-ArgmaxOp::ArgmaxOp(DeviceType dev_type) : Op(dev_type, OpType::kOpArgmax) {}
+ArgmaxOp::ArgmaxOp(DeviceType dev_type) : Op(dev_type, OpType::kOpArgmax, "argmax") {}
 
 Status ArgmaxOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "ArgmaxOp requires exactly 1 input tensor.";

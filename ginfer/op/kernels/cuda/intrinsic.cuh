@@ -265,7 +265,18 @@ struct NumericTraits<__nv_bfloat16> {
           "r"((int)(pred_guard))                         \
     )
 
-
+#define LD_GLOBAL_PRED_U32(val, ptr, pred_guard)    \
+    asm volatile(                                       \
+        "{\n"                                           \
+        "  .reg .pred p;\n"                             \
+        "  setp.ne.b32 p, %2, 0;\n"                     \
+        "  @p ld.global.u32 %0, [%1];\n"                \
+        "}\n"                                           \
+        : "=r"(reinterpret_cast<uint32_t &>(val))       \
+        : "l"(ptr),                                     \
+          "r"((int)(pred_guard))                         \
+    )
+    
 #define WARP_SIZE 32
 
 #define HALF8(x) (reinterpret_cast<float4*>(&(x))[0])

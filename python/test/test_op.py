@@ -51,6 +51,11 @@ def test_matmul_op_gemv_cuda(dtype, atol, rtol, k, n):
     out = ginfer_test.test_matmul_op_cuda(a, b)
     ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
     np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)
+    
+    bias = np.random.randn(n).astype(dtype)
+    out_with_bias = ginfer_test.test_matmul_op_with_bias_cuda(a, b, bias)
+    ref_with_bias = ref + bias.astype(np.float32)
+    np.testing.assert_allclose(out_with_bias.astype(np.float32), ref_with_bias, rtol=rtol, atol=atol)
 
 # ==================== GEMM ====================
 
@@ -73,6 +78,11 @@ def test_matmul_op_gemm_cuda(dtype, atol, rtol, m, n, k):
     out = ginfer_test.test_matmul_op_cuda(a, b)
     ref = np.matmul(a.astype(np.float32), b.astype(np.float32))
     np.testing.assert_allclose(out.astype(np.float32), ref, rtol=rtol, atol=atol)
+    
+    bias =  np.random.randn(n).astype(dtype)
+    out_with_bias = ginfer_test.test_matmul_op_with_bias_cuda(a, b, bias)
+    ref_with_bias = ref + bias.astype(np.float32)
+    np.testing.assert_allclose(out_with_bias.astype(np.float32), ref_with_bias, rtol=rtol, atol=atol)
 
 # ==================== GQA ====================
 

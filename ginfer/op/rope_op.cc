@@ -5,7 +5,10 @@
 namespace ginfer::op {
 
 ROPESinCosCacheOp::ROPESinCosCacheOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta)
-    : Op(dev_type, OpType::kOpCustom), head_dim_(head_dim), rope_theta_(rope_theta), max_seq_len_(max_seq_len) {}
+    : Op(dev_type, OpType::kOpCustom, "rope_sin_cos_cache"),
+      head_dim_(head_dim),
+      rope_theta_(rope_theta),
+      max_seq_len_(max_seq_len) {}
 
 Status ROPESinCosCacheOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.empty()) << "ROPESinCosCacheOp does not take any input tensors.";
@@ -22,7 +25,7 @@ Status ROPESinCosCacheOp::run(const std::vector<const Tensor*>& inputs, std::vec
 }
 
 ROPEOp::ROPEOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta)
-    : Op(dev_type, OpType::kOpROPE), head_dim_(head_dim), rope_theta_(rope_theta), max_seq_len_(max_seq_len) {}
+    : Op(dev_type, OpType::kOpROPE, "rope"), head_dim_(head_dim), rope_theta_(rope_theta), max_seq_len_(max_seq_len) {}
 
 Status ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
