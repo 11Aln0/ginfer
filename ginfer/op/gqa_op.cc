@@ -1,15 +1,15 @@
 #include <glog/logging.h>
 #include "ginfer/op/kernels/gqa_kernel.h"
 #include "ginfer/op/kernels/kernel_registry.h"
-#include "ginfer/op/layer.h"
+#include "ginfer/op/op.h"
 
 namespace ginfer::op {
 
-GQALayer::GQALayer(DeviceType dev_type, std::string layer_name)
-    : Layer(dev_type, LayerType::kLayerGQA, std::move(layer_name)), seq_len_(0) {}
+GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA), seq_len_(0) {}
 
-Status GQALayer::forward(const std::vector<const Tensor*>& inputs, Tensor* output) {
-  CHECK(inputs.size() == 3);
+Status GQAOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+  CHECK(inputs.size() == 3) << "GQAOp requires exactly 3 input tensors.";
+  CHECK(outputs.size() == 1) << "GQAOp requires exactly 1 output tensor.";
   const Tensor* q = inputs[0];
   const Tensor* k = inputs[1];
   const Tensor* v = inputs[2];
@@ -20,11 +20,11 @@ Status GQALayer::forward(const std::vector<const Tensor*>& inputs, Tensor* outpu
 
   auto gqa_kernel =
       kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GQAKernelFuncType>("GQA", q->dtype());
-  gqa_kernel(*dev_ctx, *q, *k, *v, *output, seq_len_);
+  gqa_kernel(*dev_ctx, *q, *k, *v, *outputs[0], seq_len_);
 
   return ginfer::error::Success();
 }
 
-void GQALayer::setSeqLen(int seq_len) { seq_len_ = seq_len; }
+void GQAOp::setSeqLen(int seq_len) { seq_len_ = seq_len; }
 
 }  // namespace ginfer::op

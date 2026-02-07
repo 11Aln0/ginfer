@@ -1,11 +1,8 @@
 #include <glog/logging.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-#include <execution>
-#include <numeric>
-#include <unordered_map>
 #include "ginfer/memory/allocator_factory.h"
-#include "ginfer/op/layer.h"
+#include "ginfer/op/op.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
 
@@ -18,24 +15,24 @@ using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
 
-Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float epsilon) {
+Tensor test_rmsnorm_op_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float epsilon) {
   DataType dtype = input_tensor.dtype();
   const Shape& shape = input_tensor.shape();
   Tensor output_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
 
-  ::ginfer::op::RMSNormLayer rmsnorm_layer(DeviceType::kDeviceCUDA, "rmsnorm_layer_cuda", epsilon);
-  rmsnorm_layer.setWeight(0, std::make_shared<Tensor>(gamma_tensor));
-  rmsnorm_layer.toDevice(DeviceType::kDeviceCUDA);
+  ::ginfer::op::RMSNormOp rmsnorm_op(DeviceType::kDeviceCUDA, epsilon);
 
   // Move tensors to GPU
   auto cu_allocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>::get_instance();
   input_tensor.toDevice(cu_allocator);
+  gamma_tensor.toDevice(cu_allocator);
   output_tensor.toDevice(cu_allocator);
 
-  // Run forward computation
-  std::vector<const Tensor*> inputs = {&input_tensor};
-  auto status = rmsnorm_layer.forward(inputs, &output_tensor);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "RMSNormLayer forward failed: " << status.msg();
+  // Run computation
+  std::vector<const Tensor*> inputs = {&input_tensor, &gamma_tensor};
+  std::vector<Tensor*> outputs = {&output_tensor};
+  auto status = rmsnorm_op.run(inputs, outputs);
+  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "RMSNormOp run failed: " << status.msg();
 
   // Copy result back to CPU
   output_tensor.toDevice(DeviceType::kDeviceCPU);
@@ -43,6 +40,6 @@ Tensor test_rmsnorm_layer_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float
   return output_tensor;
 }
 
-REGISTER_PYBIND_TEST(test_rmsnorm_layer_cuda);
+REGISTER_PYBIND_TEST(test_rmsnorm_op_cuda);
 
 }  // namespace ginfer::test::pybind

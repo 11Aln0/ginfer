@@ -1,16 +1,16 @@
 #include <gtest/gtest.h>
 #include <vector>
-#include "ginfer/op/layer.h"
+#include "ginfer/op/op.h"
 #include "ginfer/tensor/tensor.h"
 
-TEST(LayerTest, AddLayerCUDA) {
+TEST(OpTest, AddOpCUDA) {
   using ginfer::common::DeviceType;
   using ginfer::error::StatusCode;
   using ginfer::tensor::DataType;
 
-  ginfer::op::AddLayer add_layer(DeviceType::kDeviceCUDA, "add_layer_cuda");
-  EXPECT_EQ(add_layer.layerType(), ginfer::op::LayerType::kLayerAdd);
-  EXPECT_EQ(add_layer.getDeviceType(), DeviceType::kDeviceCUDA);
+  ginfer::op::AddOp add_op(DeviceType::kDeviceCUDA);
+  EXPECT_EQ(add_op.opType(), ginfer::op::OpType::kOpAdd);
+  EXPECT_EQ(add_op.getDeviceType(), DeviceType::kDeviceCUDA);
 
   ginfer::tensor::Tensor a(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
   ginfer::tensor::Tensor b(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
@@ -30,7 +30,8 @@ TEST(LayerTest, AddLayerCUDA) {
   c.toDevice(DeviceType::kDeviceCUDA);
 
   std::vector<const ginfer::tensor::Tensor*> inputs = {&a, &b};
-  auto status = add_layer.forward(inputs, &c);
+  std::vector<ginfer::tensor::Tensor*> outputs = {&c};
+  auto status = add_op.run(inputs, outputs);
   ASSERT_TRUE(status.code() == StatusCode::kSuccess) << status.msg();
 
   c.toDevice(DeviceType::kDeviceCPU);

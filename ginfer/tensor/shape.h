@@ -27,6 +27,14 @@ class Shape {
   int64_t operator[](size_t idx) const { return dims_[idx]; }
   int64_t& operator[](size_t idx) { return dims_[idx]; }
 
+  bool operator==(const Shape& other) const {
+    if (ndim() != other.ndim()) return false;
+    for (size_t i = 0; i < ndim(); ++i) {
+      if (dims_[i] != other.dims_[i]) return false;
+    }
+    return true;
+  }
+
   auto begin() const { return dims_.begin(); }
   auto end() const { return dims_.end(); }
   auto rbegin() const { return dims_.rbegin(); }
