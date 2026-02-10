@@ -17,18 +17,22 @@ void gemmKernel(const Context& ctx,
 
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "gemvKernel only supports CUDA device type.";
-  CHECK(b.layout() == tensor::Layout::kLayoutColMajor)
-      << "gemvKernel only supports col-major matrix layout.";
 
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
-  
+
+  const auto& a_shape = a.shape();
+  const auto& b_shape = b.shape();
+  const auto& b_strides = b.strides();
+  CHECK(a_shape.ndim() == 2 && b_shape.ndim() == 2) << "gemmKernel only supports 2D tensors.";
+  CHECK(a_shape[1] == b_shape[0]) << "Inner dimensions of A and B must match.";
+  CHECK(b_strides[1] == b_shape[0]) << "B must be in column-major order.";
+  const size_t M = a_shape[0];
+  const size_t K = a_shape[1];
+  const size_t N = b_shape[1];
+    
   const T* a_data = a.data<T>();
   const T* b_data = b.data<T>();
   T* c_data = c.data<T>();
-
-  const size_t M = a.shape()[0];
-  const size_t K = a.shape()[1];
-  const size_t N = b.shape()[1];
 
   int block_dim = 256;
   constexpr int BM = 128, BN = 128;

@@ -26,4 +26,6 @@ add_subdirectory(memory)
 add_pathlib_with_deps(tensor ./tensor memory)
 
 add_subdirectory(op)
+add_subdirectory(layer)
+add_subdirectory(model)
 add_subdirectory(test)

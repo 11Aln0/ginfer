@@ -39,6 +39,7 @@ class BaseOp {
   DeviceType getDeviceType() const;
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) = 0;
+  virtual Status toDevice(DeviceType dev_type);
 
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
@@ -89,10 +90,10 @@ class GQAOp : public Op {
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
-  void setSeqLen(int seq_len);
+  // void setSeqLen(int seq_len);
 
  private:
-  int seq_len_;
+  // int seq_len_;
 };
 
 class ArgmaxOp : public Op {
@@ -109,30 +110,28 @@ class EmbeddingOp : public Op {
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 };
 
-class ROPESinCosCacheOp : public Op {
+class RotaryEmbeddingOp : public Op {
  public:
-  ROPESinCosCacheOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta = 10000.0f);
+  RotaryEmbeddingOp(DeviceType dev_type, float rope_theta = 10000.0f);
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
  private:
-  int head_dim_;
-  int max_seq_len_;
   float rope_theta_;
 };
 
 class ROPEOp : public Op {
  public:
-  ROPEOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta = 10000.0f);
+  ROPEOp(DeviceType dev_type);
 
   virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
   // void updateCache(int start_pos, int end_pos);
 
  private:
-  int head_dim_;
-  int max_seq_len_;
-  float rope_theta_;
+  // int head_dim_;
+  // int max_seq_len_;
+  // float rope_theta_;
   // std::shared_ptr<Tensor> sin_cache_;
   // std::shared_ptr<Tensor> cos_cache_;
 };

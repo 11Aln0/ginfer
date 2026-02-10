@@ -51,7 +51,15 @@ REGISTER_STATUS(NotImplemented, StatusCode::kNotImplemented)
     if (!(expr)) {                                        \
       throw std::runtime_error(fmt::format(__VA_ARGS__)); \
     }                                                     \
-  } while (0);
+  } while (0)
+
+#define RETURN_ON_ERROR(status)                                  \
+  do {                                                           \
+    auto _status = (status);                                     \
+    if (_status.code() != ginfer::error::StatusCode::kSuccess) { \
+      return _status;                                            \
+    }                                                            \
+  } while (0)
 
 template <typename T, typename E>
 class Result {

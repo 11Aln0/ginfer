@@ -67,14 +67,16 @@ void gemvKernel(const Context& ctx,
                 tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "gemvKernel only supports CUDA device type.";
-  CHECK(mat.layout() == tensor::Layout::kLayoutColMajor)
-      << "gemvKernel only supports col-major matrix layout.";
   
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
-  
+
   const auto& shape = mat.shape();
+  const auto& strides = mat.strides();
+  CHECK(shape.ndim() == 2) << "gemvKernel only supports 2D tensors.";
+  CHECK(strides[1] == shape[0]) << "Matrix must be in column-major order.";
   const auto K = shape[0];
   const auto N = shape[1];
+  
   const T* vec_data = vec.data<T>();
   const T* mat_data = mat.data<T>();
   T* output_data = output.data<T>();

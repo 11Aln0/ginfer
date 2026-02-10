@@ -86,7 +86,7 @@ def test_matmul_op_gemm_cuda(dtype, atol, rtol, m, n, k):
 
 # ==================== GQA ====================
 
-def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
+def torch_gqa_sdpa_reference(q_np, k_np, v_np, is_causal=True):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # 注意：为了做 Golden Check，使用 float32 避免累积误差
@@ -94,16 +94,13 @@ def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
     k = torch.from_numpy(k_np.astype(np.float32)).to(device)
     v = torch.from_numpy(v_np.astype(np.float32)).to(device)
 
-    q = q[:, :seq_len, :, :]
-    k = k[:, :seq_len, :, :]
-    v = v[:, :seq_len, :, :]
-
     # [B, L, H, D] -> [B, H, L, D]
     q = q.permute(0, 2, 1, 3)
     k = k.permute(0, 2, 1, 3)
     v = v.permute(0, 2, 1, 3)
 
     B, num_heads, L, head_dim = q.shape
+    S = k.shape[2]
     kv_heads = k.shape[1]
 
     # GQA 广播逻辑
@@ -111,8 +108,13 @@ def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
         n_rep = num_heads // kv_heads
         k = k.repeat_interleave(n_rep, dim=1)
         v = v.repeat_interleave(n_rep, dim=1)
-
-    out = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
+    
+    if is_causal and L != S:
+        # 手动构造 lower-right causal mask
+        attn_mask = torch.ones(L, S, dtype=torch.bool, device=q.device).tril(diagonal=S - L)
+        out = F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+    else:
+        out = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
 
     # [B, H, L, D] -> [B, L, H, D]
     out = out.permute(0, 2, 1, 3)
@@ -120,37 +122,33 @@ def torch_gqa_sdpa_reference(q_np, k_np, v_np, seq_len, is_causal=True):
     return out.detach().cpu().numpy()
 
 MODEL_CONFIGS = [
-    ("Llama3-8B", 32, 8, 128, 8192),
-    ("GPT2-Base", 12, 12, 64, 1024),
-    ("BERT-Base", 12, 12, 64, 512),
+    ("Llama3-8B", 32, 8, 128),
+    ("GPT2-Base", 12, 12, 64),
+    ("BERT-Base", 12, 12, 64),
 ]
 
-@pytest.mark.parametrize("name, num_heads, kv_heads, head_dim, max_seq_len", MODEL_CONFIGS)
-@pytest.mark.parametrize("seq_len", [127, 258, 500, 1125, 2000, 5000])
+@pytest.mark.parametrize("name, num_heads, kv_heads, head_dim", MODEL_CONFIGS)
+@pytest.mark.parametrize("q_seq_len, kv_seq_len", [(127, 127), (1, 258), (500, 600), (1125, 1600), (1, 2000), (2500, 5000)])
 @pytest.mark.parametrize("dtype, atol, rtol", [
     (np.float16, 2e-3, 2e-3),
     (ml_dtypes.bfloat16, 2e-2, 2e-2)
 ])
-def test_gqa_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, max_seq_len, seq_len):
+def test_gqa_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, q_seq_len, kv_seq_len):
 
-    seq_len = min(max_seq_len, seq_len)
     batch_size = 2
 
     # 遵循 [B, MaxL, H, D] 布局
-    q = np.random.randn(batch_size, max_seq_len, num_heads, head_dim).astype(dtype)
-    k = np.random.randn(batch_size, max_seq_len, kv_heads, head_dim).astype(dtype)
-    v = np.random.randn(batch_size, max_seq_len, kv_heads, head_dim).astype(dtype)
+    q = np.random.randn(batch_size, q_seq_len, num_heads, head_dim).astype(dtype)
+    k = np.random.randn(batch_size, kv_seq_len, kv_heads, head_dim).astype(dtype)
+    v = np.random.randn(batch_size, kv_seq_len, kv_heads, head_dim).astype(dtype)
 
-    out_cuda = ginfer_test.test_gqa_op_cuda(q, k, v, seq_len)
-
-    # 提取有效区域 [B, seq_len, H, D]
-    out_cuda_valid = out_cuda[:, :seq_len, :, :]
+    out_cuda = ginfer_test.test_gqa_op_cuda(q, k, v)
 
     # PyTorch Reference
-    ref_out = torch_gqa_sdpa_reference(q, k, v, seq_len, is_causal=True)
+    ref_out = torch_gqa_sdpa_reference(q, k, v, is_causal=True)
 
     np.testing.assert_allclose(
-        out_cuda_valid.astype(np.float32),
+        out_cuda.astype(np.float32),
         ref_out,
         rtol=rtol,
         atol=atol,

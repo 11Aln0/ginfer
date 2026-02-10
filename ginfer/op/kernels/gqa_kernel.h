@@ -8,7 +8,7 @@ namespace ginfer::op::kernel {
 template <typename T, typename Context>
 
 void GQAKernel(const Context& ctx, const tensor::Tensor& q, const tensor::Tensor& k,
-               const tensor::Tensor& v, tensor::Tensor& output, int seq_len);
+               const tensor::Tensor& v, tensor::Tensor& output);
 
 using GQAKernelFuncType = decltype(&GQAKernel<float, common::DeviceContext>);
 

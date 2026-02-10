@@ -18,20 +18,16 @@ class Tensor {
  public:
   explicit Tensor() = delete;
 
-  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer,
-                  Layout layout = Layout::kLayoutRowMajor);
+  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
 
   // use default allocator to create buffer
-  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type, Layout layout = Layout::kLayoutRowMajor);
+  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
 
-  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator,
-                  Layout layout = Layout::kLayoutRowMajor);
+  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
 
   const Shape& shape() const;
 
   DataType dtype() const;
-
-  Layout layout() const;
 
   size_t size() const;
 
@@ -55,6 +51,7 @@ class Tensor {
 
   std::shared_ptr<Tensor> slice(int dim, int64_t start, int64_t end) const;
   std::shared_ptr<Tensor> reshape(const Shape& new_shape) const;
+  std::shared_ptr<Tensor> permute(const std::vector<size_t>& new_order) const;
 
  private:
   void calcStrides();
@@ -66,7 +63,9 @@ class Tensor {
   std::vector<ptrdiff_t> strides_;
   int64_t offset_ = 0;
   size_t size_ = 0;
-  Layout layout_ = Layout::kLayoutRowMajor;
+  // Layout layout_ = Layout::kLayoutRowMajor;
 };
+
+using TensorRef = std::shared_ptr<tensor::Tensor>;
 
 }  // namespace ginfer::tensor

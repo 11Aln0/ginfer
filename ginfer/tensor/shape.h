@@ -11,11 +11,13 @@ class Shape {
  public:
   explicit Shape() = delete;
 
-  explicit Shape(const std::initializer_list<int64_t> dims) : dims_(dims){};
+  explicit Shape(int ndim) : dims_(ndim, 0) {}
 
-  explicit Shape(const std::vector<int64_t>& dims) : dims_(dims){};
+  explicit Shape(const std::initializer_list<int64_t> dims) : dims_(dims) {}
 
-  explicit Shape(std::vector<int64_t>&& dims) : dims_(std::move(dims)){};
+  explicit Shape(const std::vector<int64_t>& dims) : dims_(dims) {}
+
+  explicit Shape(std::vector<int64_t>&& dims) : dims_(std::move(dims)) {}
 
   size_t ndim() const { return dims_.size(); }
 
@@ -24,8 +26,8 @@ class Shape {
     return std::accumulate(dims_.begin(), dims_.end(), 1, std::multiplies<int64_t>());
   }
 
-  int64_t operator[](size_t idx) const { return dims_[idx]; }
-  int64_t& operator[](size_t idx) { return dims_[idx]; }
+  int64_t operator[](int64_t idx) const { return dims_[idx]; }
+  int64_t& operator[](int64_t idx) { return dims_[idx]; }
 
   bool operator==(const Shape& other) const {
     if (ndim() != other.ndim()) return false;

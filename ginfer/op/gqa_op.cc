@@ -5,7 +5,7 @@
 
 namespace ginfer::op {
 
-GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA, "gqa"), seq_len_(0) {}
+GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA, "gqa") {}
 
 Status GQAOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "GQAOp requires exactly 3 input tensors.";
@@ -20,11 +20,11 @@ Status GQAOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*>
 
   auto gqa_kernel =
       kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GQAKernelFuncType>("GQA", q->dtype());
-  gqa_kernel(*dev_ctx, *q, *k, *v, *outputs[0], seq_len_);
+  gqa_kernel(*dev_ctx, *q, *k, *v, *outputs[0]);
 
   return ginfer::error::Success();
 }
 
-void GQAOp::setSeqLen(int seq_len) { seq_len_ = seq_len; }
+// void GQAOp::setSeqLen(int seq_len) { seq_len_ = seq_len; }
 
 }  // namespace ginfer::op

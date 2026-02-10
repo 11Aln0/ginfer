@@ -13,7 +13,7 @@ class GlobalDeviceAllocator {
   GlobalDeviceAllocator(const GlobalDeviceAllocator&) = delete;
   GlobalDeviceAllocator& operator=(const GlobalDeviceAllocator&) = delete;
 
-  static T* get_instance() {
+  static T* getInstance() {
     if (instance == nullptr) {
       instance = new T();
     }

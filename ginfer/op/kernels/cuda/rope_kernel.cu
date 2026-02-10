@@ -4,7 +4,7 @@
 namespace ginfer::op::kernel {
 
 template<typename T>
-__global__ void calcSinCosImpl(T* sin_cache,
+__global__ void rotaryEmbeddingImpl(T* sin_cache,
                                T* cos_cache,
                                int start_pos,
                                int end_pos,
@@ -55,24 +55,25 @@ __global__ void ROPEImpl(T* output,
 }
 
 template<typename T, typename Context>
-void CalcSinCosKernel(const Context& ctx, 
+void RotaryEmbeddingKernel(const Context& ctx, 
                       tensor::Tensor sin_cache, tensor::Tensor cos_cache,
-                      int start_pos, int end_pos,
-                      int head_dim, float rope_theta) {
+                      int start_pos, int end_pos, float rope_theta) {
 
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
-      << "CalcSinCostKernel only supports CUDA device type.";
-
+      << "RotaryEmbeddingKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+
+  const auto& shape = sin_cache.shape();
 
   T* sin_cache_data = sin_cache.data<T>();
   T* cos_cache_data = cos_cache.data<T>();
-
+  
+  int head_dim = shape[shape.ndim() - 1];
   int rope_half_dim = head_dim / 2;
   int block_size = rope_half_dim;
   int grid_size = std::min((end_pos - start_pos), 512);
 
-  calcSinCosImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
+  rotaryEmbeddingImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
       sin_cache_data,
       cos_cache_data,
       start_pos,
@@ -118,9 +119,9 @@ void ROPEKernel(const Context& ctx,
   );
 }
 
-REGISTER_KERNEL(calcSinCos,
+REGISTER_KERNEL(rotary_embedding,
                 kDeviceCUDA,
-                CalcSinCosKernel,
+                RotaryEmbeddingKernel,
                 tensor::DataType::kDataTypeFloat32);
 
 REGISTER_KERNEL(ROPE,

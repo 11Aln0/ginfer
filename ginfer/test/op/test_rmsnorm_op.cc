@@ -23,7 +23,7 @@ Tensor test_rmsnorm_op_cuda(Tensor& input_tensor, Tensor& gamma_tensor, float ep
   ::ginfer::op::RMSNormOp rmsnorm_op(DeviceType::kDeviceCUDA, epsilon);
 
   // Move tensors to GPU
-  auto cu_allocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>::get_instance();
+  auto cu_allocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>::getInstance();
   input_tensor.toDevice(cu_allocator);
   gamma_tensor.toDevice(cu_allocator);
   output_tensor.toDevice(cu_allocator);

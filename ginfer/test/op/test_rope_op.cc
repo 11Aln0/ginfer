@@ -29,15 +29,18 @@ Tensor test_rope_op_cuda(Tensor& input_tensor, int head_dim, int start_pos, int 
   cos_cache.toDevice(DeviceType::kDeviceCUDA);
 
   // Compute sin/cos cache
-  ::ginfer::op::ROPESinCosCacheOp cache_op(DeviceType::kDeviceCUDA, head_dim, max_seq_len, rope_theta);
-  std::vector<const Tensor*> cache_inputs = {};
-  std::vector<Tensor*> cache_outputs = {&sin_cache, &cos_cache};
-  auto cache_status = cache_op.run(cache_inputs, cache_outputs);
-  CHECK(cache_status.code() == ::ginfer::error::StatusCode::kSuccess)
-      << "ROPESinCosCacheOp run failed: " << cache_status.msg();
+  ::ginfer::op::RotaryEmbeddingOp rotary_embed_op(DeviceType::kDeviceCUDA, rope_theta);
+  auto pos_ids = Tensor(DataType::kDataTypeInt64, Shape({2}), DeviceType::kDeviceCPU);
+  pos_ids.data<int64_t>()[0] = start_pos;
+  pos_ids.data<int64_t>()[1] = end_pos;
+  std::vector<const Tensor*> embed_inputs = {&pos_ids};
+  std::vector<Tensor*> embed_outputs = {&sin_cache, &cos_cache};
+  auto embed_status = rotary_embed_op.run(embed_inputs, embed_outputs);
+  CHECK(embed_status.code() == ::ginfer::error::StatusCode::kSuccess)
+      << "RotaryEmbeddingOp run failed: " << embed_status.msg();
 
   // Run ROPE
-  ::ginfer::op::ROPEOp rope_op(DeviceType::kDeviceCUDA, head_dim, max_seq_len, rope_theta);
+  ::ginfer::op::ROPEOp rope_op(DeviceType::kDeviceCUDA);
 
   input_tensor.toDevice(DeviceType::kDeviceCUDA);
   output_tensor.toDevice(DeviceType::kDeviceCUDA);

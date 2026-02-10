@@ -32,12 +32,17 @@ class NumpyToTensorConverter {
     int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) * dTypeSize(dtype);
     auto buf = std::make_shared<Buffer>(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU);
 
-    Layout layout = Layout::kLayoutRowMajor;
     if ((bool)(arr.flags() & py::array::f_style)) {
-      layout = Layout::kLayoutColMajor;
+      std::reverse(shape.begin(), shape.end());
+      auto t = tensor::Tensor(dtype, Shape(shape), buf);
+      std::vector<size_t> new_order(ndim);
+      for (size_t i = 0; i < ndim; ++i) {
+        new_order[i] = ndim - 1 - i;
+      }
+      return *t.permute(new_order);
+    } else {
+      return tensor::Tensor(dtype, Shape(shape), buf);
     }
-
-    return tensor::Tensor(dtype, Shape(shape), buf, layout);
   }
 
   static py::array convert_back(const Tensor& tensor) {

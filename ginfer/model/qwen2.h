@@ -2,115 +2,116 @@
 
 #include <memory>
 #include "ginfer/common/errors.h"
+#include "ginfer/layer/layer.h"
+#include "ginfer/layer/transformer/layer.h"
+#include "ginfer/memory/allocator_factory.h"
+#include "ginfer/model/safetensor_loader.h"
 #include "ginfer/op/op.h"
 #include "ginfer/tensor/tensor.h"
 
 namespace ginfer::model {
 
-class AttentionLayer : ginfer::op::Layer {};
+using error::Status;
+using ginfer::tensor::Tensor;
+using ginfer::tensor::TensorRef;
 
-class FeedForwardLayer {};
+struct Qwen2Config {
+  tensor::DataType dtype;
 
-class EncoderLayer {};
+  int nlayer;
+  int hidden_size;
+  int num_heads;
+  int num_kv_heads;
+  int head_dim;
+  int intermediate_size;
+  int vocab_size;
+  size_t max_seq_len;
+
+  float rms_norm_eps;
+  float rope_theta;
+
+  int64_t eos_token_id;
+};
+
+class Qwen2Model;
+
+class Qwen2ModelLoader {
+  using AttentionWeight = layer::transformer::AttentionLayer::Weight;
+  using EncoderWeight = layer::transformer::EncoderLayer::Weight;
+  using FeedForwardWeight = layer::transformer::FeedForwardLayer::Weight;
+
+ public:
+  explicit Qwen2ModelLoader(std::string model_path);
+
+  std::shared_ptr<Qwen2Model> load();
+
+ private:
+  Qwen2Config loadConfig();
+  AttentionWeight loadAttentionWeight(const std::string& prefix);
+  FeedForwardWeight loadFeedForwardWeight(const std::string& prefix);
+  EncoderWeight loadEncoderLayerWeight(int layer_idx);
+
+ private:
+  std::string model_path_;
+  SafeTensorLoader weight_loader;
+};
 
 class Qwen2Model {
- private:
-  using error::Status;
-  using TensorRef = std::shared_ptr<tensor::Tensor>;
-
-  struct Qwen2Config {
-    tensor::DataType dtype;
-
-    size_t nlayer;
-    size_t hidden_size;
-    size_t num_heads;
-    size_t num_kv_heads;
-    size_t head_dim;
-    size_t intermediate_size;
-    size_t vocab_size;
-    size_t max_seq_len;
-
-    float rms_norm_eps;
-    float rope_theta;
-
-    int64_t eos_token_id;
-  };
-
-  struct Qwen2Weights {
-    // embedding
-    TensorRef in_embed_w;
-
-    // encoder layer
-    std::vector<TensorRef> attn_norm_w;  // [hidden_size]
-    std::vector<TensorRef> attn_q_w;     // [hidden_size, num_heads * head_dim]
-    std::vector<TensorRef> attn_q_b;
-    std::vector<TensorRef> attn_k_w;  // [hidden_size, num_heads * head_dim]
-    std::vector<TensorRef> attn_k_b;
-    std::vector<TensorRef> attn_v_w;  // [hidden_size, num_kv_heads * head_dim]
-    std::vector<TensorRef> attn_v_b;
-    std::vector<TensorRef> attn_o_w;    // [hidden_size, num_heads * head_dim]
-    std::vector<TensorRef> mlp_norm_w;  // [hidden_size, intermediate_size]
-    std::vector<TensorRef> mlp_gate_w;  // [hidden_size, intermediate_size]
-    std::vector<TensorRef> mlp_up_w;
-    std::vector<TensorRef> mlp_down_w;
-
-    TensorRef out_norm_w;
-    // lm head
-    TensorRef lm_head_w;  // [hidden_size, vocab_size]
-  };
-
-  struct Qwen2InternalBuffers {
-    TensorRef token_ids;  // [max_seq_len]
-
-    TensorRef embed_out;     // [max_seq_len, hidden_size]
-    TensorRef rms_norm_out;  // for decoder rmsx2 + lm_head rms [max_seq_len, hidden_size]
-
-    // attention
-    TensorRef q_out;       // [max_seq_len, num_heads * head_dim]
-    TensorRef attn_out;    // [max_seq_len, num_heads * head_dim]
-    TensorRef o_proj_out;  // [max_seq_len, hidden_size]
-    // no need for redisual
-
-    // feed-forward
-    TensorRef mlp_gate_out;  // [max_seq_len, inter_size] (reused for swiglu out)
-    TensorRef mlp_up_out;    // [max_seq_len, inter_size]
-    TensorRef mlp_down_out;  // [max_seq_len, hidden_size]
-
+  struct Intermediates {
+    TensorRef sin;          // [max_seq_len, head_dim]
+    TensorRef cos;          // [max_seq_len, head_dim]
+    TensorRef embed_out;    // [max_seq_len, hidden_size]
+    TensorRef norm_out;     // [max_seq_len, hidden_size]
     TensorRef lm_head_out;  // [max_seq_len, vocab_size]
+    TensorRef argmax_out;   // [1]
   };
 
   struct Qwen2KVCache {
     std::vector<TensorRef> k;  // [max_seq_len, num_kv_heads * head_dim] * nlayer
     std::vector<TensorRef> v;  // [max_seq_len, num_kv_heads * head_dim] * nlayer
+    int64_t offset;
   };
 
  public:
+  Qwen2Model(Qwen2Config config, common::DeviceType dev_type = common::DeviceType::kDeviceCPU);
+
   Status predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range, int64_t& next_token_id);
+
+  void toDevice(common::DeviceType dev_type);
+
+  friend class Qwen2ModelLoader;
+
+ private:
+  struct KVCache {
+    TensorRef k;
+    TensorRef v;
+    int64_t offset;
+  };
+
+  // TODO select by device
+  using InputTensorAllocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>;
 
  private:
   // mem
-  void initEncoderLayerWeight(size_t layer);
-  void initEncoderLayersWeight();
-  void initWeights();
-  void initInternalBuffers();
+  void initIntermediates();
   void initKVCache();
+  std::pair<TensorRef, TensorRef> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
 
   // forward
-  TensorRef forward(const TensorRef input_ids);
-  TensorRef forwardEmbedding(const TensorRef input_ids);
-  TensorRef forwardRMSNorm(const TensorRef input, const TensorRef weight);
-  TensorRef forwardAttention(const TensorRef input, int layer);
-  TensorRef forwardFeedForward(const TensorRef input, int layer);
-  TensorRef forwardEncoderLayer(const TensorRef input, int layer);
-  TensorRef forwardLMHead(const TensorRef input);
+  Status forward(const TensorRef input_ids, std::pair<int64_t, int64_t> pos_id_range, TensorRef output);
 
  private:
   Qwen2Config config_;
-  Qwen2Weights weights_;
-  Qwen2InternalBuffers internal_buffers_;
+
+  Intermediates intermediates_;
   Qwen2KVCache kv_cache_;
 
- private:
+  op::RotaryEmbeddingOp rotary_emb;
+  op::ArgmaxOp argmax_op;
+  layer::EmbeddingLayer embed_tokens;
+  std::vector<layer::transformer::EncoderLayer> encoder_layers;
+  layer::RMSNormLayer final_rmsnorm;
+  layer::LinearLayer lm_head;
 };
 
 }  // namespace ginfer::model

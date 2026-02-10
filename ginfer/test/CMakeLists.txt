@@ -14,8 +14,9 @@ add_gtest(test_op memory tensor op)
 # add pybind test
 file(GLOB PYBIND_SOURCES "pybind/*.cc")
 file(GLOB PYBIND_OP_TEST_SOURCES "op/test_*.cc")
-pybind11_add_module(ginfer_test ${PYBIND_SOURCES} ${PYBIND_OP_TEST_SOURCES})
-target_link_libraries(ginfer_test PRIVATE pybind11::module op)
+file(GLOB PYBIND_MODEL_TEST_SOURCES "model/test_*.cc")
+pybind11_add_module(ginfer_test ${PYBIND_SOURCES} ${PYBIND_OP_TEST_SOURCES} ${PYBIND_MODEL_TEST_SOURCES})
+target_link_libraries(ginfer_test PRIVATE pybind11::module op model)
 set_target_properties(ginfer_test PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/python
 )

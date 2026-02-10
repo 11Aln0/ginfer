@@ -12,7 +12,7 @@ using std::byte;
 TEST(TensorTest, fromBuffer) {
   // cpu test
 
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
+  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
   float* ptr1 = new float[128];
   auto cpu_buffer = std::make_shared<ginfer::memory::Buffer>(128 * sizeof(float), (byte*)ptr1,
@@ -34,7 +34,7 @@ TEST(TensorTest, fromBuffer) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::get_instance();
+  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::getInstance();
   ASSERT_NE(cuda_allocator, nullptr);
   float* ptr2 = nullptr;
   cudaError_t err = cudaMallocManaged(reinterpret_cast<void**>(&ptr2), 128 * sizeof(float));
@@ -59,7 +59,7 @@ TEST(TensorTest, fromBuffer) {
 TEST(TensorTest, fromAllocator) {
   // cpu test
 
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
+  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::tensor::Shape shape{32, 4};
   ginfer::tensor::Tensor cpu_tensor =
@@ -77,7 +77,7 @@ TEST(TensorTest, fromAllocator) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::get_instance();
+  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::getInstance();
   ASSERT_NE(cuda_allocator, nullptr);
   ginfer::tensor::Tensor cuda_tensor = ginfer::tensor::Tensor(ginfer::tensor::DataType::kDataTypeFloat32, shape,
                                                               ginfer::common::DeviceType::kDeviceCUDA);
@@ -94,7 +94,7 @@ TEST(TensorTest, fromAllocator) {
 }
 
 TEST(TensorTest, toDev) {
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
+  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::tensor::Shape shape{16, 8};
   ginfer::tensor::Tensor tensor =
@@ -114,13 +114,12 @@ TEST(TensorTest, toDev) {
   // ASSERT_EQ(cpu_tensor.shape)
 }
 
-TEST(TensorTest, layoutAndStrides) {
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::get_instance();
+TEST(TensorTest, strides) {
+  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::tensor::Shape shape{4, 3, 2};
   ginfer::tensor::Tensor row_major_tensor =
-      ginfer::tensor::Tensor(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU,
-                             ginfer::tensor::Layout::kLayoutRowMajor);
+      ginfer::tensor::Tensor(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU);
   auto row_strides = row_major_tensor.strides();
   ASSERT_EQ(row_strides.size(), 3);
   ASSERT_EQ(row_strides[0], 6);
@@ -128,8 +127,8 @@ TEST(TensorTest, layoutAndStrides) {
   ASSERT_EQ(row_strides[2], 1);
 
   ginfer::tensor::Tensor col_major_tensor =
-      ginfer::tensor::Tensor(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU,
-                             ginfer::tensor::Layout::kLayoutColMajor);
+      ginfer::tensor::Tensor(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU);
+  col_major_tensor.permute({2, 1, 0});
   auto col_strides = col_major_tensor.strides();
   ASSERT_EQ(col_strides.size(), 3);
   ASSERT_EQ(col_strides[0], 1);

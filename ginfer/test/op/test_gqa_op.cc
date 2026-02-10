@@ -14,13 +14,13 @@ using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
 
-Tensor test_gqa_op_cuda(Tensor& q_tensor, Tensor& k_tensor, Tensor& v_tensor, int seq_len) {
+Tensor test_gqa_op_cuda(Tensor& q_tensor, Tensor& k_tensor, Tensor& v_tensor) {
   DataType dtype = q_tensor.dtype();
   const Shape& shape = q_tensor.shape();
   Tensor output_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
 
   ::ginfer::op::GQAOp gqa_op(DeviceType::kDeviceCUDA);
-  gqa_op.setSeqLen(seq_len);
+  // gqa_op.setSeqLen(seq_len);
 
   // Move tensors to GPU
   q_tensor.toDevice(DeviceType::kDeviceCUDA);

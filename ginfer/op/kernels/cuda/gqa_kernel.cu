@@ -143,7 +143,8 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
                                              const T* p_m, /** old max smem */
                                              T* p_new_m, /** new max smem */
                                              float* p_l /** sum smem **/,
-                                             int seq_len,
+                                             int q_seq_len,
+                                             int kv_seq_len,
                                              int global_r_base,
                                              int global_c_base) {
                                               
@@ -160,8 +161,10 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
   
   int smem_row_offset = tid / thread_per_row; 
   int smem_col = tid % thread_per_row * vec_size;
+
+  int casual_mask_offset = kv_seq_len - q_seq_len;
   
-  int bound = min(br, seq_len - global_r_base);
+  int bound = min(br, q_seq_len - global_r_base);
   for(int r = 0; r < bound; r += row_per_iter) {
     T* sptr = p_SP + (smem_row_offset + r) * bc + smem_col;
     AccessType vec = *reinterpret_cast<const AccessType*>(sptr); 
@@ -171,7 +174,7 @@ __device__ __forceinline__ void computePTile(T* p_SP, /** S/P ptr of smem */
     #pragma unroll
     for(int j = 0; j < vec_size; j++) {
       int global_c = global_c_base + smem_col + j;
-      bool is_valid = global_c <= global_r && global_c < seq_len; // casual mask and seq_len mask
+      bool is_valid = global_c <= (global_r + casual_mask_offset) && global_c < kv_seq_len; // casual mask and seq_len mask
       vec.val[j] = is_valid ? vec.val[j] * rsqrt_head_dim : NumericTraits::fromFloat(-INFINITY); // div sqrt(head_dim)
     }
     
@@ -393,8 +396,10 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
                               T* __restrict__ output,
                               const int num_heads,
                               const int kv_heads,
-                              const int seq_len,
-                              const int pad_seq_len) {
+                              const int q_seq_len,
+                              const int kv_seq_len,
+                              size_t q_batch_stride,
+                              size_t kv_batch_stride) {
   
   static_assert(head_dim % 64 == 0, "head_dim must be multiple of 64");
 
@@ -410,8 +415,8 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
 
   int kv_head_id = head_id / (num_heads / kv_heads);
                                 
-  int q_offset = batch_id * pad_seq_len * q_seq_len_stride + q_block_id * br * q_seq_len_stride + head_id * head_dim;
-  int k_offset = batch_id * pad_seq_len * kv_seq_len_stride + kv_head_id * head_dim;
+  int q_offset = batch_id * q_batch_stride + q_block_id * br * q_seq_len_stride + head_id * head_dim;
+  int k_offset = batch_id * kv_batch_stride + kv_head_id * head_dim;
   int v_offset = k_offset;
   int out_offset = q_offset;
   
@@ -428,15 +433,15 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
   __syncthreads();
 
   // load Q block
-  loadQKVTile<T>(q + q_offset, min(br, seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
+  loadQKVTile<T>(q + q_offset, min(br, q_seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
 
-  for(int c = 0; c < seq_len; c += bc) {
-    if(c >= (q_block_id + 1) * br) break; // causal
-    int block_seq_len = min(bc, seq_len - c);
+  for(int c = 0; c < kv_seq_len; c += bc) {
+    if(c >= (q_block_id + 1) * br + kv_seq_len - q_seq_len) break; // causal
+    int kv_block_seq_len = min(bc, kv_seq_len - c);
     // load K,V block
     
-    loadQKVTile<T>(k + k_offset, block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
-    loadQKVTile<T>(v + v_offset, block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
+    loadQKVTile<T>(k + k_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
+    loadQKVTile<T>(v + v_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
     __syncthreads();
     // compute S = Q * K^T
     computeSTile<T, br, bc>(p_q_block_smem, p_k_block_smem, p_s_block_smem, head_dim);
@@ -444,7 +449,7 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
     T* p_old_m = p_m_smem + ((c/ bc) & 1) * br;
     T* p_new_m = p_m_smem + (((c/ bc) & 1) ^ 1) * br;
     int global_r_base = q_block_id * br, global_c_base = c; // for causal
-    computePTile<T, br, bc, head_dim>(p_s_block_smem, p_old_m, p_new_m, p_l_smem, seq_len, global_r_base, global_c_base);
+    computePTile<T, br, bc, head_dim>(p_s_block_smem, p_old_m, p_new_m, p_l_smem, q_seq_len, kv_seq_len, global_r_base, global_c_base);
     __syncthreads();
     // compute O += P * V
     updateOTile<T, br, bc, head_dim>(p_s_block_smem, p_v_block_smem, p_old_m, p_new_m, p_o_block_smem);
@@ -454,29 +459,36 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
     v_offset += kv_seq_len_stride * bc;
   }
   
-  storeOTile<T, head_dim>(p_o_block_smem, output + out_offset, p_l_smem, min(br, seq_len - q_block_id * br), out_seq_len_stride);
+  storeOTile<T, head_dim>(p_o_block_smem, output + out_offset, p_l_smem, min(br, q_seq_len - q_block_id * br), out_seq_len_stride);
   // store O block
 }
 
-// q: [batch, seq_len, num_heads, head_dim] padded to [batch, context_size, num_heads, head_dim]
+// q: [batch, q_seq_len, num_heads, head_dim]
+// k, v: [batch, kv_seq_len, num_heads_kv, head_dim] where num_heads_kv divides num_heads
 template <typename T, typename Context>
 void GQAKernel(const Context& ctx,
               const tensor::Tensor& q,
               const tensor::Tensor& k,
               const tensor::Tensor& v,
-              tensor::Tensor& output,
-              const int seq_len) {
+              tensor::Tensor& output) {
   
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "addKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
-  const auto& shape = q.shape();
-  const int batch = shape[0];
-  const int pad_seq_len = shape[1]; // context window
-  const int num_heads = shape[2];
-  const int head_dim = shape[3];
-  const int kv_heads = k.shape()[2];
+  const auto& q_shape = q.shape();
+  const auto& q_strides = q.strides();
+  const int batch = q_shape[0];
+  const int q_seq_len = q_shape[1];
+  const int num_heads = q_shape[2];
+  const int head_dim = q_shape[3];
+  const size_t q_batch_stride = q_strides[0];
+
+  const auto& k_shape = k.shape();
+  const auto& k_strides = k.strides();
+  const int kv_heads = k_shape[2];
+  const int kv_seq_len = k_shape[1];
+  const size_t kv_batch_stride = k_strides[0];
 
   const T* p_q = q.data<T>();
   const T* p_k = k.data<T>();
@@ -486,7 +498,7 @@ void GQAKernel(const Context& ctx,
   constexpr int br = 64, bc = 64;
 
   const int block_dim = 256;
-  dim3 grid_dim(batch, num_heads, (seq_len + br -1) / br);
+  dim3 grid_dim(batch, num_heads, (q_seq_len + br -1) / br);
   size_t smem_size = (br * head_dim * 2 + // Q, O 
                       bc * head_dim * 2 + // K, V
                       br * bc +          // S/P
@@ -502,7 +514,10 @@ void GQAKernel(const Context& ctx,
                                                smem_size);
         CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
         GQAKernelImpl<T, br, bc, 64><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
-                p_q, p_k, p_v, p_output, num_heads, kv_heads, seq_len, pad_seq_len);
+                p_q, p_k, p_v, p_output, 
+                num_heads, kv_heads, 
+                q_seq_len, kv_seq_len, 
+                q_batch_stride, kv_batch_stride);
         break;
       case 128:
         err = cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 128>, 
@@ -510,7 +525,10 @@ void GQAKernel(const Context& ctx,
                                                smem_size);
         CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
         GQAKernelImpl<T, br, bc, 128><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
-                p_q, p_k, p_v, p_output, num_heads, kv_heads, seq_len, pad_seq_len);
+                p_q, p_k, p_v, p_output, 
+                num_heads, kv_heads, 
+                q_seq_len, kv_seq_len, 
+                q_batch_stride, kv_batch_stride);
         break;
       default:
         throw std::runtime_error("Unsupported head_dim in gqaKernel dispatcher");

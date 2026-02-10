@@ -4,28 +4,25 @@
 
 namespace ginfer::op {
 
-ROPESinCosCacheOp::ROPESinCosCacheOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta)
-    : Op(dev_type, OpType::kOpCustom, "rope_sin_cos_cache"),
-      head_dim_(head_dim),
-      rope_theta_(rope_theta),
-      max_seq_len_(max_seq_len) {}
+RotaryEmbeddingOp::RotaryEmbeddingOp(DeviceType dev_type, float rope_theta)
+    : Op(dev_type, OpType::kOpCustom, "rotary_embedding"), rope_theta_(rope_theta) {}
 
-Status ROPESinCosCacheOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
-  CHECK(inputs.empty()) << "ROPESinCosCacheOp does not take any input tensors.";
-  CHECK(outputs.size() == 2) << "ROPESinCosCacheOp requires exactly 2 output tensors.";
+Status RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+  CHECK(inputs.size() == 1) << "RotaryEmbeddingOp requires exactly 1 input tensor.";
+  CHECK(outputs.size() == 2) << "RotaryEmbeddingOp requires exactly 2 output tensors.";
 
   common::DeviceType dev_type = getDeviceType();
+  auto pos_ids_range = inputs[0]->data<int64_t>();
 
-  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::CalcSinCosKernelFuncType>(
-      "calcSinCos", tensor::DataType::kDataTypeFloat32);
+  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::RotaryEmbeddingKernelFuncType>(
+      "rotary_embedding", tensor::DataType::kDataTypeFloat32);
   auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *outputs[0], *outputs[1], 0, max_seq_len_, head_dim_, rope_theta_);
+  kernel(*dev_ctx, *outputs[0], *outputs[1], pos_ids_range[0], pos_ids_range[1], rope_theta_);
 
   return ginfer::error::Success();
 }
 
-ROPEOp::ROPEOp(DeviceType dev_type, int head_dim, int max_seq_len, float rope_theta)
-    : Op(dev_type, OpType::kOpROPE, "rope"), head_dim_(head_dim), rope_theta_(rope_theta), max_seq_len_(max_seq_len) {}
+ROPEOp::ROPEOp(DeviceType dev_type) : Op(dev_type, OpType::kOpROPE, "rope") {}
 
 Status ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
