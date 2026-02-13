@@ -8,17 +8,16 @@ __global__ void rotaryEmbeddingImpl(T* sin_cache,
                                T* cos_cache,
                                int start_pos,
                                int end_pos,
-                               int head_dim,
+                               int half_head_dim,
                                float rope_theta) {
 
   int j = threadIdx.x;
-  int rope_half_dim = head_dim / 2;
 
-  for(int pos_id = start_pos + blockIdx.x; pos_id < end_pos; pos_id += gridDim.x) {
-    float theta = pos_id / powf(rope_theta, (2.0f * (float)j) / (float)head_dim);
+  for(int pos_id = start_pos + blockIdx.x; pos_id <= end_pos; pos_id += gridDim.x) {
+    float theta = pos_id / powf(rope_theta, (float)j / (float)half_head_dim);  // 2 * j / head_dim -> j / rope_half_dim
     // write from the start of the cache
-    sin_cache[(pos_id - start_pos) * rope_half_dim + j] = static_cast<T>(sinf(theta));
-    cos_cache[(pos_id - start_pos) * rope_half_dim + j] = static_cast<T>(cosf(theta));
+    sin_cache[(pos_id - start_pos) * half_head_dim + j] = static_cast<T>(sinf(theta));
+    cos_cache[(pos_id - start_pos) * half_head_dim + j] = static_cast<T>(cosf(theta));
   }
 } 
 
@@ -68,17 +67,16 @@ void RotaryEmbeddingKernel(const Context& ctx,
   T* sin_cache_data = sin_cache.data<T>();
   T* cos_cache_data = cos_cache.data<T>();
   
-  int head_dim = shape[shape.ndim() - 1];
-  int rope_half_dim = head_dim / 2;
-  int block_size = rope_half_dim;
-  int grid_size = std::min((end_pos - start_pos), 512);
+  int half_head_dim = shape[shape.ndim() - 1];
+  int block_size = half_head_dim;
+  int grid_size = std::min((end_pos - start_pos + 1), 512);
 
   rotaryEmbeddingImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
       sin_cache_data,
       cos_cache_data,
       start_pos,
       end_pos,
-      head_dim,
+      half_head_dim,
       rope_theta
   );
 }
@@ -106,7 +104,7 @@ void ROPEKernel(const Context& ctx,
   const float* cos_cache_data = cos_cache.data<float>();
 
   int block_size = 256;
-  int grid_size = std::min((total_num_heads + block_size - 1) / block_size, 512);
+  int grid_size = std::min((total_num_heads * (head_dim / 2) + block_size - 1) / block_size, 512);
 
   ROPEImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
       output_data,

@@ -26,6 +26,10 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
 
   void copyFrom(const Buffer* src);
 
+  void copyFrom(const Buffer& src, size_t size);
+
+  void copyFrom(const Buffer* src, size_t size);
+
   virtual ~Buffer();
 
   size_t size() const { return size_; }

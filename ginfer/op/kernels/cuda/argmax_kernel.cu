@@ -51,7 +51,6 @@ __forceinline__ __device__ void block_reduce_argmax(float& val, int64_t& idx,
 template<typename T, int vec_size = DefaultVecSize<T>::value>
 __global__ void argmaxKernelImpl(const T* input, int64_t* output_idx, size_t size) {
 
-
   __shared__ int64_t max_idx[32];
   __shared__ float max_val[32];
 

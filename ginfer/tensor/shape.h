@@ -26,8 +26,8 @@ class Shape {
     return std::accumulate(dims_.begin(), dims_.end(), 1, std::multiplies<int64_t>());
   }
 
-  int64_t operator[](int64_t idx) const { return dims_[idx]; }
-  int64_t& operator[](int64_t idx) { return dims_[idx]; }
+  int64_t operator[](int64_t idx) const { return dims_.at(idx); }
+  int64_t& operator[](int64_t idx) { return dims_.at(idx); }
 
   bool operator==(const Shape& other) const {
     if (ndim() != other.ndim()) return false;

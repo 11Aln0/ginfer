@@ -36,22 +36,22 @@ class Layer : public BaseLayer {
   using BaseLayer::BaseLayer;
 };
 
-class LayerWithParam : public Layer {
-  using Layer::Layer;
+// class LayerWithParam : public Layer {
+//   using Layer::Layer;
 
- public:
-  virtual Status toDevice(DeviceType dev_type) override;
+//  public:
+//   virtual Status toDevice(DeviceType dev_type) override;
 
-  virtual std::vector<TensorRef> getWeights() = 0;
-};
+//   virtual std::vector<TensorRef> getWeights() = 0;
+// };
 
-class LinearLayer : public LayerWithParam {
+class LinearLayer : public Layer {
  public:
   LinearLayer(DeviceType dev_type, std::string layer_name);
 
   virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  virtual std::vector<TensorRef> getWeights() override;
+  virtual Status toDevice(DeviceType dev_type) override;
 
   void setWeight(const TensorRef& weight);
   void setBias(const TensorRef& bias);
@@ -62,7 +62,7 @@ class LinearLayer : public LayerWithParam {
   TensorRef bias_;    // [out_features]
 };
 
-class RMSNormLayer : public LayerWithParam {
+class RMSNormLayer : public Layer {
  public:
   RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon);
 
@@ -70,20 +70,20 @@ class RMSNormLayer : public LayerWithParam {
 
   void setWeight(const TensorRef& gamma);
 
-  virtual std::vector<TensorRef> getWeights() override;
+  virtual Status toDevice(DeviceType dev_type) override;
 
  private:
   op::RMSNormOp norm_op_;
   TensorRef gamma_;
 };
 
-class EmbeddingLayer : public LayerWithParam {
+class EmbeddingLayer : public Layer {
  public:
   EmbeddingLayer(DeviceType dev_type, std::string layer_name);
 
   virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  virtual std::vector<TensorRef> getWeights() override;
+  virtual Status toDevice(DeviceType dev_type) override;
 
   void setWeight(const TensorRef& weight);
 

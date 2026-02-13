@@ -25,7 +25,7 @@ class AttentionLayer : public Layer {
   };
 
  public:
-  AttentionLayer(DeviceType dev_type, std::string layer_name);
+  AttentionLayer(DeviceType dev_type, std::string layer_name, int num_heads, int num_kv_heads, int head_dim);
 
   Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
@@ -45,6 +45,10 @@ class AttentionLayer : public Layer {
   LinearLayer k_proj;
   LinearLayer v_proj;
   LinearLayer o_proj;
+
+  int num_heads_;
+  int num_kv_heads_;
+  int head_dim_;
 };
 
 class FeedForwardLayer : public Layer {
@@ -98,7 +102,8 @@ class EncoderLayer : public Layer {
   };
 
  public:
-  EncoderLayer(DeviceType dev_type, std::string layer_name, float rms_norm_eps);
+  EncoderLayer(DeviceType dev_type, std::string layer_name, float rms_norm_eps, int num_heads, int num_kv_heads,
+               int head_dim);
 
   Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 

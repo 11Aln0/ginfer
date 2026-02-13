@@ -94,20 +94,20 @@ def torch_gqa_sdpa_reference(q_np, k_np, v_np, is_causal=True):
     k = torch.from_numpy(k_np.astype(np.float32)).to(device)
     v = torch.from_numpy(v_np.astype(np.float32)).to(device)
 
-    # [B, L, H, D] -> [B, H, L, D]
-    q = q.permute(0, 2, 1, 3)
-    k = k.permute(0, 2, 1, 3)
-    v = v.permute(0, 2, 1, 3)
+    # [L, H, D] -> [H, L, D]
+    q = q.permute(1, 0, 2)
+    k = k.permute(1, 0, 2)
+    v = v.permute(1, 0, 2)
 
-    B, num_heads, L, head_dim = q.shape
-    S = k.shape[2]
-    kv_heads = k.shape[1]
+    num_heads, L, head_dim = q.shape
+    S = k.shape[1]
+    kv_heads = k.shape[0]
 
     # GQA 广播逻辑
     if num_heads != kv_heads:
         n_rep = num_heads // kv_heads
-        k = k.repeat_interleave(n_rep, dim=1)
-        v = v.repeat_interleave(n_rep, dim=1)
+        k = k.repeat_interleave(n_rep, dim=0)
+        v = v.repeat_interleave(n_rep, dim=0)
     
     if is_causal and L != S:
         # 手动构造 lower-right causal mask
@@ -116,44 +116,43 @@ def torch_gqa_sdpa_reference(q_np, k_np, v_np, is_causal=True):
     else:
         out = F.scaled_dot_product_attention(q, k, v, is_causal=is_causal)
 
-    # [B, H, L, D] -> [B, L, H, D]
-    out = out.permute(0, 2, 1, 3)
+    # [H, L, D] -> [L, H, D]
+    out = out.permute(1, 0, 2)
 
     return out.detach().cpu().numpy()
 
 MODEL_CONFIGS = [
     ("Llama3-8B", 32, 8, 128),
     ("GPT2-Base", 12, 12, 64),
-    ("BERT-Base", 12, 12, 64),
+    ("Qwen2-1.5B", 12, 2, 128),
 ]
 
 @pytest.mark.parametrize("name, num_heads, kv_heads, head_dim", MODEL_CONFIGS)
-@pytest.mark.parametrize("q_seq_len, kv_seq_len", [(127, 127), (1, 258), (500, 600), (1125, 1600), (1, 2000), (2500, 5000)])
+@pytest.mark.parametrize("q_seq_len, kv_seq_len", [(127, 127), (1, 258), (9, 9), (1125, 1600), (1, 2000), (2500, 5000)])
 @pytest.mark.parametrize("dtype, atol, rtol", [
     (np.float16, 2e-3, 2e-3),
     (ml_dtypes.bfloat16, 2e-2, 2e-2)
 ])
 def test_gqa_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, q_seq_len, kv_seq_len):
 
-    batch_size = 2
+    # batch_size = 2
 
     # 遵循 [B, MaxL, H, D] 布局
-    q = np.random.randn(batch_size, q_seq_len, num_heads, head_dim).astype(dtype)
-    k = np.random.randn(batch_size, kv_seq_len, kv_heads, head_dim).astype(dtype)
-    v = np.random.randn(batch_size, kv_seq_len, kv_heads, head_dim).astype(dtype)
+    q = np.random.randn(q_seq_len, num_heads, head_dim).astype(dtype)
+    k = np.random.randn(kv_seq_len, kv_heads, head_dim).astype(dtype)
+    v = np.random.randn(kv_seq_len, kv_heads, head_dim).astype(dtype)
 
     out_cuda = ginfer_test.test_gqa_op_cuda(q, k, v)
 
     # PyTorch Reference
     ref_out = torch_gqa_sdpa_reference(q, k, v, is_causal=True)
 
-    np.testing.assert_allclose(
-        out_cuda.astype(np.float32),
-        ref_out,
-        rtol=rtol,
-        atol=atol,
-        err_msg=f"Logic error in {name} config!"
-    )
+    out_cuda = out_cuda.astype(np.float32)
+    if not np.allclose(out_cuda, ref_out, rtol=rtol, atol=atol):
+        print("Max absolute error:", np.max(np.abs(out_cuda - ref_out)))
+        print("Max relative error:", np.max(np.abs(out_cuda - ref_out) / (np.abs(ref_out) + 1e-6)))
+    np.testing.assert_allclose(out_cuda, ref_out, rtol=rtol, atol=atol)
+
 
 # ==================== Argmax ====================
 
@@ -224,7 +223,7 @@ ROPE_CONFIGS = [
 def test_rope_op_cuda(dtype, atol, rtol, seq_len, nhead, head_dim, rope_theta):
     x = np.random.randn(seq_len, nhead, head_dim).astype(dtype)
     start_pos = 0
-    end_pos = seq_len
+    end_pos = seq_len - 1
     out = ginfer_test.test_rope_op_cuda(x, head_dim, start_pos, end_pos, rope_theta)
     ref = rope_reference(x, start_pos, rope_theta).astype(dtype)
     np.testing.assert_allclose(out, ref, rtol=rtol, atol=atol)

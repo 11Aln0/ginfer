@@ -87,7 +87,6 @@ std::shared_ptr<Qwen2Model> Qwen2ModelLoader::load() {
   Qwen2Config config = loadConfig();
   auto m = std::make_shared<Qwen2Model>(config);
 
-  SafeTensorLoader weight_loader;
   weight_loader.load(model_path_ + "/model.safetensors");  // TODO multi-part safetensors
 
   m->embed_tokens.setWeight(weight_loader.getTensor("model.embed_tokens.weight"));

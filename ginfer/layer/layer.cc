@@ -14,11 +14,11 @@ Status BaseLayer::toDevice(DeviceType dev_type) {
   return ginfer::error::Success();
 }
 
-Status LayerWithParam::toDevice(DeviceType dev_type) {
-  for (auto weight : getWeights()) {
-    weight->toDevice(dev_type);
-  }
-  return BaseLayer::toDevice(dev_type);
-}
+// Status LayerWithParam::toDevice(DeviceType dev_type) {
+//   for (auto weight : getWeights()) {
+//     weight->toDevice(dev_type);
+//   }
+//   return BaseLayer::toDevice(dev_type);
+// }
 
 }  // namespace ginfer::layer

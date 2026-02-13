@@ -13,7 +13,7 @@ __global__ void addKernelImpl(const T* __restrict__ a,
                               const T* __restrict__ b, 
                               T* __restrict__ c, 
                               size_t n) {
-
+                                
   using AccessT = AlignedVector<T, vec_size>;
 
   size_t tid = blockIdx.x * blockDim.x + threadIdx.x;

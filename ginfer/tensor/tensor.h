@@ -39,6 +39,8 @@ class Tensor {
 
   void toDevice(memory::DeviceAllocator* allocator);
 
+  void copyFrom(const Tensor& src);
+
   template <typename T>
   T* data() {
     return reinterpret_cast<T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));

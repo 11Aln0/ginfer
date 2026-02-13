@@ -93,7 +93,7 @@ class Qwen2Model {
 
  private:
   // mem
-  void initIntermediates();
+  void lazyAllocIntermediates();
   void initKVCache();
   std::pair<TensorRef, TensorRef> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
 
@@ -102,9 +102,11 @@ class Qwen2Model {
 
  private:
   Qwen2Config config_;
+  common::DeviceType dev_type_;
 
   Intermediates intermediates_;
   Qwen2KVCache kv_cache_;
+  bool intermediates_allocated_ = false;
 
   op::RotaryEmbeddingOp rotary_emb;
   op::ArgmaxOp argmax_op;

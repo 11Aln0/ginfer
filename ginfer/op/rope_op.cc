@@ -28,7 +28,7 @@ Status ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*
   CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
   CHECK(outputs.size() == 1) << "ROPEOp requires exactly 1 output tensor.";
 
-  const Tensor* input = inputs[0];
+  const Tensor* input = inputs[0];  // [seq_len, num_heads or num_kv_heads, head_dim]
   const Tensor* sin_cache = inputs[1];
   const Tensor* cos_cache = inputs[2];
 

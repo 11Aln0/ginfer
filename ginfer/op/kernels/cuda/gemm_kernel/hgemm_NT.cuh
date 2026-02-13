@@ -208,6 +208,12 @@ __global__ void __launch_bounds__(256)
       ST_GLOBAL_PRED_U32(C + store_gmem_c_addr1, acc1, bound1);
     }
   }
+
+  // if(threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0) {
+  //   for(int i = 0; i < 16; i++) {
+  //     printf("%d: A: %f, B: %f, C: %f\n", i, static_cast<float>(A[i]), static_cast<float>(B[i]), static_cast<float>(C[i]));
+  //   }
+  // }
 }
 
 } // namespace ginfer::op::kernel

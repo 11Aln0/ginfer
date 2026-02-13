@@ -22,11 +22,8 @@ Tensor test_rope_op_cuda(Tensor& input_tensor, int head_dim, int start_pos, int 
   int max_seq_len = end_pos;
 
   // Create sin/cos cache tensors
-  Tensor sin_cache(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCPU);
-  Tensor cos_cache(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCPU);
-
-  sin_cache.toDevice(DeviceType::kDeviceCUDA);
-  cos_cache.toDevice(DeviceType::kDeviceCUDA);
+  Tensor sin_cache(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCUDA);
+  Tensor cos_cache(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCUDA);
 
   // Compute sin/cos cache
   ::ginfer::op::RotaryEmbeddingOp rotary_embed_op(DeviceType::kDeviceCUDA, rope_theta);

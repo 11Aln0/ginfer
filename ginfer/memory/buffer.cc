@@ -19,9 +19,10 @@ Buffer::Buffer(size_t size, DeviceAllocator* allocator)
   ptr_ = (std::byte*)allocator_->alloc(size_);
 }
 
-void Buffer::copyFrom(const Buffer& src) {
-  CHECK(src.size() == size_) << "Source buffer size (" << src.size() << ") does not match destination buffer size ("
-                             << size_ << ").";
+void Buffer::copyFrom(const Buffer& src, size_t size) {
+  CHECK(size_ <= size && size <= src.size())
+      << "Size argument is out of range. Size: " << size << ", this buffer size: " << size_
+      << ", source buffer size: " << src.size();
   CHECK(src.ptr() != nullptr && ptr_ != nullptr) << "Source or destination buffer pointer is nullptr.";
 
   if (src.devType() == dev_type_) {
@@ -36,10 +37,14 @@ void Buffer::copyFrom(const Buffer& src) {
   }
 }
 
-void Buffer::copyFrom(const Buffer* src) {
+void Buffer::copyFrom(const Buffer* src, size_t size) {
   CHECK(src != nullptr) << "Source buffer is nullptr.";
-  copyFrom(*src);
+  copyFrom(*src, size);
 }
+
+void Buffer::copyFrom(const Buffer& src) { copyFrom(src, size_); }
+
+void Buffer::copyFrom(const Buffer* src) { copyFrom(*src, size_); }
 
 Buffer::~Buffer() {
   if (!external_) {

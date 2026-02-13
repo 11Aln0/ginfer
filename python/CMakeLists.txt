@@ -10,4 +10,5 @@ function(add_python_test test_name)
     message(STATUS "Added Python test ${test_name}")
 endfunction()
 
-add_python_test(test_layer)
+add_python_test(test_op)
+add_python_test(test_model)

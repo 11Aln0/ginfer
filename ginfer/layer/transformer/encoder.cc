@@ -3,9 +3,10 @@
 
 namespace ginfer::layer::transformer {
 
-EncoderLayer::EncoderLayer(DeviceType dev_type, std::string layer_name, float rms_norm_eps)
+EncoderLayer::EncoderLayer(DeviceType dev_type, std::string layer_name, float rms_norm_eps, int num_heads,
+                           int num_kv_heads, int head_dim)
     : Layer(dev_type, std::move(layer_name)),
-      self_attn(dev_type, "self_attn"),
+      self_attn(dev_type, "self_attn", num_heads, num_kv_heads, head_dim),
       mlp(dev_type, "mlp"),
       mlp_norm(dev_type, "mlp_norm", rms_norm_eps),
       attn_norm(dev_type, "attn_norm", rms_norm_eps),

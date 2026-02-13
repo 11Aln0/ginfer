@@ -3,7 +3,7 @@
 namespace ginfer::layer {
 
 EmbeddingLayer::EmbeddingLayer(DeviceType dev_type, std::string layer_name)
-    : LayerWithParam(dev_type, std::move(layer_name)), embed_op_(dev_type) {}
+    : Layer(dev_type, std::move(layer_name)), embed_op_(dev_type) {}
 
 void EmbeddingLayer::setWeight(const TensorRef& weight) { weight_ = weight; }
 
@@ -12,6 +12,9 @@ Status EmbeddingLayer::forward(const std::vector<TensorRef>& inputs, TensorRef o
   return embed_op_.run({inputs[0].get(), weight_.get()}, {output.get()});
 }
 
-std::vector<TensorRef> EmbeddingLayer::getWeights() { return {weight_}; }
+Status EmbeddingLayer::toDevice(DeviceType dev_type) {
+  weight_->toDevice(dev_type);
+  return embed_op_.toDevice(dev_type);
+}
 
 }  // namespace ginfer::layer

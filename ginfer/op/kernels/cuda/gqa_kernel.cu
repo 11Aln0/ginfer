@@ -7,7 +7,7 @@
 
 namespace ginfer::op::kernel {
 
-template <typename T, int vec_size = DefaultVecSize<T>::value>
+template <typename T, int b, int vec_size = DefaultVecSize<T>::value>
 __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
                                           int block_seq_len,
                                           int head_dim,
@@ -34,6 +34,14 @@ __device__ __forceinline__ void loadQKVTile(const T* __restrict__ p_global,
       *reinterpret_cast<AccessT*>(sptr) = zero_vec;
     }
     tptr += rows_per_block * seq_len_stride;
+    sptr += rows_per_block * head_dim;
+  }
+
+  // clear smem
+  int start_r = (block_seq_len + rows_per_block - 1) / rows_per_block * rows_per_block;
+  sptr = p_smem + (start_r + smem_row) * head_dim + smem_col * vec_size;
+  for(int r = start_r + smem_row; r < b; r += rows_per_block) {
+    *reinterpret_cast<AccessT*>(sptr) = zero_vec;
     sptr += rows_per_block * head_dim;
   }
 }
@@ -433,15 +441,15 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
   __syncthreads();
 
   // load Q block
-  loadQKVTile<T>(q + q_offset, min(br, q_seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
+  loadQKVTile<T, br>(q + q_offset, min(br, q_seq_len - q_block_id * br), head_dim, q_seq_len_stride, p_q_block_smem);
 
   for(int c = 0; c < kv_seq_len; c += bc) {
     if(c >= (q_block_id + 1) * br + kv_seq_len - q_seq_len) break; // causal
     int kv_block_seq_len = min(bc, kv_seq_len - c);
     // load K,V block
     
-    loadQKVTile<T>(k + k_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
-    loadQKVTile<T>(v + v_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
+    loadQKVTile<T, bc>(k + k_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_k_block_smem);
+    loadQKVTile<T, bc>(v + v_offset, kv_block_seq_len, head_dim, kv_seq_len_stride, p_v_block_smem);
     __syncthreads();
     // compute S = Q * K^T
     computeSTile<T, br, bc>(p_q_block_smem, p_k_block_smem, p_s_block_smem, head_dim);
@@ -460,11 +468,18 @@ __global__ void GQAKernelImpl(const T* __restrict__ q,
   }
   
   storeOTile<T, head_dim>(p_o_block_smem, output + out_offset, p_l_smem, min(br, q_seq_len - q_block_id * br), out_seq_len_stride);
+  
+  // __syncthreads();
+  // if(threadIdx.x == 0 && blockIdx.x == 0 && blockIdx.y == 0 && blockIdx.z == 0) {
+  //   for(int i = 0; i < 16; i++) {
+  //     printf("%d: q: %f, k: %f, v: %f, o: %f\n", i, static_cast<float>(q[i]), static_cast<float>(k[i]), static_cast<float>(v[i]), static_cast<float>(output[i]));
+  //   }
+  // }
   // store O block
 }
 
-// q: [batch, q_seq_len, num_heads, head_dim]
-// k, v: [batch, kv_seq_len, num_heads_kv, head_dim] where num_heads_kv divides num_heads
+// q: [q_seq_len, num_heads, head_dim]
+// k, v: [kv_seq_len, num_heads_kv, head_dim] where num_heads_kv divides num_heads
 template <typename T, typename Context>
 void GQAKernel(const Context& ctx,
               const tensor::Tensor& q,
@@ -473,22 +488,22 @@ void GQAKernel(const Context& ctx,
               tensor::Tensor& output) {
   
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
-      << "addKernel only supports CUDA device type.";
+      << "GQAKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& q_shape = q.shape();
   const auto& q_strides = q.strides();
-  const int batch = q_shape[0];
-  const int q_seq_len = q_shape[1];
-  const int num_heads = q_shape[2];
-  const int head_dim = q_shape[3];
-  const size_t q_batch_stride = q_strides[0];
+  const int batch = 1;
+  const int q_seq_len = q_shape[0];
+  const int num_heads = q_shape[1];
+  const int head_dim = q_shape[2];
+  const size_t q_batch_stride = 0;
 
   const auto& k_shape = k.shape();
   const auto& k_strides = k.strides();
-  const int kv_heads = k_shape[2];
-  const int kv_seq_len = k_shape[1];
-  const size_t kv_batch_stride = k_strides[0];
+  const int kv_seq_len = k_shape[0];
+  const int kv_heads = k_shape[1];
+  const size_t kv_batch_stride = 0;
 
   const T* p_q = q.data<T>();
   const T* p_k = k.data<T>();
@@ -505,7 +520,7 @@ void GQAKernel(const Context& ctx,
                       2 * br) * sizeof(T) + br * sizeof(float);
 
   auto dispatcher = [&] () {                 
-    DLOG(INFO) << "GQA kernel smem size: " << smem_size;
+    // DLOG(INFO) << "GQA kernel smem size: " << smem_size;
     cudaError_t err;
     switch(head_dim) {
       case 64:

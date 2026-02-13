@@ -50,6 +50,12 @@ void Tensor::toDevice(memory::DeviceAllocator* allocator) {
 
 void Tensor::toDevice(DeviceType dev_type) { toDevice(memory::getDefaultDeviceAllocator(dev_type)); }
 
+void Tensor::copyFrom(const Tensor& src) {
+  CHECK_EQ(this->size_, src.size_) << "Copy failed: tensor sizes do not match.";
+  CHECK(this->dtype_ == src.dtype_) << "Copy failed: tensor data types do not match.";
+  this->buffer_->copyFrom(src.buffer_.get(), this->size_ * dTypeSize(dtype_));
+}
+
 std::shared_ptr<Tensor> Tensor::slice(int dim, int64_t start, int64_t end) const {
   CHECK(dim >= 0 && dim < static_cast<int>(shape_.ndim())) << "Slice failed: dimension out of range.";
   CHECK(start >= 0 && end <= shape_[dim] && start < end) << "Slice failed: invalid start or end indices.";
@@ -61,6 +67,7 @@ std::shared_ptr<Tensor> Tensor::slice(int dim, int64_t start, int64_t end) const
   int64_t new_offset = start * strides_[dim] + offset_;
   new_tensor->offset_ = new_offset;
   new_tensor->strides_ = strides_;
+  new_tensor->size_ = new_shape.numel();
   return new_tensor;
 }
 
