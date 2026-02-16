@@ -79,6 +79,10 @@ class Qwen2Model {
 
   void toDevice(common::DeviceType dev_type);
 
+  int getVocabSize() const;
+
+  int64_t getEosTokenId() const;
+
   friend class Qwen2ModelLoader;
 
  private:
@@ -94,7 +98,7 @@ class Qwen2Model {
  private:
   // mem
   void lazyAllocIntermediates();
-  void initKVCache();
+  void lazyAllocKVCache();
   std::pair<TensorRef, TensorRef> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
 
   // forward
@@ -107,6 +111,7 @@ class Qwen2Model {
   Intermediates intermediates_;
   Qwen2KVCache kv_cache_;
   bool intermediates_allocated_ = false;
+  bool kv_cache_allocated_ = false;
 
   op::RotaryEmbeddingOp rotary_emb;
   op::ArgmaxOp argmax_op;

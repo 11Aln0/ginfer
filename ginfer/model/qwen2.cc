@@ -15,21 +15,21 @@ Qwen2Model::Qwen2Model(Qwen2Config config, common::DeviceType dev_type)
     encoder_layers.emplace_back(dev_type, "encoder_layer_" + std::to_string(i), config.rms_norm_eps, config.num_heads,
                                 config.num_kv_heads, config.head_dim);
   }
-  initKVCache();
 }
 
-void Qwen2Model::initKVCache() {
+void Qwen2Model::lazyAllocKVCache() {
+  if (kv_cache_allocated_) return;
   kv_cache_.offset = 0;
   const auto& c = config_;
   int64_t max_seq_len = static_cast<int64_t>(c.max_seq_len);
   // init k,v cache
-  // TODO lazy allocation
   for (int i = 0; i < config_.nlayer; ++i) {
-    kv_cache_.k.push_back(std::make_shared<Tensor>(
-        config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim}, memory::DeviceType::kDeviceCPU));
-    kv_cache_.v.push_back(std::make_shared<Tensor>(
-        config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim}, memory::DeviceType::kDeviceCPU));
+    kv_cache_.k.push_back(
+        std::make_shared<Tensor>(config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim}, dev_type_));
+    kv_cache_.v.push_back(
+        std::make_shared<Tensor>(config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim}, dev_type_));
   }
+  kv_cache_allocated_ = true;
 }
 
 void Qwen2Model::lazyAllocIntermediates() {
@@ -117,13 +117,6 @@ void Qwen2Model::toDevice(common::DeviceType dev_type) {
   final_rmsnorm.toDevice(dev_type);
   lm_head.toDevice(dev_type);
 
-  for (auto& k : kv_cache_.k) {
-    k->toDevice(dev_type);
-  }
-  for (auto& v : kv_cache_.v) {
-    v->toDevice(dev_type);
-  }
-
   argmax_op.toDevice(dev_type);
   rotary_emb.toDevice(dev_type);
 }
@@ -131,6 +124,7 @@ void Qwen2Model::toDevice(common::DeviceType dev_type) {
 Status Qwen2Model::predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range,
                            int64_t& next_token_id) {
   lazyAllocIntermediates();
+  lazyAllocKVCache();
 
   int64_t seq_len = token_ids.shape()[0];
   CHECK_LE(seq_len, static_cast<int64_t>(config_.max_seq_len)) << "Input token_ids length exceeds max_seq_len.";
@@ -154,5 +148,9 @@ Status Qwen2Model::predict(const tensor::Tensor& token_ids, std::pair<int64_t, i
 
   return ginfer::error::Success();
 }
+
+int Qwen2Model::getVocabSize() const { return config_.vocab_size; }
+
+int64_t Qwen2Model::getEosTokenId() const { return config_.eos_token_id; }
 
 }  // namespace ginfer::model

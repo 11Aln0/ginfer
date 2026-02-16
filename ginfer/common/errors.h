@@ -3,6 +3,7 @@
 #include <fmt/core.h>
 
 #include <string>
+#include <variant>
 
 namespace ginfer::error {
 
@@ -61,23 +62,49 @@ REGISTER_STATUS(NotImplemented, StatusCode::kNotImplemented)
     }                                                            \
   } while (0)
 
+}  // namespace ginfer::error
+
+namespace ginfer {
+
+template <typename T>
+struct Ok {
+  T value;
+  Ok(T v) : value(std::move(v)) {}
+};
+
+template <typename E>
+struct Err {
+  E error;
+  Err(E e) : error(std::move(e)) {}
+};
+
+// template <typename T>
+// Ok(T) -> Ok<T>;
+// template <typename E>
+// Err(E) -> Err<E>;
+
 template <typename T, typename E>
 class Result {
  public:
-  static Result ok(T value) { return Result(std::move(value)); }
-  static Result err(E error) { return Result(std::move(error)); }
+  // static Result ok(T value) { return Result(std::move(value)); }
+  // static Result err(E error) { return Result(std::move(error)); }
 
-  bool hasValue() const { return has_value_; }
-  const T& value() const { return value_; }
-  const E& err() const { return error_; }
+  Result(Ok<T> ok) : data_(std::move(ok)) {}
+  Result(Err<E> err) : data_(std::move(err)) {}
+
+  bool ok() const { return std::holds_alternative<Ok<T>>(data_); }
+  const T& value() const { return std::get<Ok<T>>(data_).value; }
+  const E& err() const { return std::get<Err<E>>(data_).error; }
 
  private:
-  Result(T&& v) : has_value_(true), value_(std::move(v)) {}
-  Result(E&& e) : has_value_(false), error_(std::move(e)) {}
-
-  bool has_value_;
-  T value_;
-  E error_;
+  std::variant<Ok<T>, Err<E>> data_;
 };
 
-}  // namespace ginfer::error
+#define RETURN_ERR_ON(expr, ...)            \
+  do {                                      \
+    if ((expr)) {                           \
+      return Err(fmt::format(__VA_ARGS__)); \
+    }                                       \
+  } while (0)
+
+}  // namespace ginfer

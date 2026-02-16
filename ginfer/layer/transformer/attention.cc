@@ -72,7 +72,8 @@ Status AttentionLayer::toDevice(DeviceType dev_type) {
   RETURN_ON_ERROR(q_proj.toDevice(dev_type));
   RETURN_ON_ERROR(k_proj.toDevice(dev_type));
   RETURN_ON_ERROR(v_proj.toDevice(dev_type));
-  return o_proj.toDevice(dev_type);
+  RETURN_ON_ERROR(o_proj.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 }  // namespace ginfer::layer::transformer

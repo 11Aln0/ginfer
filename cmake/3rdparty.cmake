@@ -22,3 +22,20 @@ if(NOT TARGET concurrentqueue)
   target_include_directories(concurrentqueue INTERFACE ${concurrentqueue_SOURCE_DIR})
 endif()
 
+
+CPMAddPackage(
+  NAME tokenizers_cpp
+  GITHUB_REPOSITORY mlc-ai/tokenizers-cpp
+  GIT_TAG 34885cfd7b9ef27b859c28a41e71413dd31926f5
+  OPTIONS
+    "TOKENIZERS_CPP_EXAMPLE OFF"
+)
+
+CPMAddPackage(
+  NAME jinja
+  GITHUB_REPOSITORY 11Aln0/jinja.cpp
+  GIT_TAG e69a9b76562a85869cda28ee245cee487298d17a
+  OPTIONS
+    "JINJA_USE_EXTERNAL_JSON ON"
+    "JINJA_BUILD_TESTS OFF"
+)
