@@ -27,9 +27,9 @@ class AttentionLayer : public Layer {
  public:
   AttentionLayer(DeviceType dev_type, std::string layer_name, int num_heads, int num_kv_heads, int head_dim);
 
-  Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  Status toDevice(DeviceType dev_type) override;
+  Result<void, std::string> toDevice(DeviceType dev_type) override;
 
   void setWeight(const Weight& weight);
 
@@ -68,9 +68,9 @@ class FeedForwardLayer : public Layer {
  public:
   FeedForwardLayer(DeviceType dev_type, std::string layer_name);
 
-  Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  Status toDevice(DeviceType dev_type) override;
+  Result<void, std::string> toDevice(DeviceType dev_type) override;
 
   void setWeight(const Weight& weight);
 
@@ -105,9 +105,9 @@ class EncoderLayer : public Layer {
   EncoderLayer(DeviceType dev_type, std::string layer_name, float rms_norm_eps, int num_heads, int num_kv_heads,
                int head_dim);
 
-  Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  Status toDevice(DeviceType dev_type) override;
+  Result<void, std::string> toDevice(DeviceType dev_type) override;
 
   void setWeight(const Weight& weight);
 

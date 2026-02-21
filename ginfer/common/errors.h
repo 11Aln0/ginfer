@@ -54,14 +54,6 @@ REGISTER_STATUS(NotImplemented, StatusCode::kNotImplemented)
     }                                                     \
   } while (0)
 
-#define RETURN_ON_ERROR(status)                                  \
-  do {                                                           \
-    auto _status = (status);                                     \
-    if (_status.code() != ginfer::error::StatusCode::kSuccess) { \
-      return _status;                                            \
-    }                                                            \
-  } while (0)
-
 }  // namespace ginfer::error
 
 namespace ginfer {
@@ -69,19 +61,28 @@ namespace ginfer {
 template <typename T>
 struct Ok {
   T value;
-  Ok(T v) : value(std::move(v)) {}
+
+  template <typename U>
+  Ok(U&& v) : value(std::forward<U>(v)) {}
+};
+
+template <>
+struct Ok<void> {
+  Ok() = default;
 };
 
 template <typename E>
 struct Err {
   E error;
-  Err(E e) : error(std::move(e)) {}
+
+  template <typename U>
+  Err(U&& e) : error(std::forward<U>(e)) {}
 };
 
-// template <typename T>
-// Ok(T) -> Ok<T>;
-// template <typename E>
-// Err(E) -> Err<E>;
+template <typename U>
+Ok(U&&) -> Ok<std::decay_t<U>>;
+template <typename E>
+Err(E&&) -> Err<std::decay_t<E>>;
 
 template <typename T, typename E>
 class Result {
@@ -93,8 +94,25 @@ class Result {
   Result(Err<E> err) : data_(std::move(err)) {}
 
   bool ok() const { return std::holds_alternative<Ok<T>>(data_); }
-  const T& value() const { return std::get<Ok<T>>(data_).value; }
-  const E& err() const { return std::get<Err<E>>(data_).error; }
+
+  const E& err() const& { return std::get<Err<E>>(data_).error; }
+  E&& err() && { return std::move(std::get<Err<E>>(data_).error); }
+  E& err() & { return std::get<Err<E>>(data_).error; }
+
+  template <typename U = T>
+  const std::enable_if_t<!std::is_void_v<U>, U>& value() const& {
+    return std::get<Ok<T>>(data_).value;
+  }
+
+  template <typename U = T>
+  std::enable_if_t<!std::is_void_v<U>, U>&& value() && {
+    return std::move(std::get<Ok<T>>(data_).value);
+  }
+
+  template <typename U = T>
+  std::enable_if_t<!std::is_void_v<U>, U>& value() & {
+    return std::get<Ok<T>>(data_).value;
+  }
 
  private:
   std::variant<Ok<T>, Err<E>> data_;
@@ -105,6 +123,45 @@ class Result {
     if ((expr)) {                           \
       return Err(fmt::format(__VA_ARGS__)); \
     }                                       \
+  } while (0)
+
+#define DECLARE_OR_RETURN(lhs, expr)         \
+  auto _res_##lhs = (expr);                  \
+  if (!_res_##lhs.ok()) {                    \
+    return Err(std::move(_res_##lhs).err()); \
+  }                                          \
+  auto lhs = std::move(_res_##lhs).value();
+
+#define ASSIGN_OR_RETURN(lhs, expr)      \
+  do {                                   \
+    auto _res = (expr);                  \
+    if (!_res.ok()) {                    \
+      return Err(std::move(_res).err()); \
+    }                                    \
+    lhs = std::move(_res).value();       \
+  } while (0)
+
+#define DECLARE_OR_THROW(lhs, expr)                        \
+  auto _res_##lhs = (expr);                                \
+  if (!_res_##lhs.ok()) {                                  \
+    throw std::runtime_error(std::move(_res_##lhs).err()); \
+  }                                                        \
+  auto lhs = std::move(_res_##lhs).value();
+
+#define ASSIGN_OR_THROW(lhs, expr)                     \
+  do {                                                 \
+    auto _res = (expr);                                \
+    if (!_res.ok()) {                                  \
+      throw std::runtime_error(std::move(_res).err()); \
+    }                                                  \
+    lhs = std::move(_res).value();                     \
+  } while (0)
+
+#define RETURN_ON_ERR(expr)              \
+  do {                                   \
+    if (!(expr).ok()) {                  \
+      return Err(std::move(expr).err()); \
+    }                                    \
   } while (0)
 
 }  // namespace ginfer

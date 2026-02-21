@@ -6,7 +6,7 @@ namespace ginfer::op {
 
 ArgmaxOp::ArgmaxOp(DeviceType dev_type) : Op(dev_type, OpType::kOpArgmax, "argmax") {}
 
-Status ArgmaxOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> ArgmaxOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "ArgmaxOp requires exactly 1 input tensor.";
   CHECK(outputs.size() == 1) << "ArgmaxOp requires exactly 1 output tensor.";
 
@@ -19,7 +19,7 @@ Status ArgmaxOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tenso
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *outputs[0]);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 }  // namespace ginfer::op

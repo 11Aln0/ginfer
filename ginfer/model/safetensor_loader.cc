@@ -56,7 +56,7 @@ tensor::DataType SafeTensorLoader::parseDataType(const std::string& dtype_str) c
   }
 }
 
-std::shared_ptr<tensor::Tensor> SafeTensorLoader::getTensor(const std::string& name) const {
+tensor::TensorRef SafeTensorLoader::getTensor(const std::string& name) const {
   auto it = metadata_.find(name);
   CHECK_THROW(it != metadata_.end(), "Tensor not found: {}", name);
   const auto& meta = it->second;
@@ -71,8 +71,11 @@ std::shared_ptr<tensor::Tensor> SafeTensorLoader::getTensor(const std::string& n
   CHECK_THROW(expected_size == meta.data_offset_end - meta.data_offset_begin,
               "Data size mismatch for tensor {}: expected {}, actual {}", name, expected_size,
               meta.data_offset_end - meta.data_offset_begin);
-  auto buffer = std::make_shared<memory::Buffer>(expected_size, (std::byte*)data_ptr, memory::DeviceType::kDeviceCPU);
-  return std::make_shared<tensor::Tensor>(dtype, tensor::Shape(meta.shape), buffer);
+  auto buf_res = memory::Buffer::create(expected_size, (std::byte*)data_ptr, memory::DeviceType::kDeviceCPU);
+  CHECK_THROW(buf_res.ok(), "Failed to create buffer for tensor {}: {}", name, buf_res.err());
+  auto res = tensor::Tensor::create(dtype, tensor::Shape(meta.shape), buf_res.value());
+  CHECK_THROW(res.ok(), "Failed to create tensor {}: {}", name, res.err());
+  return res.value();
 }
 
 }  // namespace ginfer::model

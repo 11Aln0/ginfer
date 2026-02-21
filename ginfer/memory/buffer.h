@@ -11,17 +11,16 @@ namespace ginfer::memory {
 
 class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<Buffer> {
  public:
-  explicit Buffer() = default;
-
   // create buffer from external memory，no need to manage memory release
-  explicit Buffer(size_t size, std::byte* ptr, DeviceType dev_type);
+  static Result<std::shared_ptr<Buffer>, std::string> create(size_t size, std::byte* ptr, DeviceType dev_type);
 
   // create buffer by default allocator，need to manage memory release
-  explicit Buffer(size_t size, DeviceType dev_type);
+  static Result<std::shared_ptr<Buffer>, std::string> create(size_t size, DeviceType dev_type);
 
   // create buffer by allocator, need to manage memory release
-  explicit Buffer(size_t size, DeviceAllocator* allocator);
+  static Result<std::shared_ptr<Buffer>, std::string> create(size_t size, DeviceAllocator* allocator);
 
+ public:
   void copyFrom(const Buffer& src);
 
   void copyFrom(const Buffer* src);
@@ -39,6 +38,11 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
   std::byte* ptr() const { return ptr_; }
 
   bool allocated() const { return ptr_ != nullptr; }
+
+ private:
+  explicit Buffer() = delete;
+
+  explicit Buffer(size_t size, std::byte* ptr, DeviceAllocator* allocator, bool external);
 
  private:
   size_t size_ = 0;

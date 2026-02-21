@@ -56,13 +56,15 @@ struct ReturnValConverter {
 };
 
 template <>
-struct ArgConverter<tensor::Tensor> {
-  static tensor::Tensor convert(const PyArgType& arg) { return NumpyToTensorConverter::convert(arg.cast<py::array>()); }
+struct ArgConverter<tensor::TensorRef> {
+  static tensor::TensorRef convert(const PyArgType& arg) {
+    return NumpyToTensorConverter::convert(arg.cast<py::array>());
+  }
 };
 
 template <>
-struct ReturnValConverter<tensor::Tensor> {
-  static py::object convert(const tensor::Tensor& val) { return NumpyToTensorConverter::convert_back(val); }
+struct ReturnValConverter<tensor::TensorRef> {
+  static py::object convert(const tensor::TensorRef val) { return NumpyToTensorConverter::convert_back(val); }
 };
 
 template <typename F>
@@ -88,6 +90,7 @@ class TensorFuncBridge {
   }
 };
 
-#define WRAP_TENSOR_FUNC(fn) [](py::args args) { return ginfer::test::pybind::TensorFuncBridge<decltype(&fn)>::call(&fn, args); }
+#define WRAP_TENSOR_FUNC(fn) \
+  [](py::args args) { return ginfer::test::pybind::TensorFuncBridge<decltype(&fn)>::call(&fn, args); }
 
 }  // namespace ginfer::test::pybind

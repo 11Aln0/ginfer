@@ -9,7 +9,7 @@ namespace ginfer::op {
 
 MatmulOp::MatmulOp(DeviceType dev_type) : Op(dev_type, OpType::kOpMatmul, "matmul") {}
 
-Status MatmulOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> MatmulOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2 || inputs.size() == 3) << "MatmulOp requires exactly 2 or 3 input tensors.";
   CHECK(outputs.size() == 1) << "MatmulOp requires exactly 1 output tensor.";
   const Tensor* A = inputs[0];
@@ -41,7 +41,7 @@ Status MatmulOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tenso
     }
   }
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 bool MatmulOp::isGemvMode(const Tensor* A) {

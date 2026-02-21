@@ -9,31 +9,31 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using memory::Buffer;
 using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
+using tensor::TensorRef;
 
-Tensor test_add_op_cuda(Tensor& a_tensor, Tensor& b_tensor) {
-  DataType dtype = a_tensor.dtype();
-  const Shape& shape = a_tensor.shape();
-  Tensor c_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
+TensorRef test_add_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
+  auto c_res = Tensor::create(a_tensor->dtype(), Shape(a_tensor->shape()), DeviceType::kDeviceCPU);
+  CHECK(c_res.ok()) << c_res.err();
+  auto c_tensor = c_res.value();
 
   ::ginfer::op::AddOp add_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  a_tensor.toDevice(DeviceType::kDeviceCUDA);
-  b_tensor.toDevice(DeviceType::kDeviceCUDA);
-  c_tensor.toDevice(DeviceType::kDeviceCUDA);
+  a_tensor->toDevice(DeviceType::kDeviceCUDA);
+  b_tensor->toDevice(DeviceType::kDeviceCUDA);
+  c_tensor->toDevice(DeviceType::kDeviceCUDA);
 
   // Run computation
-  std::vector<const Tensor*> inputs = {&a_tensor, &b_tensor};
-  std::vector<Tensor*> outputs = {&c_tensor};
+  std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get()};
+  std::vector<Tensor*> outputs = {c_tensor.get()};
   auto status = add_op.run(inputs, outputs);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "AddOp run failed: " << status.msg();
+  CHECK(status.ok()) << "AddOp run failed: " << status.err();
 
   // Copy result back to CPU
-  c_tensor.toDevice(DeviceType::kDeviceCPU);
+  c_tensor->toDevice(DeviceType::kDeviceCPU);
 
   return c_tensor;
 }

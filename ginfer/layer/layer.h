@@ -13,7 +13,6 @@
 namespace ginfer::layer {
 
 using ginfer::common::DeviceType;
-using ginfer::error::Status;
 using ginfer::tensor::Tensor;
 using ginfer::tensor::TensorRef;
 
@@ -23,9 +22,9 @@ class BaseLayer {
 
   DeviceType getDeviceType() const;
 
-  virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) = 0;
+  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) = 0;
 
-  virtual Status toDevice(DeviceType dev_type);
+  virtual Result<void, std::string> toDevice(DeviceType dev_type);
 
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
@@ -40,7 +39,7 @@ class Layer : public BaseLayer {
 //   using Layer::Layer;
 
 //  public:
-//   virtual Status toDevice(DeviceType dev_type) override;
+//   virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 
 //   virtual std::vector<TensorRef> getWeights() = 0;
 // };
@@ -49,9 +48,9 @@ class LinearLayer : public Layer {
  public:
   LinearLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  virtual Status toDevice(DeviceType dev_type) override;
+  virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 
   void setWeight(const TensorRef& weight);
   void setBias(const TensorRef& bias);
@@ -66,11 +65,11 @@ class RMSNormLayer : public Layer {
  public:
   RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon);
 
-  virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
   void setWeight(const TensorRef& gamma);
 
-  virtual Status toDevice(DeviceType dev_type) override;
+  virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 
  private:
   op::RMSNormOp norm_op_;
@@ -81,9 +80,9 @@ class EmbeddingLayer : public Layer {
  public:
   EmbeddingLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Status forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
 
-  virtual Status toDevice(DeviceType dev_type) override;
+  virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 
   void setWeight(const TensorRef& weight);
 

@@ -4,20 +4,22 @@
 
 namespace ginfer::memory {
 
-Buffer::Buffer(size_t size, std::byte* ptr, DeviceType dev_type)
-    : size_(size), ptr_(ptr), external_(true), dev_type_(dev_type) {
-  allocator_ = getDefaultDeviceAllocator(dev_type);
+Result<std::shared_ptr<Buffer>, std::string> Buffer::create(size_t size, std::byte* ptr, DeviceType dev_type) {
+  auto allocator = getDefaultDeviceAllocator(dev_type);
+  return Ok(std::shared_ptr<Buffer>(new Buffer(size, ptr, allocator, true)));
 }
 
-Buffer::Buffer(size_t size, DeviceType dev_type) : size_(size), external_(false), dev_type_(dev_type) {
-  allocator_ = getDefaultDeviceAllocator(dev_type);
-  ptr_ = (std::byte*)allocator_->alloc(size_);
+Result<std::shared_ptr<Buffer>, std::string> Buffer::create(size_t size, DeviceAllocator* allocator) {
+  DECLARE_OR_RETURN(ptr, allocator->alloc(size));
+  return Ok(std::shared_ptr<Buffer>(new Buffer(size, (std::byte*)ptr, allocator, false)));
 }
 
-Buffer::Buffer(size_t size, DeviceAllocator* allocator)
-    : size_(size), external_(false), dev_type_(allocator->devType()), allocator_(allocator) {
-  ptr_ = (std::byte*)allocator_->alloc(size_);
+Result<std::shared_ptr<Buffer>, std::string> Buffer::create(size_t size, DeviceType dev_type) {
+  return create(size, getDefaultDeviceAllocator(dev_type));
 }
+
+Buffer::Buffer(size_t size, std::byte* ptr, DeviceAllocator* allocator, bool external)
+    : size_(size), ptr_(ptr), external_(external), dev_type_(allocator->devType()), allocator_(allocator) {}
 
 void Buffer::copyFrom(const Buffer& src, size_t size) {
   CHECK(size_ <= size && size <= src.size())

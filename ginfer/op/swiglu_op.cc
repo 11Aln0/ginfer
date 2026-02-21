@@ -6,7 +6,7 @@ namespace ginfer::op {
 
 SwiGLUOp::SwiGLUOp(DeviceType dev_type) : Op(dev_type, OpType::kOpSwiGLU, "swiglu") {}
 
-Status SwiGLUOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> SwiGLUOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "SwiGLUOp requires exactly 2 input tensors (gate, up).";
   CHECK(outputs.size() == 1) << "SwiGLUOp requires exactly 1 output tensor.";
 
@@ -20,7 +20,7 @@ Status SwiGLUOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tenso
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *outputs[0], *gate, *up);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 }  // namespace ginfer::op

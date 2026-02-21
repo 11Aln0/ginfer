@@ -20,7 +20,7 @@ void LinearLayer::setWeight(const TensorRef& weight) {
 
 void LinearLayer::setBias(const TensorRef& bias) { bias_ = bias; }
 
-Status LinearLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> LinearLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
   CHECK_EQ(inputs.size(), 1) << "LinearLayer requires exactly 1 input tensor.";
 
   std::vector<const Tensor*> mm_inputs = {inputs[0].get(), weight_.get()};
@@ -31,7 +31,7 @@ Status LinearLayer::forward(const std::vector<TensorRef>& inputs, TensorRef outp
   return mm_op_.run(mm_inputs, {output.get()});
 }
 
-Status LinearLayer::toDevice(DeviceType dev_type) {
+Result<void, std::string> LinearLayer::toDevice(DeviceType dev_type) {
   weight_->toDevice(dev_type);
   if (bias_ != nullptr) {
     bias_->toDevice(dev_type);

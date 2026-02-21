@@ -6,7 +6,7 @@ namespace ginfer::op {
 
 EmbeddingOp::EmbeddingOp(DeviceType dev_type) : Op(dev_type, OpType::kOpEmbedding, "embedding") {}
 
-Status EmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> EmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "EmbeddingOp requires exactly 2 input tensors.";
   CHECK(outputs.size() == 1) << "EmbeddingOp requires exactly 1 output tensor.";
 
@@ -20,7 +20,7 @@ Status EmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Te
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *weight, *outputs[0]);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 }  // namespace ginfer::op

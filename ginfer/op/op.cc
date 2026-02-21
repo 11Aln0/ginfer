@@ -7,9 +7,9 @@ namespace ginfer::op {
 BaseOp::BaseOp(DeviceType dev_type, OpType op_type, std::string name)
     : dev_type_(dev_type), op_type_(op_type), name_(std::move(name)) {}
 
-Status BaseOp::toDevice(DeviceType dev_type) {
+Result<void, std::string> BaseOp::toDevice(DeviceType dev_type) {
   dev_type_ = dev_type;
-  return error::Success();
+  return Ok<void>();
 }
 
 OpType BaseOp::opType() const { return op_type_; }

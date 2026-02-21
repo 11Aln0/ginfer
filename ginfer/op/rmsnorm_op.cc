@@ -7,7 +7,7 @@ namespace ginfer::op {
 RMSNormOp::RMSNormOp(DeviceType dev_type, float epsilon)
     : Op(dev_type, OpType::kOpRMSNorm, "rmsnorm"), epsilon_(epsilon) {}
 
-Status RMSNormOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> RMSNormOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "RMSNormOp requires exactly 2 input tensors.";
   CHECK(outputs.size() == 1) << "RMSNormOp requires exactly 1 output tensor.";
 
@@ -27,7 +27,7 @@ Status RMSNormOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tens
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *gamma, *outputs[0], epsilon_);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 }  // namespace ginfer::op

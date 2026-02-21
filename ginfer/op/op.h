@@ -11,7 +11,6 @@
 namespace ginfer::op {
 
 using ginfer::common::DeviceType;
-using ginfer::error::Status;
 using ginfer::tensor::Tensor;
 
 enum class OpType : uint8_t {
@@ -38,8 +37,8 @@ class BaseOp {
   OpType opType() const;
   DeviceType getDeviceType() const;
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) = 0;
-  virtual Status toDevice(DeviceType dev_type);
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) = 0;
+  virtual Result<void, std::string> toDevice(DeviceType dev_type);
 
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
@@ -55,7 +54,7 @@ class MatmulOp : public Op {
  public:
   MatmulOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
  private:
   bool isGemvMode(const Tensor* A);
@@ -65,20 +64,20 @@ class AddOp : public Op {
  public:
   AddOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
  private:
   bool checkBroadcastable(const tensor::Shape& shapeA, const tensor::Shape& shapeB);
 
   //  private:
-  //   Status checkParams(const std::vector<const Tensor*>& inputs, const std::vector<Tensor*> outputs);
+  //   Result<void, std::string> checkParams(const std::vector<const Tensor*>& inputs, const std::vector<Tensor*> outputs);
 };
 
 class RMSNormOp : public Op {
  public:
   RMSNormOp(DeviceType dev_type, float epsilon);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
  private:
   float epsilon_;
@@ -88,7 +87,7 @@ class GQAOp : public Op {
  public:
   GQAOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
   // void setSeqLen(int seq_len);
 
@@ -100,21 +99,21 @@ class ArgmaxOp : public Op {
  public:
   ArgmaxOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 };
 
 class EmbeddingOp : public Op {
  public:
   EmbeddingOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 };
 
 class RotaryEmbeddingOp : public Op {
  public:
   RotaryEmbeddingOp(DeviceType dev_type, float rope_theta = 10000.0f);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
  private:
   float rope_theta_;
@@ -124,7 +123,7 @@ class ROPEOp : public Op {
  public:
   ROPEOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 
   // void updateCache(int start_pos, int end_pos);
 
@@ -140,7 +139,7 @@ class SwiGLUOp : public Op {
  public:
   SwiGLUOp(DeviceType dev_type);
 
-  virtual Status run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
 };
 
 }  // namespace ginfer::op

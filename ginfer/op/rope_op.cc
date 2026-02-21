@@ -7,7 +7,7 @@ namespace ginfer::op {
 RotaryEmbeddingOp::RotaryEmbeddingOp(DeviceType dev_type, float rope_theta)
     : Op(dev_type, OpType::kOpCustom, "rotary_embedding"), rope_theta_(rope_theta) {}
 
-Status RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "RotaryEmbeddingOp requires exactly 1 input tensor.";
   CHECK(outputs.size() == 2) << "RotaryEmbeddingOp requires exactly 2 output tensors.";
 
@@ -19,12 +19,12 @@ Status RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs, std::vec
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *outputs[0], *outputs[1], pos_ids_range[0], pos_ids_range[1], rope_theta_);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 ROPEOp::ROPEOp(DeviceType dev_type) : Op(dev_type, OpType::kOpROPE, "rope") {}
 
-Status ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
   CHECK(outputs.size() == 1) << "ROPEOp requires exactly 1 output tensor.";
 
@@ -39,7 +39,7 @@ Status ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *outputs[0], *sin_cache, *cos_cache);
 
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 }  // namespace ginfer::op

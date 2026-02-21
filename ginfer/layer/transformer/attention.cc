@@ -18,7 +18,7 @@ AttentionLayer::AttentionLayer(DeviceType dev_type, std::string layer_name, int 
       num_kv_heads_(num_kv_heads),
       head_dim_(head_dim) {}
 
-Status AttentionLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> AttentionLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
   CHECK(inputs.size() == 5) << "AttentionLayer requires exactly 5 input tensors.";
   const auto& hidden_state = inputs[0];  // [seq_len, hidden_size]
   const auto& sin_cache = inputs[1];     // [seq_len, head_dim]
@@ -39,13 +39,13 @@ Status AttentionLayer::forward(const std::vector<TensorRef>& inputs, TensorRef o
   const TensorRef v = v_cache->slice(0, kv_seq_len - q_seq_len, kv_seq_len);
   TensorRef gqa_out = intermediates_.gqa_out->slice(0, 0, q_seq_len);
 
-  RETURN_ON_ERROR(q_proj.forward({hidden_state}, q));
-  RETURN_ON_ERROR(k_proj.forward({hidden_state}, k));
-  RETURN_ON_ERROR(v_proj.forward({hidden_state}, v));
+  RETURN_ON_ERR(q_proj.forward({hidden_state}, q));
+  RETURN_ON_ERR(k_proj.forward({hidden_state}, k));
+  RETURN_ON_ERR(v_proj.forward({hidden_state}, v));
 
-  RETURN_ON_ERROR(rope_op.run({q.get(), sin_cache.get(), cos_cache.get()}, {q.get()}));
-  RETURN_ON_ERROR(rope_op.run({k.get(), sin_cache.get(), cos_cache.get()}, {k.get()}));
-  RETURN_ON_ERROR(gqa_op.run({q.get(), k_cache.get(), v_cache.get()}, {gqa_out.get()}));
+  RETURN_ON_ERR(rope_op.run({q.get(), sin_cache.get(), cos_cache.get()}, {q.get()}));
+  RETURN_ON_ERR(rope_op.run({k.get(), sin_cache.get(), cos_cache.get()}, {k.get()}));
+  RETURN_ON_ERR(gqa_op.run({q.get(), k_cache.get(), v_cache.get()}, {gqa_out.get()}));
 
   gqa_out = gqa_out->reshape(hidden_state->shape());  // reshape back to [seq_len, num_heads * head_dim]
   return o_proj.forward({gqa_out}, output);
@@ -66,13 +66,13 @@ void AttentionLayer::setWeight(const Weight& weight) {
 
 void AttentionLayer::setIntermediates(const Intermediates& intermediates) { intermediates_ = intermediates; }
 
-Status AttentionLayer::toDevice(DeviceType dev_type) {
-  RETURN_ON_ERROR(rope_op.toDevice(dev_type));
-  RETURN_ON_ERROR(gqa_op.toDevice(dev_type));
-  RETURN_ON_ERROR(q_proj.toDevice(dev_type));
-  RETURN_ON_ERROR(k_proj.toDevice(dev_type));
-  RETURN_ON_ERROR(v_proj.toDevice(dev_type));
-  RETURN_ON_ERROR(o_proj.toDevice(dev_type));
+Result<void, std::string> AttentionLayer::toDevice(DeviceType dev_type) {
+  RETURN_ON_ERR(rope_op.toDevice(dev_type));
+  RETURN_ON_ERR(gqa_op.toDevice(dev_type));
+  RETURN_ON_ERR(q_proj.toDevice(dev_type));
+  RETURN_ON_ERR(k_proj.toDevice(dev_type));
+  RETURN_ON_ERR(v_proj.toDevice(dev_type));
+  RETURN_ON_ERR(o_proj.toDevice(dev_type));
   return Layer::toDevice(dev_type);
 }
 

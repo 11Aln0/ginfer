@@ -11,7 +11,6 @@
 
 namespace ginfer::model {
 
-using error::Status;
 using ginfer::tensor::Tensor;
 using ginfer::tensor::TensorRef;
 
@@ -75,9 +74,10 @@ class Qwen2Model {
  public:
   Qwen2Model(Qwen2Config config, common::DeviceType dev_type = common::DeviceType::kDeviceCPU);
 
-  Status predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range, int64_t& next_token_id);
+  Result<void, std::string> predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range,
+                                    int64_t& next_token_id);
 
-  void toDevice(common::DeviceType dev_type);
+  Result<void, std::string> toDevice(common::DeviceType dev_type);
 
   int getVocabSize() const;
 
@@ -92,17 +92,15 @@ class Qwen2Model {
     int64_t offset;
   };
 
-  // TODO select by device
-  using InputTensorAllocator = ginfer::memory::GlobalCUDAAllocator<ginfer::memory::cuda::PooledAllocStrategy>;
-
  private:
   // mem
-  void lazyAllocIntermediates();
-  void lazyAllocKVCache();
-  std::pair<TensorRef, TensorRef> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
+  Result<void, std::string> lazyAllocIntermediates();
+  Result<void, std::string> lazyAllocKVCache();
+  Result<std::pair<TensorRef, TensorRef>, std::string> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
 
   // forward
-  Status forward(const TensorRef input_ids, std::pair<int64_t, int64_t> pos_id_range, TensorRef output);
+  Result<void, std::string> forward(const TensorRef input_ids, std::pair<int64_t, int64_t> pos_id_range,
+                                    TensorRef output);
 
  private:
   Qwen2Config config_;

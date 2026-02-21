@@ -9,7 +9,7 @@ FeedForwardLayer::FeedForwardLayer(DeviceType dev_type, std::string layer_name)
       swiglu_op(dev_type),
       down_proj(dev_type, "down_proj") {}
 
-Status FeedForwardLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> FeedForwardLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
   const auto& input = inputs[0];  // [seq_len, hidden_size]
   int64_t seq_len = input->shape()[0];
 
@@ -17,9 +17,9 @@ Status FeedForwardLayer::forward(const std::vector<TensorRef>& inputs, TensorRef
   TensorRef up_out = intermediates_.up_out->slice(0, 0, seq_len);
   TensorRef swiglu_out = intermediates_.swiglu_out->slice(0, 0, seq_len);
 
-  RETURN_ON_ERROR(gate_proj.forward({input}, gate_out));
-  RETURN_ON_ERROR(up_proj.forward({input}, up_out));
-  RETURN_ON_ERROR(swiglu_op.run({gate_out.get(), up_out.get()}, {swiglu_out.get()}));
+  RETURN_ON_ERR(gate_proj.forward({input}, gate_out));
+  RETURN_ON_ERR(up_proj.forward({input}, up_out));
+  RETURN_ON_ERR(swiglu_op.run({gate_out.get(), up_out.get()}, {swiglu_out.get()}));
   return down_proj.forward({swiglu_out}, output);
 }
 
@@ -32,10 +32,10 @@ void FeedForwardLayer::setWeight(const Weight& weight) {
   down_proj.setWeight(w.down_w);
 }
 
-Status FeedForwardLayer::toDevice(DeviceType dev_type) {
-  RETURN_ON_ERROR(gate_proj.toDevice(dev_type));
-  RETURN_ON_ERROR(up_proj.toDevice(dev_type));
-  RETURN_ON_ERROR(swiglu_op.toDevice(dev_type));
+Result<void, std::string> FeedForwardLayer::toDevice(DeviceType dev_type) {
+  RETURN_ON_ERR(gate_proj.toDevice(dev_type));
+  RETURN_ON_ERR(up_proj.toDevice(dev_type));
+  RETURN_ON_ERR(swiglu_op.toDevice(dev_type));
   return down_proj.toDevice(dev_type);
 }
 

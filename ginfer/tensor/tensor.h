@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "ginfer/common/errors.h"
 #include "ginfer/memory/allocator.h"
 #include "ginfer/memory/buffer.h"
 #include "ginfer/tensor/dtype.h"
@@ -12,18 +13,21 @@
 
 namespace ginfer::tensor {
 
+class Tensor;
+
+using ginfer::memory::DeviceAllocator;
 using ginfer::memory::DeviceType;
+using TensorRef = std::shared_ptr<tensor::Tensor>;
 
 class Tensor {
  public:
+  static Result<TensorRef, std::string> create(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
+
+  static Result<TensorRef, std::string> create(DataType dtype, Shape shape, DeviceType dev_type);
+
+  static Result<TensorRef, std::string> create(DataType dtype, Shape shape, DeviceAllocator* allocator);
+
   explicit Tensor() = delete;
-
-  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
-
-  // use default allocator to create buffer
-  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
-
-  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
 
   const Shape& shape() const;
 
@@ -35,9 +39,9 @@ class Tensor {
 
   std::vector<ptrdiff_t> strides() const;
 
-  void toDevice(DeviceType dev_type);
+  Result<void, std::string> toDevice(DeviceType dev_type);
 
-  void toDevice(memory::DeviceAllocator* allocator);
+  Result<void, std::string> toDevice(memory::DeviceAllocator* allocator);
 
   void copyFrom(const Tensor& src);
 
@@ -56,6 +60,13 @@ class Tensor {
   std::shared_ptr<Tensor> permute(const std::vector<size_t>& new_order) const;
 
  private:
+  explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
+
+  // use default allocator to create buffer
+  explicit Tensor(DataType dtype, Shape shape, DeviceType dev_type);
+
+  explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
+
   void calcStrides();
 
  private:
@@ -67,7 +78,5 @@ class Tensor {
   size_t size_ = 0;
   // Layout layout_ = Layout::kLayoutRowMajor;
 };
-
-using TensorRef = std::shared_ptr<tensor::Tensor>;
 
 }  // namespace ginfer::tensor

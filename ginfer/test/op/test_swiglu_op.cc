@@ -9,28 +9,28 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using memory::Buffer;
 using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
+using tensor::TensorRef;
 
-Tensor test_swiglu_op_cuda(Tensor& gate_tensor, Tensor& up_tensor) {
-  DataType dtype = gate_tensor.dtype();
-  const Shape& shape = gate_tensor.shape();
-  Tensor output_tensor(dtype, Shape(shape), DeviceType::kDeviceCPU);
+TensorRef test_swiglu_op_cuda(TensorRef gate_tensor, TensorRef up_tensor) {
+  auto out_res = Tensor::create(gate_tensor->dtype(), Shape(gate_tensor->shape()), DeviceType::kDeviceCPU);
+  CHECK(out_res.ok()) << out_res.err();
+  auto output_tensor = out_res.value();
 
   ::ginfer::op::SwiGLUOp swiglu_op(DeviceType::kDeviceCUDA);
 
-  gate_tensor.toDevice(DeviceType::kDeviceCUDA);
-  up_tensor.toDevice(DeviceType::kDeviceCUDA);
-  output_tensor.toDevice(DeviceType::kDeviceCUDA);
+  gate_tensor->toDevice(DeviceType::kDeviceCUDA);
+  up_tensor->toDevice(DeviceType::kDeviceCUDA);
+  output_tensor->toDevice(DeviceType::kDeviceCUDA);
 
-  std::vector<const Tensor*> inputs = {&gate_tensor, &up_tensor};
-  std::vector<Tensor*> outputs = {&output_tensor};
+  std::vector<const Tensor*> inputs = {gate_tensor.get(), up_tensor.get()};
+  std::vector<Tensor*> outputs = {output_tensor.get()};
   auto status = swiglu_op.run(inputs, outputs);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "SwiGLUOp run failed: " << status.msg();
+  CHECK(status.ok()) << "SwiGLUOp run failed: " << status.err();
 
-  output_tensor.toDevice(DeviceType::kDeviceCPU);
+  output_tensor->toDevice(DeviceType::kDeviceCPU);
   return output_tensor;
 }
 

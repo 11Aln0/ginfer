@@ -4,6 +4,7 @@
 #include <pybind11/pybind11.h>
 #include <array>
 #include <cstddef>
+#include "ginfer/common/errors.h"
 #include "ginfer/tensor/tensor.h"
 #include "ginfer/test/pybind/type.h"
 
@@ -18,10 +19,11 @@ using tensor::dTypeSize;
 using tensor::Layout;
 using tensor::Shape;
 using tensor::Tensor;
+using tensor::TensorRef;
 
 class NumpyToTensorConverter {
  public:
-  static Tensor convert(py::array arr) {
+  static TensorRef convert(py::array arr) {
     size_t ndim = arr.ndim();
     std::vector<int64_t> shape;
     for (int i = 0; i < ndim; ++i) {
@@ -30,32 +32,33 @@ class NumpyToTensorConverter {
 
     DataType dtype = type::numpyDtypeToTensorDtype(arr.dtype());
     int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) * dTypeSize(dtype);
-    auto buf = std::make_shared<Buffer>(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU);
+    DECLARE_OR_THROW(buf, Buffer::create(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU));
 
     if ((bool)(arr.flags() & py::array::f_style)) {
       std::reverse(shape.begin(), shape.end());
-      auto t = tensor::Tensor(dtype, Shape(shape), buf);
+      DECLARE_OR_THROW(t, Tensor::create(dtype, Shape(shape), buf));
       std::vector<size_t> new_order(ndim);
       for (size_t i = 0; i < ndim; ++i) {
         new_order[i] = ndim - 1 - i;
       }
-      return *t.permute(new_order);
+      return t->permute(new_order);
     } else {
-      return tensor::Tensor(dtype, Shape(shape), buf);
+      DECLARE_OR_THROW(t, Tensor::create(dtype, Shape(shape), buf));
+      return t;
     }
   }
 
-  static py::array convert_back(const Tensor& tensor) {
-    const Shape& shape = tensor.shape();
+  static py::array convert_back(const TensorRef tensor) {
+    const Shape& shape = tensor->shape();
     std::vector<size_t> np_shape;
     for (size_t i = 0; i < shape.ndim(); ++i) {
       np_shape.push_back(shape[i]);
     }
 
-    py::dtype np_dtype = type::tensorDtypeToNumpyDtype(tensor.dtype());
+    py::dtype np_dtype = type::tensorDtypeToNumpyDtype(tensor->dtype());
     py::array np_array(np_dtype, np_shape);
-    size_t nbytes = tensor.nbytes();
-    std::memcpy(np_array.mutable_data(), tensor.data<void>(), nbytes);
+    size_t nbytes = tensor->nbytes();
+    std::memcpy(np_array.mutable_data(), tensor->data<void>(), nbytes);
     return np_array;
   }
 };

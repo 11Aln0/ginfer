@@ -9,9 +9,9 @@ BaseLayer::BaseLayer(DeviceType dev_type, std::string layer_name)
 
 DeviceType BaseLayer::getDeviceType() const { return dev_type_; }
 
-Status BaseLayer::toDevice(DeviceType dev_type) {
+Result<void, std::string> BaseLayer::toDevice(DeviceType dev_type) {
   dev_type_ = dev_type;
-  return ginfer::error::Success();
+  return Ok<void>();
 }
 
 // Status LayerWithParam::toDevice(DeviceType dev_type) {

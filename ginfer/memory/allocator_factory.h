@@ -1,11 +1,12 @@
 #pragma once
 
-#include <memory>
+#include <stdexcept>
 
+#include "ginfer/memory/alloc_strategy.h"
 #include "ginfer/memory/allocator.h"
-#include "ginfer/memory/cuda/cuda_allocator.h"
 
 namespace ginfer::memory {
+
 template <class T, typename = typename std::enable_if_t<std::is_base_of<DeviceAllocator, T>::value>>
 class GlobalDeviceAllocator {
  public:
@@ -24,12 +25,24 @@ class GlobalDeviceAllocator {
   inline static T* instance = nullptr;
 };
 
-template <typename S>
-using GlobalCUDAAllocator = GlobalDeviceAllocator<cuda::CUDADeviceAllocator<S>>;
+using GlobalCUDAAllocator = GlobalDeviceAllocator<CUDADeviceAllocator>;
 using GlobalCPUAllocator = GlobalDeviceAllocator<CPUDeviceAllocator>;
 
-using DefaultGlobalCUDAAllocator = GlobalCUDAAllocator<cuda::DefaultAllocStrategy>;
+using DefaultGlobalCUDAAllocator = GlobalCUDAAllocator;
 using DefaultGlobalCPUAllocator = GlobalCPUAllocator;
 
-DeviceAllocator* getDefaultDeviceAllocator(DeviceType dev_type);
+template <template <typename> class Strategy = DefaultAlllocStrategy>
+DeviceAllocator* getDeviceAllocator(DeviceType dev_type) {
+  switch (dev_type) {
+    case DeviceType::kDeviceCPU:
+      return GlobalDeviceAllocator<Strategy<CPUDeviceAllocator>>::getInstance();
+    case DeviceType::kDeviceCUDA:
+      return GlobalDeviceAllocator<Strategy<CUDADeviceAllocator>>::getInstance();
+    default:
+      throw std::invalid_argument("Unsupported device type.");
+  }
+}
+
+inline DeviceAllocator* getDefaultDeviceAllocator(DeviceType dev_type) { return getDeviceAllocator(dev_type); }
+
 }  // namespace ginfer::memory

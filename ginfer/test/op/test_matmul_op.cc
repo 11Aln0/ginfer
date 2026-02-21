@@ -9,66 +9,68 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using memory::Buffer;
 using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
+using tensor::TensorRef;
 
-Tensor test_matmul_op_cuda(Tensor& a_tensor, Tensor& b_tensor) {
-  DataType dtype = a_tensor.dtype();
-  const Shape& a_shape = a_tensor.shape();
-  const Shape& b_shape = b_tensor.shape();
+TensorRef test_matmul_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
+  const Shape& a_shape = a_tensor->shape();
+  const Shape& b_shape = b_tensor->shape();
   auto shape = Shape({a_shape[0], b_shape[1]});
   if (a_shape.ndim() == 1) {
     shape = Shape({b_shape[1]});
   }
-  Tensor c_tensor(dtype, shape, DeviceType::kDeviceCPU);
+  auto c_res = Tensor::create(a_tensor->dtype(), shape, DeviceType::kDeviceCPU);
+  CHECK(c_res.ok()) << c_res.err();
+  auto c_tensor = c_res.value();
 
   ::ginfer::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  a_tensor.toDevice(DeviceType::kDeviceCUDA);
-  b_tensor.toDevice(DeviceType::kDeviceCUDA);
-  c_tensor.toDevice(DeviceType::kDeviceCUDA);
+  a_tensor->toDevice(DeviceType::kDeviceCUDA);
+  b_tensor->toDevice(DeviceType::kDeviceCUDA);
+  c_tensor->toDevice(DeviceType::kDeviceCUDA);
 
   // Run computation
-  std::vector<const Tensor*> inputs = {&a_tensor, &b_tensor};
-  std::vector<Tensor*> outputs = {&c_tensor};
+  std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get()};
+  std::vector<Tensor*> outputs = {c_tensor.get()};
   auto status = matmul_op.run(inputs, outputs);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "MatmulOp run failed: " << status.msg();
+  CHECK(status.ok()) << "MatmulOp run failed: " << status.err();
 
   // Copy result back to CPU
-  c_tensor.toDevice(DeviceType::kDeviceCPU);
+  c_tensor->toDevice(DeviceType::kDeviceCPU);
 
   return c_tensor;
 }
 
-Tensor test_matmul_op_with_bias_cuda(Tensor& a_tensor, Tensor& b_tensor, Tensor& bias_tensor) {
-  DataType dtype = a_tensor.dtype();
-  const Shape& a_shape = a_tensor.shape();
-  const Shape& b_shape = b_tensor.shape();
+TensorRef test_matmul_op_with_bias_cuda(TensorRef a_tensor, TensorRef b_tensor, TensorRef bias_tensor) {
+  const Shape& a_shape = a_tensor->shape();
+  const Shape& b_shape = b_tensor->shape();
   auto shape = Shape({a_shape[0], b_shape[1]});
   if (a_shape.ndim() == 1) {
     shape = Shape({b_shape[1]});
   }
-  Tensor c_tensor(dtype, shape, DeviceType::kDeviceCPU);
+  auto c_res = Tensor::create(a_tensor->dtype(), shape, DeviceType::kDeviceCPU);
+  CHECK(c_res.ok()) << c_res.err();
+  auto c_tensor = c_res.value();
 
   ::ginfer::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  a_tensor.toDevice(DeviceType::kDeviceCUDA);
-  b_tensor.toDevice(DeviceType::kDeviceCUDA);
-  bias_tensor.toDevice(DeviceType::kDeviceCUDA);
-  c_tensor.toDevice(DeviceType::kDeviceCUDA);
+  a_tensor->toDevice(DeviceType::kDeviceCUDA);
+  b_tensor->toDevice(DeviceType::kDeviceCUDA);
+  bias_tensor->toDevice(DeviceType::kDeviceCUDA);
+  c_tensor->toDevice(DeviceType::kDeviceCUDA);
 
   // Run computation
-  std::vector<const Tensor*> inputs = {&a_tensor, &b_tensor, &bias_tensor};
-  std::vector<Tensor*> outputs = {&c_tensor};
+  std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get(), bias_tensor.get()};
+  std::vector<Tensor*> outputs = {c_tensor.get()};
   auto status = matmul_op.run(inputs, outputs);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "MatmulOp run failed: " << status.msg();
+  CHECK(status.ok()) << "MatmulOp run failed: " << status.err();
 
   // Copy result back to CPU
-  c_tensor.toDevice(DeviceType::kDeviceCPU);
+  c_tensor->toDevice(DeviceType::kDeviceCPU);
 
   return c_tensor;
 }

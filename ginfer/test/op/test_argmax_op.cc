@@ -9,25 +9,27 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using memory::Buffer;
 using tensor::DataType;
 using tensor::Shape;
 using tensor::Tensor;
+using tensor::TensorRef;
 
-Tensor test_argmax_op_cuda(Tensor& input_tensor) {
-  Tensor output_tensor(DataType::kDataTypeInt64, Shape({1}), DeviceType::kDeviceCPU);
+TensorRef test_argmax_op_cuda(TensorRef input_tensor) {
+  auto out_res = Tensor::create(DataType::kDataTypeInt64, Shape({1}), DeviceType::kDeviceCPU);
+  CHECK(out_res.ok()) << out_res.err();
+  auto output_tensor = out_res.value();
 
   ::ginfer::op::ArgmaxOp argmax_op(DeviceType::kDeviceCUDA);
 
-  input_tensor.toDevice(DeviceType::kDeviceCUDA);
-  output_tensor.toDevice(DeviceType::kDeviceCUDA);
+  input_tensor->toDevice(DeviceType::kDeviceCUDA);
+  output_tensor->toDevice(DeviceType::kDeviceCUDA);
 
-  std::vector<const Tensor*> inputs = {&input_tensor};
-  std::vector<Tensor*> outputs = {&output_tensor};
+  std::vector<const Tensor*> inputs = {input_tensor.get()};
+  std::vector<Tensor*> outputs = {output_tensor.get()};
   auto status = argmax_op.run(inputs, outputs);
-  CHECK(status.code() == ::ginfer::error::StatusCode::kSuccess) << "ArgmaxOp run failed: " << status.msg();
+  CHECK(status.ok()) << "ArgmaxOp run failed: " << status.err();
 
-  output_tensor.toDevice(DeviceType::kDeviceCPU);
+  output_tensor->toDevice(DeviceType::kDeviceCPU);
   return output_tensor;
 }
 
