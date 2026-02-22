@@ -29,7 +29,7 @@ struct Qwen2Config {
   float rms_norm_eps;
   float rope_theta;
 
-  int64_t eos_token_id;
+  int32_t eos_token_id;
 };
 
 class Qwen2Model;
@@ -74,14 +74,13 @@ class Qwen2Model {
  public:
   Qwen2Model(Qwen2Config config, common::DeviceType dev_type = common::DeviceType::kDeviceCPU);
 
-  Result<void, std::string> predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range,
-                                    int64_t& next_token_id);
+  Result<int32_t, std::string> predict(const tensor::TensorRef token_ids, std::pair<int64_t, int64_t> pos_id_range);
 
   Result<void, std::string> toDevice(common::DeviceType dev_type);
 
   int getVocabSize() const;
 
-  int64_t getEosTokenId() const;
+  int32_t getEosTokenId() const;
 
   friend class Qwen2ModelLoader;
 

@@ -159,8 +159,9 @@ class Result {
 
 #define RETURN_ON_ERR(expr)              \
   do {                                   \
-    if (!(expr).ok()) {                  \
-      return Err(std::move(expr).err()); \
+    auto _res = (expr);                  \
+    if (!_res.ok()) {                    \
+      return Err(std::move(_res).err()); \
     }                                    \
   } while (0)
 

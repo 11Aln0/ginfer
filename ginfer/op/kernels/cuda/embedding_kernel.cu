@@ -5,7 +5,7 @@
 namespace ginfer::op::kernel {
 
 template <typename T, int VecSize = DefaultVecSize<T>::value>
-__global__ void embeddingKernelImpl(const int64_t* input, const T* weight, T* output,
+__global__ void embeddingKernelImpl(const int32_t* input, const T* weight, T* output,
                                     size_t num_indices, int64_t embedding_dim) {
 
   using AccessT = AlignedVector<T, VecSize>;
@@ -14,7 +14,7 @@ __global__ void embeddingKernelImpl(const int64_t* input, const T* weight, T* ou
   int token_idx =  blockIdx.x;
   if(token_idx >= num_indices) return;
 
-  int64_t token_id = input[token_idx];
+  int32_t token_id = input[token_idx];
 
   int bound = embedding_dim / VecSize;
   AccessT* out_vec = reinterpret_cast<AccessT*>(output + token_idx * embedding_dim);
@@ -36,7 +36,7 @@ void embeddingKernel(const Context& ctx, const tensor::Tensor& input,
   const auto& weight_shape = weight.shape();
   size_t num_indices = std::accumulate(input_shape.begin(), input_shape.end(), 1, std::multiplies<size_t>());
 
-  const int64_t* input_data = input.data<int64_t>();
+  const int32_t* input_data = input.data<int32_t>();
   const T* weight_data = weight.data<T>();
   T* output_data = output.data<T>();
 

@@ -20,29 +20,29 @@ using tensor::Shape;
 using tensor::Tensor;
 using tensor::TensorRef;
 
-std::vector<int64_t> qwen2_generate(const std::string& model_path, TensorRef input_ids,
+std::vector<int32_t> qwen2_generate(const std::string& model_path, TensorRef input_ids,
                                     std::pair<int64_t, int64_t> pos_id_range) {
   model::Qwen2ModelLoader loader(model_path);
   auto model = loader.load();
   auto to_device_res = model->toDevice(DeviceType::kDeviceCUDA);
   CHECK(to_device_res.ok()) << "Qwen2Model toDevice failed: " << to_device_res.err();
 
-  std::vector<int64_t> token_ids;
+  std::vector<int32_t> token_ids;
 
   // Move input tensors to CUDA (model is on CUDA in this test)
-  auto input_ids_dev_res = Tensor::create(DataType::kDataTypeInt64, Shape({1}), DeviceType::kDeviceCUDA);
+  auto input_ids_dev_res = Tensor::create(DataType::kDataTypeInt32, Shape({1}), DeviceType::kDeviceCUDA);
   CHECK(input_ids_dev_res.ok()) << input_ids_dev_res.err();
   auto input_ids_dev = input_ids_dev_res.value();
   input_ids->toDevice(DeviceType::kDeviceCUDA);
 
   // Prepare output tensor
-  int64_t next_token_id = -1;
   // prefill
-  auto status = model->predict(*input_ids, pos_id_range, next_token_id);
-  CHECK(status.ok()) << "Qwen2Model predict failed: " << status.err();
+  auto res = model->predict(input_ids, pos_id_range);
+  CHECK(res.ok()) << "Qwen2Model predict failed: " << res.err();
+  int32_t next_token_id = res.value();
   input_ids->toDevice(DeviceType::kDeviceCPU);
   input_ids = input_ids->slice(0, 0, 1);
-  input_ids->data<int64_t>()[0] = next_token_id;  // Update
+  input_ids->data<int32_t>()[0] = next_token_id;  // Update
 
   // decode loop
   while (next_token_id != model->getEosTokenId()) {
@@ -50,9 +50,10 @@ std::vector<int64_t> qwen2_generate(const std::string& model_path, TensorRef inp
     token_ids.push_back(next_token_id);
     pos_id_range = {pos_id_range.second + 1, pos_id_range.second + 1};
     input_ids_dev->copyFrom(*input_ids);
-    status = model->predict(*input_ids_dev, pos_id_range, next_token_id);
-    CHECK(status.ok()) << "Qwen2Model predict failed: " << status.err();
-    input_ids->data<int64_t>()[0] = next_token_id;  // Update
+    auto res = model->predict(input_ids_dev, pos_id_range);
+    CHECK(res.ok()) << "Qwen2Model predict failed: " << res.err();
+    next_token_id = res.value();
+    input_ids->data<int32_t>()[0] = next_token_id;  // Update
   }
 
   token_ids.push_back(next_token_id);
@@ -65,12 +66,12 @@ TensorRef test_qwen2_generate_cuda(const std::string& model_path, TensorRef inpu
   auto token_ids = qwen2_generate(model_path, input_ids, pos_id_range);
   int64_t token_count = token_ids.size();
 
-  auto buf_res = Buffer::create(token_count * sizeof(int64_t), DeviceType::kDeviceCPU);
+  auto buf_res = Buffer::create(token_count * sizeof(int32_t), DeviceType::kDeviceCPU);
   CHECK(buf_res.ok()) << buf_res.err();
   auto buf = buf_res.value();
   std::memcpy(buf->ptr(), token_ids.data(), buf->size());
 
-  auto out_res = Tensor::create(DataType::kDataTypeInt64, Shape({token_count}), buf);
+  auto out_res = Tensor::create(DataType::kDataTypeInt32, Shape({token_count}), buf);
   CHECK(out_res.ok()) << out_res.err();
   return out_res.value();
 }
@@ -85,24 +86,22 @@ std::string test_qwen2_infer_cuda(const std::string& model_path, const std::stri
   auto tokenizer = std::make_unique<model::tokenizer::AutoTokenizer>(model_path);
   auto conversation = nlohmann::json::array({{{"role", "user"}, {"content", prompt}}});
   auto input_content = tokenizer->applyChatTemplate(conversation);
-  auto input_ids_32 = tokenizer->encode(input_content);
-  auto input_ids_vec = std::vector<int64_t>(input_ids_32.begin(), input_ids_32.end());
+  auto input_ids_vec = tokenizer->encode(input_content);
 
-  auto buf_res = Buffer::create(input_ids_vec.size() * sizeof(int64_t), DeviceType::kDeviceCPU);
+  auto buf_res = Buffer::create(input_ids_vec.size() * sizeof(int32_t), DeviceType::kDeviceCPU);
   CHECK(buf_res.ok()) << buf_res.err();
   auto buf = buf_res.value();
   std::memcpy(buf->ptr(), input_ids_vec.data(), buf->size());
 
   auto input_ids_res =
-      Tensor::create(DataType::kDataTypeInt64, Shape({static_cast<int64_t>(input_ids_vec.size())}), buf);
+      Tensor::create(DataType::kDataTypeInt32, Shape({static_cast<int64_t>(input_ids_vec.size())}), buf);
   CHECK(input_ids_res.ok()) << input_ids_res.err();
   auto input_ids = input_ids_res.value();
 
   std::pair<int64_t, int64_t> pos_id_range{0, static_cast<int64_t>(input_ids_vec.size()) - 1};
   auto next_token_ids = qwen2_generate(model_path, input_ids, pos_id_range);
-  auto next_token_ids_32 = std::vector<int32_t>(next_token_ids.begin(), next_token_ids.end());
 
-  return input_content + tokenizer->decode(next_token_ids_32, true);
+  return input_content + tokenizer->decode(next_token_ids, true);
 }
 
 REGISTER_PYBIND_TEST(test_qwen2_generate_cuda);

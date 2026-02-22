@@ -59,7 +59,7 @@ def hf_infer(
 
 def test_qwen2_generate_cuda():
     # <｜User｜>Who are you?<｜Assistant｜><think>
-    input_ids = np.array([151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int64)
+    input_ids = np.array([151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
     seq_len = len(input_ids)
     pos_id_range = (0, seq_len - 1) # closed interval
     

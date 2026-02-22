@@ -13,6 +13,11 @@ endif ()
 if (CUDA_FOUND)
     message(STATUS "Found CUDA Toolkit v${CUDA_VERSION_STRING}")
 
+    # Suppress nvcc warnings from third-party headers (fmt v11 compatibility issues):
+    #   128-D: loop is not reachable (fmt::detail::compare template instantiation)
+    #   2417-D: constexpr constructor calls non-constexpr function (fmt::detail::bigint)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -diag-suppress=128,2417")
+
     include(FindCUDA/select_compute_arch)
     CUDA_DETECT_INSTALLED_GPUS(INSTALLED_GPU_CCS_1)
     string(STRIP "${INSTALLED_GPU_CCS_1}" INSTALLED_GPU_CCS_2)

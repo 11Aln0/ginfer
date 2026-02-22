@@ -140,36 +140,33 @@ Result<void, std::string> Qwen2Model::toDevice(common::DeviceType dev_type) {
   return Ok<void>();
 }
 
-Result<void, std::string> Qwen2Model::predict(const tensor::Tensor& token_ids, std::pair<int64_t, int64_t> pos_id_range,
-                                              int64_t& next_token_id) {
+Result<int32_t, std::string> Qwen2Model::predict(const tensor::TensorRef token_ids,
+                                                 std::pair<int64_t, int64_t> pos_id_range) {
   RETURN_ON_ERR(lazyAllocIntermediates());
   RETURN_ON_ERR(lazyAllocKVCache());
 
-  int64_t seq_len = token_ids.shape()[0];
+  int64_t seq_len = token_ids->shape()[0];
   CHECK_LE(seq_len, static_cast<int64_t>(config_.max_seq_len)) << "Input token_ids length exceeds max_seq_len.";
-  auto input_ids = token_ids;
-  input_ids.toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(dev_type_));
-  auto input_ids_ref = std::make_shared<tensor::Tensor>(input_ids);
+  auto input_ids = token_ids->slice(0, 0, seq_len);
+  input_ids->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(dev_type_));
 
   // forward
   auto norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
   auto lm_head_out = intermediates_.lm_head_out->slice(0, 0, seq_len);
-  RETURN_ON_ERR(forward(input_ids_ref, pos_id_range, norm_out));
+  RETURN_ON_ERR(forward(input_ids, pos_id_range, norm_out));
   RETURN_ON_ERR(lm_head.forward({norm_out}, lm_head_out));
 
   // get next token id (argmax)
   lm_head_out = lm_head_out->slice(0, seq_len - 1, seq_len);  // only need the last token's logits
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
   RETURN_ON_ERR(argmax_op.run({lm_head_out.get()}, {argmax_out.get()}));
-  argmax_out->toDevice(memory::DeviceType::kDeviceCPU);
+  argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU));
 
-  next_token_id = argmax_out->data<int64_t>()[0];
-
-  return Ok<void>();
+  return Ok(static_cast<int32_t>(argmax_out->data<int32_t>()[0]));
 }
 
 int Qwen2Model::getVocabSize() const { return config_.vocab_size; }
 
-int64_t Qwen2Model::getEosTokenId() const { return config_.eos_token_id; }
+int32_t Qwen2Model::getEosTokenId() const { return config_.eos_token_id; }
 
 }  // namespace ginfer::model
