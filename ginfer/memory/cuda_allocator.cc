@@ -13,6 +13,7 @@ Result<void*, std::string> CUDADeviceAllocator::alloc(size_t size) {
   void* ptr = nullptr;
   cudaError_t err = cudaMalloc(&ptr, size);
   RETURN_ERR_ON(err != cudaSuccess, "cudaMalloc failed: {}", cudaGetErrorString(err));
+  DLOG(INFO) << "Allocated " << size / 1024.0 << " KB on CUDA device.";
   return Ok(ptr);
 }
 

@@ -74,7 +74,7 @@ def test_qwen2_generate_cuda():
 
 def test_qwen2_infer_cuda():
     prompt = "Who are you?"
-    hf_model, hf_tokenizer, model_path = load_hf_model(MODEL_PATH, device_name="cuda:0")
+    hf_model, hf_tokenizer, model_path = load_hf_model(MODEL_PATH, device_name="cuda:1")
     ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0)
     
     result = ginfer_test.test_qwen2_infer_cuda(model_path, prompt)

@@ -77,11 +77,6 @@ TensorRef test_qwen2_generate_cuda(const std::string& model_path, TensorRef inpu
 }
 
 std::string test_qwen2_infer_cuda(const std::string& model_path, const std::string& prompt) {
-  model::Qwen2ModelLoader loader(model_path);
-  auto model = loader.load();
-  auto to_device_res = model->toDevice(DeviceType::kDeviceCUDA);
-  CHECK(to_device_res.ok()) << "Qwen2Model toDevice failed: " << to_device_res.err();
-
   // Tokenize prompt
   auto tokenizer = std::make_unique<model::tokenizer::AutoTokenizer>(model_path);
   auto conversation = nlohmann::json::array({{{"role", "user"}, {"content", prompt}}});

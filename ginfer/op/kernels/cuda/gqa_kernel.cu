@@ -520,7 +520,7 @@ void GQAKernel(const Context& ctx,
                       2 * br) * sizeof(T) + br * sizeof(float);
 
   auto dispatcher = [&] () {                 
-    // DLOG(INFO) << "GQA kernel smem size: " << smem_size;
+    DLOG(INFO) << "GQA kernel smem size: " << smem_size;
     cudaError_t err;
     switch(head_dim) {
       case 64:

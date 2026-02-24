@@ -61,9 +61,11 @@ class PooledAllocStrategy : public BaseAllocator {
     int bucket_index = getBucketIndex(aligned_size);
     void* p = nullptr;
     if (free_blocks_[bucket_index].try_dequeue(p)) {
+      DLOG(INFO) << "Reusing block of size " << aligned_size / 1024.0 << " KB.";
     } else {
       auto res = BaseAllocator::alloc(aligned_size);
       RETURN_ON_ERR(res);
+      DLOG(INFO) << "Allocated new block of size " << aligned_size / 1024.0 << " KB.";
       p = res.value();
     }
     return Ok(p);

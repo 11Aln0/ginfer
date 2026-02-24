@@ -18,12 +18,23 @@ enable_testing()
 include(cmake/3rdparty.cmake)
 include(cmake/cuda.cmake)
 
+# set build type to Release by default
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
 # global const
 set(GINFER_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # include directories
 include_directories("${GINFER_SRC_DIR}")
 
+# compile definitions
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_definitions(NDEBUG)
+endif()
+
+# options
 option(WITH_CUDA "Build with CUDA" OFF)
 
 add_subdirectory(ginfer)

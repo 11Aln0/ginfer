@@ -52,39 +52,33 @@ Result<void, std::string> Qwen2Model::lazyAllocIntermediates() {
 
   auto& i = intermediates_;
   DECLARE_OR_RETURN(t0, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
-  DECLARE_OR_RETURN(sin, Tensor::create(DataType::kDataTypeFloat32, Shape{max_seq_len, head_dim / 2}, dev_type));
-  DECLARE_OR_RETURN(cos, Tensor::create(DataType::kDataTypeFloat32, Shape{max_seq_len, head_dim / 2}, dev_type));
-  DECLARE_OR_RETURN(embed_out, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
-  DECLARE_OR_RETURN(lm_head_out, Tensor::create(dtype, Shape{max_seq_len, config_.vocab_size}, dev_type));
-  DECLARE_OR_RETURN(argmax_out, Tensor::create(DataType::kDataTypeInt64, Shape{1}, dev_type));
-  i.sin = std::move(sin);
-  i.cos = std::move(cos);
-  i.embed_out = std::move(embed_out);
+  ASSIGN_OR_RETURN(i.sin, Tensor::create(DataType::kDataTypeFloat32, Shape{max_seq_len, head_dim / 2}, dev_type));
+  ASSIGN_OR_RETURN(i.cos, Tensor::create(DataType::kDataTypeFloat32, Shape{max_seq_len, head_dim / 2}, dev_type));
+  ASSIGN_OR_RETURN(i.embed_out, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
+  ASSIGN_OR_RETURN(i.lm_head_out, Tensor::create(dtype, Shape{1, config_.vocab_size}, dev_type));
+  ASSIGN_OR_RETURN(i.argmax_out, Tensor::create(DataType::kDataTypeInt64, Shape{1}, dev_type));
   i.norm_out = t0;
-  i.lm_head_out = std::move(lm_head_out);
-  i.argmax_out = std::move(argmax_out);
 
-  DECLARE_OR_RETURN(q_proj_out, Tensor::create(dtype, Shape{max_seq_len, config_.num_heads * head_dim}, dev_type));
-  DECLARE_OR_RETURN(gqa_out, Tensor::create(dtype, Shape{max_seq_len, config_.num_heads * head_dim}, dev_type));
+  DECLARE_OR_RETURN(t1, Tensor::create(dtype, Shape{max_seq_len, config_.num_heads * head_dim}, dev_type));
   layer::transformer::AttentionLayer::Intermediates attn_intermediates = {
-      .q_proj_out = std::move(q_proj_out),
-      .gqa_out = std::move(gqa_out),
+      .q_proj_out = t1,
+      .gqa_out = t1,
   };
 
-  DECLARE_OR_RETURN(t1, Tensor::create(dtype, Shape{max_seq_len, config_.intermediate_size}, dev_type));
+  DECLARE_OR_RETURN(t2, Tensor::create(dtype, Shape{max_seq_len, config_.intermediate_size}, dev_type));
   DECLARE_OR_RETURN(up_out, Tensor::create(dtype, Shape{max_seq_len, config_.intermediate_size}, dev_type));
   layer::transformer::FeedForwardLayer::Intermediates mlp_intermediates = {
-      .gate_out = t1,
-      .up_out = std::move(up_out),
-      .swiglu_out = t1,
+      .gate_out = t2,
+      .up_out = up_out,
+      .swiglu_out = t2,
   };
 
   DECLARE_OR_RETURN(attn_out, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
   layer::transformer::EncoderLayer::Intermediates encoder_intermediates = {
-      .attn = std::move(attn_intermediates),
-      .mlp = std::move(mlp_intermediates),
-      .norm_out = std::move(t0),
-      .attn_out = std::move(attn_out),
+      .attn = attn_intermediates,
+      .mlp = mlp_intermediates,
+      .norm_out = t0,
+      .attn_out = attn_out,
   };
 
   for (auto& e : encoder_layers) {
@@ -152,12 +146,12 @@ Result<int32_t, std::string> Qwen2Model::predict(const tensor::TensorRef token_i
 
   // forward
   auto norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
-  auto lm_head_out = intermediates_.lm_head_out->slice(0, 0, seq_len);
+  auto lm_head_out = intermediates_.lm_head_out;
   RETURN_ON_ERR(forward(input_ids, pos_id_range, norm_out));
+  norm_out = norm_out->slice(0, seq_len - 1, seq_len);  // only need the last token's hidden state for LM head
   RETURN_ON_ERR(lm_head.forward({norm_out}, lm_head_out));
 
   // get next token id (argmax)
-  lm_head_out = lm_head_out->slice(0, seq_len - 1, seq_len);  // only need the last token's logits
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
   RETURN_ON_ERR(argmax_op.run({lm_head_out.get()}, {argmax_out.get()}));
   argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU));
