@@ -5,7 +5,7 @@ __pycache__
 core.[0-9][0-9]*
 *.log
 .pytest_cache
-dsr1*
+/models/
 set_env.sh
 *.db
 *.nsys-rep

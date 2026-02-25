@@ -1,4 +1,4 @@
-#include "ginfer/model/safetensor_loader.h"
+#include "ginfer/model/loader/safetensor_loader.h"
 #include <nlohmann/json.hpp>
 #include "ginfer/common/errors.h"
 

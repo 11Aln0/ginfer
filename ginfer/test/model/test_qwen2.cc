@@ -1,6 +1,7 @@
 #include <glog/logging.h>
 #include <tokenizers_cpp.h>
 #include <vector>
+#include "ginfer/model/model_factory.h"
 #include "ginfer/model/qwen2.h"
 #include "ginfer/model/tokenizer/auto_tokenizer.h"
 #include "ginfer/op/op.h"
@@ -22,8 +23,8 @@ using tensor::TensorRef;
 
 std::vector<int32_t> qwen2_generate(const std::string& model_path, TensorRef input_ids,
                                     std::pair<int64_t, int64_t> pos_id_range) {
-  model::Qwen2ModelLoader loader(model_path);
-  auto model = loader.load();
+  auto loader = model::ModelFactory::createLoader(model_path);
+  auto model = loader->load();
   auto to_device_res = model->toDevice(DeviceType::kDeviceCUDA);
   CHECK(to_device_res.ok()) << "Qwen2Model toDevice failed: " << to_device_res.err();
 
