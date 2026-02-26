@@ -71,5 +71,7 @@ def test_model_infer_cuda():
     
     result = ginfer_test.test_model_infer_cuda(MODEL_PATH, prompt)
     
+    print("result", result)
+    print("ref_result", ref_result)
     assert result == ref_result
     

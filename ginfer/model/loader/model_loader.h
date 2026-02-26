@@ -14,20 +14,21 @@
 namespace ginfer::model {
 
 class ModelLoader {
-  using AttentionWeight = layer::transformer::AttentionLayer::Weight;
-  using EncoderWeight = layer::transformer::EncoderLayer::Weight;
-  using FeedForwardWeight = layer::transformer::FeedForwardLayer::Weight;
-
  public:
   explicit ModelLoader(std::string model_path);
 
   virtual std::shared_ptr<Model> load() = 0;
 
  protected:
+  using AttentionWeight = layer::transformer::AttentionLayer::Weight;
+  using EncoderWeight = layer::transformer::EncoderLayer::Weight;
+  using FeedForwardWeight = layer::transformer::FeedForwardLayer::Weight;
+
+ protected:
   nlohmann::json loadConfigJSON();
   tensor::DataType parseDataType(const std::string& dtype_str) const;
 
-  AttentionWeight loadAttentionWeight(const std::string& prefix);
+  AttentionWeight loadAttentionWeight(const std::string& prefix, bool q_bias, bool k_bias, bool v_bias, bool o_bias);
   FeedForwardWeight loadFeedForwardWeight(const std::string& prefix);
   EncoderWeight loadEncoderLayerWeight(int layer_idx);
 

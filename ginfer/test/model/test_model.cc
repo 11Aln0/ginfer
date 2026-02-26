@@ -46,7 +46,7 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   input_ids->data<int32_t>()[0] = next_token_id;  // Update
 
   // decode loop
-  while (next_token_id != model->getEosTokenId()) {
+  while (!model->isEosToken(next_token_id)) {
     // LOG(INFO) << "Predicted token id: " << next_token_id;
     token_ids.push_back(next_token_id);
     pos_id_range = {pos_id_range.second + 1, pos_id_range.second + 1};
@@ -96,8 +96,9 @@ std::string test_model_infer_cuda(const std::string& model_path, const std::stri
 
   std::pair<int64_t, int64_t> pos_id_range{0, static_cast<int64_t>(input_ids_vec.size()) - 1};
   auto next_token_ids = model_generate(model_path, input_ids, pos_id_range);
-
-  return input_content + tokenizer->decode(next_token_ids, true);
+  auto all_token_ids = input_ids_vec;
+  all_token_ids.insert(all_token_ids.end(), next_token_ids.begin(), next_token_ids.end());
+  return tokenizer->decode(all_token_ids, true);
 }
 
 REGISTER_PYBIND_TEST(test_model_generate_cuda);

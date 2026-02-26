@@ -20,7 +20,11 @@ Llama3Config Llama3ModelLoader::loadConfig() {
   config.max_seq_len = 4096;  // temporary fix for llama3 models with longer context
   config.rms_norm_eps = json.value("rms_norm_eps", 1e-6f);
   config.rope_theta = json.value("rope_theta", 10000.0f);
-  config.eos_token_id = json.value("eos_token_id", static_cast<int32_t>(config.vocab_size - 1));
+  if (auto it = json.find("eos_token_id"); it != json.end() && it->is_array()) {
+    config.eos_token_ids = it->get<std::vector<int32_t>>();
+  } else {
+    config.eos_token_ids = {json.value("eos_token_id", static_cast<int32_t>(config.vocab_size - 1))};
+  }
   config.tie_word_embeddings = json.value("tie_word_embeddings", false);
 
   auto rope_scaling_json = json.value("rope_scaling", nlohmann::json::object());
@@ -30,6 +34,21 @@ Llama3Config Llama3ModelLoader::loadConfig() {
   config.rope_scaling.old_ctx_len = json.value("original_max_position_embeddings", 8192);
 
   return config;
+}
+
+ModelLoader::EncoderWeight Llama3ModelLoader::loadEncoderLayerWeight(int layer_idx) {
+  std::string prefix = "model.layers." + std::to_string(layer_idx);
+  auto attn = loadAttentionWeight(prefix, false, false, false, false);
+  auto mlp = loadFeedForwardWeight(prefix);
+
+  EncoderWeight w = {
+      .attn = attn,
+      .mlp = mlp,
+      .attn_norm = weight_loader.getTensor(prefix + ".input_layernorm.weight"),
+      .mlp_norm = weight_loader.getTensor(prefix + ".post_attention_layernorm.weight"),
+  };
+
+  return w;
 }
 
 std::shared_ptr<Model> Llama3ModelLoader::load() {

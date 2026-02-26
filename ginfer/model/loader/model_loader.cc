@@ -28,17 +28,19 @@ tensor::DataType ModelLoader::parseDataType(const std::string& dtype_str) const 
   }
 }
 
-ModelLoader::AttentionWeight ModelLoader::loadAttentionWeight(const std::string& prefix) {
+ModelLoader::AttentionWeight ModelLoader::loadAttentionWeight(const std::string& prefix, bool q_bias, bool k_bias,
+                                                              bool v_bias, bool o_bias) {
   std::string attn_prefix = prefix + ".self_attn";
   AttentionWeight w = {
       .q_w = weight_loader.getTensor(attn_prefix + ".q_proj.weight"),
-      .q_b = weight_loader.getTensor(attn_prefix + ".q_proj.bias"),
       .k_w = weight_loader.getTensor(attn_prefix + ".k_proj.weight"),
-      .k_b = weight_loader.getTensor(attn_prefix + ".k_proj.bias"),
       .v_w = weight_loader.getTensor(attn_prefix + ".v_proj.weight"),
-      .v_b = weight_loader.getTensor(attn_prefix + ".v_proj.bias"),
       .o_w = weight_loader.getTensor(attn_prefix + ".o_proj.weight"),
   };
+  if (q_bias) w.q_b = weight_loader.getTensor(attn_prefix + ".q_proj.bias");
+  if (k_bias) w.k_b = weight_loader.getTensor(attn_prefix + ".k_proj.bias");
+  if (v_bias) w.v_b = weight_loader.getTensor(attn_prefix + ".v_proj.bias");
+  if (o_bias) w.o_b = weight_loader.getTensor(attn_prefix + ".o_proj.bias");
   return w;
 }
 
@@ -54,7 +56,7 @@ ModelLoader::FeedForwardWeight ModelLoader::loadFeedForwardWeight(const std::str
 
 ModelLoader::EncoderWeight ModelLoader::loadEncoderLayerWeight(int layer_idx) {
   std::string prefix = "model.layers." + std::to_string(layer_idx);
-  auto attn = loadAttentionWeight(prefix);
+  auto attn = loadAttentionWeight(prefix, true, true, true, true);
   auto mlp = loadFeedForwardWeight(prefix);
 
   EncoderWeight w = {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 #include "ginfer/common/errors.h"
 #include "ginfer/layer/layer.h"
 #include "ginfer/layer/transformer/layer.h"
@@ -21,7 +22,7 @@ struct ModelConfig {
   int vocab_size;
   size_t max_seq_len;
 
-  int32_t eos_token_id;
+  std::vector<int32_t> eos_token_ids;
 };
 
 class Model {
@@ -40,7 +41,12 @@ class Model {
 
   int getVocabSize() const { return config_.vocab_size; }
 
-  int32_t getEosTokenId() const { return config_.eos_token_id; }
+  bool isEosToken(int32_t token_id) const {
+    for (auto id : config_.eos_token_ids) {
+      if (id == token_id) return true;
+    }
+    return false;
+  }
 
  private:
   ModelConfig config_;

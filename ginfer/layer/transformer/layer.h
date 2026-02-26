@@ -16,6 +16,7 @@ class AttentionLayer : public Layer {
     TensorRef v_w;  // [hidden_size, num_kv_heads * head_dim]
     TensorRef v_b;
     TensorRef o_w;  // [hidden_size, num_heads * head_dim]
+    TensorRef o_b;
   };
 
   struct Intermediates {
