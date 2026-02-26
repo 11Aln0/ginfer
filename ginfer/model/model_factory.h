@@ -3,6 +3,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include "ginfer/common/errors.h"
+#include "ginfer/model/llama3.h"
 #include "ginfer/model/loader/model_loader.h"
 #include "ginfer/model/model.h"
 #include "ginfer/model/qwen2.h"
@@ -19,6 +20,8 @@ class ModelFactory {
     std::string model_type = json.value("model_type", "");
     if (model_type == "qwen2")
       return std::make_unique<Qwen2ModelLoader>(model_path);
+    else if (model_type == "llama")
+      return std::make_unique<Llama3ModelLoader>(model_path);
     else
       CHECK_THROW(false, "Unsupported model type: {}", model_type);
   }

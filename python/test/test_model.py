@@ -7,18 +7,10 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 from huggingface_hub import snapshot_download
 
-# ==================== Qwen2 ====================
 
-MODEL_PATH = os.environ.get("QWEN2_MODEL_PATH", "")
+MODEL_PATH = os.environ.get("MODEL_PATH", "")
 
 def load_hf_model(model_path=None, device_name="cpu"):
-    model_id = "deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B"
-
-    if model_path and os.path.isdir(model_path):
-        print(f"Loading model from local path: {model_path}")
-    else:
-        print(f"Loading model from Hugging Face: {model_id}")
-        model_path = snapshot_download(model_id)
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
     model = AutoModelForCausalLM.from_pretrained(
         model_path,
@@ -27,7 +19,7 @@ def load_hf_model(model_path=None, device_name="cpu"):
         trust_remote_code=True,
     )
 
-    return model, tokenizer, model_path
+    return model, tokenizer
 
 
 def hf_generate(
@@ -57,27 +49,27 @@ def hf_infer(
     result = tokenizer.decode(output, skip_special_tokens=True)
     return result
 
-def test_qwen2_generate_cuda():
+def test_model_generate_cuda():
     # <｜User｜>Who are you?<｜Assistant｜><think>
     input_ids = np.array([151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
     seq_len = len(input_ids)
     pos_id_range = (0, seq_len - 1) # closed interval
     
-    hf_model, _, model_path = load_hf_model(MODEL_PATH, device_name="cuda:0")
+    hf_model, _, = load_hf_model(MODEL_PATH, device_name="cuda:0")
     ref_token_ids = hf_generate(torch.tensor([input_ids], device="cuda:0"), hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0).tolist()
     
-    next_token_ids = ginfer_test.test_qwen2_generate_cuda(model_path, input_ids, pos_id_range)
+    next_token_ids = ginfer_test.test_model_generate_cuda(MODEL_PATH, input_ids, pos_id_range)
     token_ids = np.concatenate([input_ids, next_token_ids])
     
 
     np.testing.assert_array_equal(token_ids, ref_token_ids)
 
-def test_qwen2_infer_cuda():
+def test_model_infer_cuda():
     prompt = "Who are you?"
-    hf_model, hf_tokenizer, model_path = load_hf_model(MODEL_PATH, device_name="cuda:1")
+    hf_model, hf_tokenizer = load_hf_model(MODEL_PATH, device_name="cuda:1")
     ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0)
     
-    result = ginfer_test.test_qwen2_infer_cuda(model_path, prompt)
+    result = ginfer_test.test_model_infer_cuda(MODEL_PATH, prompt)
     
     assert result == ref_result
     

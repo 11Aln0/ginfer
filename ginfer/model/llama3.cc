@@ -1,18 +1,11 @@
-#include "ginfer/model/qwen2.h"
-#include <fstream>
-#include <nlohmann/json.hpp>
-#include "ginfer/common/errors.h"
-#include "ginfer/layer/layer.h"
-#include "ginfer/layer/transformer/layer.h"
-#include "ginfer/model/loader/safetensor_loader.h"
+#include "ginfer/model/llama3.h"
 
 namespace ginfer::model {
 
-// loader
-Qwen2ModelLoader::Qwen2ModelLoader(std::string model_path) : ModelLoader(std::move(model_path)) {}
+Llama3ModelLoader::Llama3ModelLoader(std::string model_path) : ModelLoader(std::move(model_path)) {}
 
-Qwen2Config Qwen2ModelLoader::loadConfig() {
-  Qwen2Config config;
+Llama3Config Llama3ModelLoader::loadConfig() {
+  Llama3Config config;
 
   auto json = loadConfigJSON();
   config.dtype = parseDataType(json.value("torch_dtype", "float16"));
@@ -24,19 +17,24 @@ Qwen2Config Qwen2ModelLoader::loadConfig() {
   config.head_dim = json.value("head_dim", config.hidden_size / config.num_heads);
   config.intermediate_size = json.at("intermediate_size").get<int>();
   config.vocab_size = json.at("vocab_size").get<int>();
-  // config.max_seq_len = json.at("max_position_embeddings").get<size_t>();
-  config.max_seq_len = 4096;  // TODO temporary fix for qwen2 models with longer context
+  config.max_seq_len = 4096;  // temporary fix for llama3 models with longer context
   config.rms_norm_eps = json.value("rms_norm_eps", 1e-6f);
   config.rope_theta = json.value("rope_theta", 10000.0f);
-  config.eos_token_id = json.value("eos_token_id", static_cast<int32_t>(151645));
+  config.eos_token_id = json.value("eos_token_id", static_cast<int32_t>(config.vocab_size - 1));
   config.tie_word_embeddings = json.value("tie_word_embeddings", false);
+
+  auto rope_scaling_json = json.value("rope_scaling", nlohmann::json::object());
+  config.rope_scaling.factor = rope_scaling_json.value("factor", 1.0f);
+  config.rope_scaling.high_freq_factor = rope_scaling_json.value("high_freq_factor", 1.0f);
+  config.rope_scaling.low_freq_factor = rope_scaling_json.value("low_freq_factor", 1.0f);
+  config.rope_scaling.old_ctx_len = json.value("original_max_position_embeddings", 8192);
 
   return config;
 }
 
-std::shared_ptr<Model> Qwen2ModelLoader::load() {
-  Qwen2Config config = loadConfig();
-  auto m = std::make_shared<Qwen2Model>(config);
+std::shared_ptr<Model> Llama3ModelLoader::load() {
+  Llama3Config config = loadConfig();
+  auto m = std::make_shared<Llama3Model>(config);
 
   weight_loader.load(model_path_ + "/model.safetensors");  // TODO multi-part safetensors
 
@@ -57,9 +55,9 @@ std::shared_ptr<Model> Qwen2ModelLoader::load() {
   return m;
 }
 
-// model
-
-Qwen2Model::Qwen2Model(Qwen2Config config, common::DeviceType dev_type)
-    : LlamaArchModel(config, dev_type), rotary_emb(dev_type, config.rope_theta) {}
+Llama3Model::Llama3Model(Llama3Config cfg, common::DeviceType dev_type)
+    : LlamaArchModel(cfg, dev_type),
+      rotary_emb(dev_type, cfg.rope_theta, cfg.rope_scaling.factor, cfg.rope_scaling.high_freq_factor,
+                 cfg.rope_scaling.low_freq_factor, cfg.rope_scaling.old_ctx_len) {}
 
 }  // namespace ginfer::model

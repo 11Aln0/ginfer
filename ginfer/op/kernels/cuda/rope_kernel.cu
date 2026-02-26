@@ -3,23 +3,68 @@
 
 namespace ginfer::op::kernel {
 
-template<typename T>
-__global__ void rotaryEmbeddingImpl(T* sin_cache,
-                               T* cos_cache,
-                               int start_pos,
-                               int end_pos,
-                               int half_head_dim,
-                               float rope_theta) {
+
+struct DefaultRopePolicy {
+  float rope_theta;
+  int half_head_dim;
+
+  DefaultRopePolicy(float rope_theta, int half_head_dim) : rope_theta(rope_theta), half_head_dim(half_head_dim) {}
+
+  __device__ __forceinline__ float computeInvFreq(int j) {
+    return 1.0f / powf(rope_theta, (float)j / (float)half_head_dim);  // 2 * j / head_dim -> j / rope_half_dim
+  }
+};
+
+struct Llama3RopePolicy {
+  float rope_theta;
+  int half_head_dim;
+  float factor;
+  float low_freq_factor;
+  float high_freq_factor;
+  int old_ctx_len;
+
+  Llama3RopePolicy(float rope_theta, int half_head_dim, float factor, float low_freq_factor, float high_freq_factor, int old_ctx_len) 
+    : rope_theta(rope_theta), half_head_dim(half_head_dim), 
+      factor(factor), low_freq_factor(low_freq_factor), high_freq_factor(high_freq_factor), 
+      old_ctx_len(old_ctx_len) {}
+
+  __device__ __forceinline__ float computeInvFreq(int j) {
+    float low_freq_wavelen = (float)old_ctx_len / low_freq_factor;
+    float high_freq_wavelen = (float)old_ctx_len / high_freq_factor;
+
+    float inv_freq = 1.0f / powf(rope_theta, (float)j / (float)half_head_dim);
+    float wavelen = 2 * M_PI * inv_freq;
+
+    if(wavelen > low_freq_wavelen) {
+      inv_freq = inv_freq / factor;
+    } else if(wavelen < high_freq_wavelen) {
+    } else {
+      float smooth = (old_ctx_len / wavelen - low_freq_factor) / (high_freq_factor - low_freq_factor);
+      inv_freq = (1 - smooth) * inv_freq / factor + smooth * inv_freq;
+    }
+    
+    return inv_freq;
+  }
+};
+
+template<typename T, typename Policy>
+__global__ void rotaryEmbeddingImpl(Policy policy,
+                                    T* sin_cache,
+                                    T* cos_cache,
+                                    int start_pos,
+                                    int end_pos,
+                                    int half_head_dim) {
 
   int j = threadIdx.x;
+  float inv_freq = policy.computeInvFreq(j);
 
   for(int pos_id = start_pos + blockIdx.x; pos_id <= end_pos; pos_id += gridDim.x) {
-    float theta = pos_id / powf(rope_theta, (float)j / (float)half_head_dim);  // 2 * j / head_dim -> j / rope_half_dim
+    float theta = pos_id * inv_freq;
     // write from the start of the cache
     sin_cache[(pos_id - start_pos) * half_head_dim + j] = static_cast<T>(sinf(theta));
     cos_cache[(pos_id - start_pos) * half_head_dim + j] = static_cast<T>(cosf(theta));
   }
-} 
+}
 
 
 template<typename T>
@@ -54,8 +99,8 @@ __global__ void ROPEImpl(T* output,
 }
 
 template<typename T, typename Context>
-void RotaryEmbeddingKernel(const Context& ctx, 
-                      tensor::Tensor sin_cache, tensor::Tensor cos_cache,
+void RotaryEmbeddingKernel(const Context& ctx,
+                      tensor::Tensor& sin_cache, tensor::Tensor& cos_cache,
                       int start_pos, int end_pos, float rope_theta) {
 
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
@@ -66,26 +111,62 @@ void RotaryEmbeddingKernel(const Context& ctx,
 
   T* sin_cache_data = sin_cache.data<T>();
   T* cos_cache_data = cos_cache.data<T>();
-  
+
   int half_head_dim = shape[shape.ndim() - 1];
   int block_size = half_head_dim;
   int grid_size = std::min((end_pos - start_pos + 1), 512);
 
+  DefaultRopePolicy policy(rope_theta, half_head_dim);
   rotaryEmbeddingImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
+      policy,
       sin_cache_data,
       cos_cache_data,
       start_pos,
       end_pos,
-      half_head_dim,
-      rope_theta
+      half_head_dim
   );
 }
+
+
+// input [seq_len, nhead, head_dim]
+// Computes Llama3-scaled sin/cos into caches, then applies RoPE to input -> output
+template<typename T, typename Context>
+void Llama3RotaryEmbeddingKernel(const Context& ctx,
+                                 tensor::Tensor& sin_cache, tensor::Tensor& cos_cache,
+                                 int start_pos, int end_pos,
+                                 float rope_theta, float factor, float high_freq_factor,
+                                 float low_freq_factor, int old_ctx_len) {
+
+  CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
+      << "RotaryEmbeddingKernel only supports CUDA device type.";
+  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+
+  const auto& shape = sin_cache.shape();
+
+  T* sin_cache_data = sin_cache.data<T>();
+  T* cos_cache_data = cos_cache.data<T>();
+
+  int half_head_dim = shape[shape.ndim() - 1];
+  int block_size = half_head_dim;
+  int grid_size = std::min((end_pos - start_pos + 1), 512);
+
+  Llama3RopePolicy policy(rope_theta, half_head_dim, factor, low_freq_factor, high_freq_factor, old_ctx_len);
+  rotaryEmbeddingImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
+      policy,
+      sin_cache_data,
+      cos_cache_data,
+      start_pos,
+      end_pos,
+      half_head_dim
+  );
+}
+
 
 // input [seq_len, nhead, head_dim]
 template<typename T, typename Context>
 void ROPEKernel(const Context& ctx, 
-                const tensor::Tensor input, tensor::Tensor output,
-                const tensor::Tensor sin_cache, tensor::Tensor cos_cache) {
+                const tensor::Tensor& input, tensor::Tensor& output,
+                const tensor::Tensor& sin_cache, const tensor::Tensor& cos_cache) {
 
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "ROPEKernel only supports CUDA device type.";
@@ -120,6 +201,11 @@ void ROPEKernel(const Context& ctx,
 REGISTER_KERNEL(rotary_embedding,
                 kDeviceCUDA,
                 RotaryEmbeddingKernel,
+                tensor::DataType::kDataTypeFloat32);
+
+REGISTER_KERNEL(llama3_rotary_embedding,
+                kDeviceCUDA,
+                Llama3RotaryEmbeddingKernel,
                 tensor::DataType::kDataTypeFloat32);
 
 REGISTER_KERNEL(ROPE,

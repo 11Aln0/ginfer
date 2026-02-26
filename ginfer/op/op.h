@@ -54,7 +54,8 @@ class MatmulOp : public Op {
  public:
   MatmulOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
  private:
   bool isGemvMode(const Tensor* A);
@@ -64,20 +65,23 @@ class AddOp : public Op {
  public:
   AddOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
  private:
   bool checkBroadcastable(const tensor::Shape& shapeA, const tensor::Shape& shapeB);
 
   //  private:
-  //   Result<void, std::string> checkParams(const std::vector<const Tensor*>& inputs, const std::vector<Tensor*> outputs);
+  //   Result<void, std::string> checkParams(const std::vector<const Tensor*>& inputs, const std::vector<Tensor*>
+  //   outputs);
 };
 
 class RMSNormOp : public Op {
  public:
   RMSNormOp(DeviceType dev_type, float epsilon);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
  private:
   float epsilon_;
@@ -87,7 +91,8 @@ class GQAOp : public Op {
  public:
   GQAOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
   // void setSeqLen(int seq_len);
 
@@ -99,31 +104,51 @@ class ArgmaxOp : public Op {
  public:
   ArgmaxOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 };
 
 class EmbeddingOp : public Op {
  public:
   EmbeddingOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 };
 
 class RotaryEmbeddingOp : public Op {
  public:
   RotaryEmbeddingOp(DeviceType dev_type, float rope_theta = 10000.0f);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
  private:
   float rope_theta_;
+};
+
+class Llama3RotaryEmbeddingOp : public Op {
+ public:
+  Llama3RotaryEmbeddingOp(DeviceType dev_type, float rope_theta, float factor, float high_freq_factor,
+                          float low_freq_factor, int old_ctx_len);
+
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
+
+ private:
+  float rope_theta_;
+  float factor_;
+  float high_freq_factor_;
+  float low_freq_factor_;
+  int old_ctx_len_;
 };
 
 class ROPEOp : public Op {
  public:
   ROPEOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 
   // void updateCache(int start_pos, int end_pos);
 
@@ -139,7 +164,8 @@ class SwiGLUOp : public Op {
  public:
   SwiGLUOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) override;
+  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
 };
 
 }  // namespace ginfer::op

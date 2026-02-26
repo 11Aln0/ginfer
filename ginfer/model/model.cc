@@ -10,7 +10,6 @@ LlamaArchModel::LlamaArchModel(LlamaArchModelConfig config, common::DeviceType d
       final_rmsnorm(dev_type, "final_rmsnorm", config.rms_norm_eps),
       lm_head(dev_type, "lm_head"),
       argmax_op(dev_type),
-      rotary_emb(dev_type, config.rope_theta),
       Model(config, dev_type) {
   // initialize encoder layers
   for (size_t i = 0; i < config.nlayer; ++i) {
@@ -91,22 +90,22 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
 }
 
 Result<std::pair<TensorRef, TensorRef>, std::string> LlamaArchModel::getPositionEmbedding(
-    std::pair<int64_t, int64_t> pos_id_range) {
+    TensorRef sin_cache, TensorRef cos_cache, std::pair<int64_t, int64_t> pos_id_range) {
   auto [start, end] = pos_id_range;
-  auto sin = intermediates_.sin->slice(0, 0, end - start + 1);
-  auto cos = intermediates_.cos->slice(0, 0, end - start + 1);
-  DECLARE_OR_RETURN(pos_ids,
-                    Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, memory::DeviceType::kDeviceCPU));
+  auto sin = sin_cache->slice(0, 0, end - start + 1);
+  auto cos = cos_cache->slice(0, 0, end - start + 1);
+  auto allocator = memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU);
+  DECLARE_OR_RETURN(pos_ids, Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, allocator));
   pos_ids->data<int64_t>()[0] = start;
   pos_ids->data<int64_t>()[1] = end;
-  rotary_emb.run({pos_ids.get()}, {sin.get(), cos.get()});
+  getRotaryEmbeddingOp().run({pos_ids.get()}, {sin.get(), cos.get()});
   return Ok(std::pair<TensorRef, TensorRef>{sin, cos});
 }
 
 Result<void, std::string> LlamaArchModel::forward(const TensorRef input_ids, std::pair<int64_t, int64_t> pos_id_range,
                                                   TensorRef output) {
   int64_t seq_len = input_ids->shape()[0];
-  DECLARE_OR_RETURN(sin_cos, getPositionEmbedding(pos_id_range));
+  DECLARE_OR_RETURN(sin_cos, getPositionEmbedding(intermediates_.sin, intermediates_.cos, pos_id_range));
   auto [sin, cos] = sin_cos;
 
   auto embed_out = intermediates_.embed_out->slice(0, 0, seq_len);
@@ -125,14 +124,13 @@ Result<void, std::string> LlamaArchModel::forward(const TensorRef input_ids, std
 Result<void, std::string> LlamaArchModel::toDevice(common::DeviceType dev_type) {
   dev_type_ = dev_type;
   RETURN_ON_ERR(embed_tokens.toDevice(dev_type));
+  RETURN_ON_ERR(getRotaryEmbeddingOp().toDevice(dev_type));
   for (auto& encoder : encoder_layers) {
     RETURN_ON_ERR(encoder.toDevice(dev_type));
   }
   RETURN_ON_ERR(final_rmsnorm.toDevice(dev_type));
   RETURN_ON_ERR(lm_head.toDevice(dev_type));
-  RETURN_ON_ERR(argmax_op.toDevice(dev_type));
-  RETURN_ON_ERR(rotary_emb.toDevice(dev_type));
-  return Ok<void>();
+  return argmax_op.toDevice(dev_type);
 }
 
 Result<int32_t, std::string> LlamaArchModel::predict(const tensor::TensorRef token_ids,

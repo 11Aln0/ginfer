@@ -57,6 +57,8 @@ struct LlamaArchModelConfig : public ModelConfig {
 
   float rms_norm_eps;
   float rope_theta;
+
+  bool tie_word_embeddings;
 };
 
 class LlamaArchModel : public Model {
@@ -88,7 +90,9 @@ class LlamaArchModel : public Model {
   // mem
   Result<void, std::string> lazyAllocIntermediates();
   Result<void, std::string> lazyAllocKVCache();
-  Result<std::pair<TensorRef, TensorRef>, std::string> getPositionEmbedding(std::pair<int64_t, int64_t> pos_id_range);
+
+  Result<std::pair<TensorRef, TensorRef>, std::string> getPositionEmbedding(TensorRef sin_cache, TensorRef cos_cache,
+                                                                            std::pair<int64_t, int64_t> pos_id_range);
 
   // forward
   Result<void, std::string> forward(const TensorRef input_ids, std::pair<int64_t, int64_t> pos_id_range,
@@ -104,7 +108,9 @@ class LlamaArchModel : public Model {
   KVCache kv_cache_;
 
  protected:
-  op::RotaryEmbeddingOp rotary_emb;
+  virtual op::Op& getRotaryEmbeddingOp() = 0;
+
+ protected:
   op::ArgmaxOp argmax_op;
   layer::EmbeddingLayer embed_tokens;
   std::vector<layer::transformer::EncoderLayer> encoder_layers;
