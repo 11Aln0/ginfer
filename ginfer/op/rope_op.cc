@@ -7,7 +7,8 @@ namespace ginfer::op {
 RotaryEmbeddingOp::RotaryEmbeddingOp(DeviceType dev_type, float rope_theta)
     : Op(dev_type, OpType::kOpCustom, "rotary_embedding"), rope_theta_(rope_theta) {}
 
-Result<void, std::string> RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs,
+Result<void, std::string> RotaryEmbeddingOp::run(const common::InferContext& ctx,
+                                                 const std::vector<const Tensor*>& inputs,
                                                  std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "RotaryEmbeddingOp requires exactly 1 input tensor.";
   CHECK(outputs.size() == 2) << "RotaryEmbeddingOp requires exactly 2 output tensors.";
@@ -32,7 +33,8 @@ Llama3RotaryEmbeddingOp::Llama3RotaryEmbeddingOp(DeviceType dev_type, float rope
       low_freq_factor_(low_freq_factor),
       old_ctx_len_(old_ctx_len) {}
 
-Result<void, std::string> Llama3RotaryEmbeddingOp::run(const std::vector<const Tensor*>& inputs,
+Result<void, std::string> Llama3RotaryEmbeddingOp::run(const common::InferContext& ctx,
+                                                       const std::vector<const Tensor*>& inputs,
                                                        std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "Llama3RotaryEmbeddingOp requires exactly 1 input tensor.";
   CHECK(outputs.size() == 2) << "Llama3RotaryEmbeddingOp requires exactly 2 output tensors.";
@@ -51,7 +53,8 @@ Result<void, std::string> Llama3RotaryEmbeddingOp::run(const std::vector<const T
 
 ROPEOp::ROPEOp(DeviceType dev_type) : Op(dev_type, OpType::kOpROPE, "rope") {}
 
-Result<void, std::string> ROPEOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> ROPEOp::run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
+                                      std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
   CHECK(outputs.size() == 1) << "ROPEOp requires exactly 1 output tensor.";
 

@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "ginfer/common/context.h"
 #include "ginfer/common/device.h"
 #include "ginfer/common/errors.h"
 #include "ginfer/tensor/tensor.h"
@@ -37,7 +38,8 @@ class BaseOp {
   OpType opType() const;
   DeviceType getDeviceType() const;
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) = 0;
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) = 0;
   virtual Result<void, std::string> toDevice(DeviceType dev_type);
 
  private:
@@ -54,7 +56,7 @@ class MatmulOp : public Op {
  public:
   MatmulOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
  private:
@@ -65,7 +67,7 @@ class AddOp : public Op {
  public:
   AddOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
  private:
@@ -80,7 +82,7 @@ class RMSNormOp : public Op {
  public:
   RMSNormOp(DeviceType dev_type, float epsilon);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
  private:
@@ -91,7 +93,7 @@ class GQAOp : public Op {
  public:
   GQAOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
   // void setSeqLen(int seq_len);
@@ -100,11 +102,22 @@ class GQAOp : public Op {
   // int seq_len_;
 };
 
+class GQAVarlenOp : public Op {
+ public:
+  GQAVarlenOp(DeviceType dev_type, int paged_block_size);
+
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
+
+ private:
+  int paged_block_size_;
+};
+
 class ArgmaxOp : public Op {
  public:
   ArgmaxOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 };
 
@@ -112,7 +125,7 @@ class EmbeddingOp : public Op {
  public:
   EmbeddingOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 };
 
@@ -120,7 +133,7 @@ class RotaryEmbeddingOp : public Op {
  public:
   RotaryEmbeddingOp(DeviceType dev_type, float rope_theta = 10000.0f);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
  private:
@@ -132,7 +145,7 @@ class Llama3RotaryEmbeddingOp : public Op {
   Llama3RotaryEmbeddingOp(DeviceType dev_type, float rope_theta, float factor, float high_freq_factor,
                           float low_freq_factor, int old_ctx_len);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
  private:
@@ -147,7 +160,7 @@ class ROPEOp : public Op {
  public:
   ROPEOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
   // void updateCache(int start_pos, int end_pos);
@@ -164,7 +177,7 @@ class SwiGLUOp : public Op {
  public:
   SwiGLUOp(DeviceType dev_type);
 
-  virtual Result<void, std::string> run(const std::vector<const Tensor*>& inputs,
+  virtual Result<void, std::string> run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 };
 

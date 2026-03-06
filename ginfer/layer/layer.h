@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "ginfer/common/context.h"
 #include "ginfer/common/device.h"
 #include "ginfer/common/errors.h"
 #include "ginfer/op/op.h"
@@ -22,7 +23,8 @@ class BaseLayer {
 
   DeviceType getDeviceType() const;
 
-  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) = 0;
+  virtual Result<void, std::string> forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                            TensorRef output) = 0;
 
   virtual Result<void, std::string> toDevice(DeviceType dev_type);
 
@@ -48,7 +50,8 @@ class LinearLayer : public Layer {
  public:
   LinearLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                            TensorRef output) override;
 
   virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 
@@ -65,7 +68,8 @@ class RMSNormLayer : public Layer {
  public:
   RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon);
 
-  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                            TensorRef output) override;
 
   void setWeight(const TensorRef& gamma);
 
@@ -80,7 +84,8 @@ class EmbeddingLayer : public Layer {
  public:
   EmbeddingLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Result<void, std::string> forward(const std::vector<TensorRef>& inputs, TensorRef output) override;
+  virtual Result<void, std::string> forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                            TensorRef output) override;
 
   virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
 

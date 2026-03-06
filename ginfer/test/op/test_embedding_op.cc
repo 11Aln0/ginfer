@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "ginfer/common/context.h"
 #include "ginfer/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -37,7 +38,7 @@ TensorRef test_embedding_op_cuda(TensorRef input_tensor, TensorRef weight_tensor
 
   std::vector<const Tensor*> inputs = {input_tensor.get(), weight_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = embedding_op.run(inputs, outputs);
+  auto status = embedding_op.run(common::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "EmbeddingOp run failed: " << status.err();
 
   output_tensor->toDevice(DeviceType::kDeviceCPU);

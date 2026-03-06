@@ -455,12 +455,13 @@ __global__ void GQAVarlenKernelImpl(const T* __restrict__ q,
   int q_seq_offset = cu_seqlens_q[batch_id];
   int q_seqlen = cu_seqlens_q[batch_id + 1] - q_seq_offset;
   if(br * q_tile_id >= q_seqlen) return; // early exit
-  int kv_seq_offset = cu_seqlens_kv[batch_id];
-  int kv_seqlen = cu_seqlens_kv[batch_id + 1] - kv_seq_offset;
+  int kv_seqlen = cu_seqlens_kv[batch_id + 1] - cu_seqlens_kv[batch_id];
 
   const int* block_table = block_tables + batch_id * block_table_len;
 
   int q_gmem_offset = (q_seq_offset + q_tile_id * br) * q_seqlen_stride + head_id * head_dim;
+  int k_gmem_offset = kv_head_id * head_dim;
+  int v_gmem_offset = k_gmem_offset; // seqlen stride should be handled in loadKVPagedTile 
   int out_gmem_offset = q_gmem_offset;
   
   T* p_q_block_smem = reinterpret_cast<T*>(smem);
@@ -481,11 +482,10 @@ __global__ void GQAVarlenKernelImpl(const T* __restrict__ q,
 
   for(int c = 0; c < kv_seqlen; c += bc) {
     if(c >= (q_tile_id + 1) * br + kv_seqlen - q_seqlen) break; // causal
-    int kv_block_seqlen = min(bc, kv_seqlen - c);
 
     // load K,V block
-    loadKVPagedTile<T, bc, head_dim>(k, p_k_block_smem, kv_block_seqlen, block_table, c, kv_seqlen, kv_seqlen_stride, paged_block_size);
-    loadKVPagedTile<T, bc, head_dim>(v, p_v_block_smem, kv_block_seqlen, block_table, c, kv_seqlen, kv_seqlen_stride, paged_block_size);
+    loadKVPagedTile<T, bc, head_dim>(k + k_gmem_offset, p_k_block_smem, block_table, c, kv_seqlen, kv_seqlen_stride, paged_block_size);
+    loadKVPagedTile<T, bc, head_dim>(v + v_gmem_offset, p_v_block_smem, block_table, c, kv_seqlen, kv_seqlen_stride, paged_block_size);
     __syncthreads();
 
     // compute S = Q * K^T
@@ -515,9 +515,9 @@ __global__ void GQAVarlenKernelImpl(const T* __restrict__ q,
 }
 
 // q: [batch * q_seqlen, num_heads, head_dim]
-// k, v: [batch * kv_seqlen, num_heads_kv, head_dim] where num_heads_kv divides num_heads
+// k, v: [num_blocks, block_size, num_heads_kv, head_dim] where num_heads_kv divides num_heads
 template <typename T, typename Context>
-void GQAKernel(const Context& ctx,
+void GQAVarlenKernel(const Context& ctx,
               const tensor::Tensor& q,
               const tensor::Tensor& k,
               const tensor::Tensor& v,
@@ -529,7 +529,7 @@ void GQAKernel(const Context& ctx,
               tensor::Tensor& output) {
   
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
-      << "GQAKernel only supports CUDA device type.";
+      << "GQAVarlenKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& q_shape = q.shape();
@@ -538,7 +538,7 @@ void GQAKernel(const Context& ctx,
   const int head_dim = q_shape[2];
 
   const auto& k_shape = k.shape();
-  const int kv_heads = k_shape[1];
+  const int kv_heads = k_shape[2];
 
   const int block_table_len = block_tables.shape()[1];
 

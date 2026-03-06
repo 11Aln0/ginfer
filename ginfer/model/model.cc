@@ -1,4 +1,5 @@
 #include "ginfer/model/model.h"
+#include "ginfer/common/context.h"
 #include "ginfer/memory/allocator_factory.h"
 
 namespace ginfer::model {
@@ -98,7 +99,7 @@ Result<std::pair<TensorRef, TensorRef>, std::string> LlamaArchModel::getPosition
   DECLARE_OR_RETURN(pos_ids, Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, allocator));
   pos_ids->data<int64_t>()[0] = start;
   pos_ids->data<int64_t>()[1] = end;
-  getRotaryEmbeddingOp().run({pos_ids.get()}, {sin.get(), cos.get()});
+  getRotaryEmbeddingOp().run(common::InferContext{}, {pos_ids.get()}, {sin.get(), cos.get()});
   return Ok(std::pair<TensorRef, TensorRef>{sin, cos});
 }
 
@@ -109,16 +110,17 @@ Result<void, std::string> LlamaArchModel::forward(const TensorRef input_ids, std
   auto [sin, cos] = sin_cos;
 
   auto embed_out = intermediates_.embed_out->slice(0, 0, seq_len);
-  RETURN_ON_ERR(embed_tokens.forward({input_ids}, embed_out));
+  common::InferContext infer_ctx;
+  RETURN_ON_ERR(embed_tokens.forward(infer_ctx, {input_ids}, embed_out));
   TensorRef hidden_state = embed_out;
   for (int i = 0; i < config_.nlayer; ++i) {
     auto& encoder = encoder_layers[i];
     auto k_cache = kv_cache_.k[i]->slice(0, 0, kv_cache_.offset + seq_len);
     auto v_cache = kv_cache_.v[i]->slice(0, 0, kv_cache_.offset + seq_len);
-    RETURN_ON_ERR(encoder.forward({hidden_state, sin, cos, k_cache, v_cache}, hidden_state));
+    RETURN_ON_ERR(encoder.forward(infer_ctx, {hidden_state, sin, cos, k_cache, v_cache}, hidden_state));
   }
   kv_cache_.offset += seq_len;
-  return final_rmsnorm.forward({hidden_state}, output);
+  return final_rmsnorm.forward(infer_ctx, {hidden_state}, output);
 }
 
 Result<void, std::string> LlamaArchModel::toDevice(common::DeviceType dev_type) {
@@ -148,11 +150,11 @@ Result<int32_t, std::string> LlamaArchModel::predict(const tensor::TensorRef tok
   auto lm_head_out = intermediates_.lm_head_out;
   RETURN_ON_ERR(forward(input_ids, pos_id_range, norm_out));
   norm_out = norm_out->slice(0, seq_len - 1, seq_len);  // only need the last token's hidden state for LM head
-  RETURN_ON_ERR(lm_head.forward({norm_out}, lm_head_out));
+  RETURN_ON_ERR(lm_head.forward(common::InferContext{}, {norm_out}, lm_head_out));
 
   // get next token id (argmax)
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
-  RETURN_ON_ERR(argmax_op.run({lm_head_out.get()}, {argmax_out.get()}));
+  RETURN_ON_ERR(argmax_op.run(common::InferContext{}, {lm_head_out.get()}, {argmax_out.get()}));
   argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU));
 
   return Ok(argmax_out->data<int32_t>()[0]);

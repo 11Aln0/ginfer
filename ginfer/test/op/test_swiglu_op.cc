@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "ginfer/common/context.h"
 #include "ginfer/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -27,7 +28,7 @@ TensorRef test_swiglu_op_cuda(TensorRef gate_tensor, TensorRef up_tensor) {
 
   std::vector<const Tensor*> inputs = {gate_tensor.get(), up_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = swiglu_op.run(inputs, outputs);
+  auto status = swiglu_op.run(common::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "SwiGLUOp run failed: " << status.err();
 
   output_tensor->toDevice(DeviceType::kDeviceCPU);

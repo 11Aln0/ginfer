@@ -20,7 +20,8 @@ void LinearLayer::setWeight(const TensorRef& weight) {
 
 void LinearLayer::setBias(const TensorRef& bias) { bias_ = bias; }
 
-Result<void, std::string> LinearLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> LinearLayer::forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                               TensorRef output) {
   CHECK_EQ(inputs.size(), 1) << "LinearLayer requires exactly 1 input tensor.";
 
   std::vector<const Tensor*> mm_inputs = {inputs[0].get(), weight_.get()};
@@ -28,7 +29,7 @@ Result<void, std::string> LinearLayer::forward(const std::vector<TensorRef>& inp
     mm_inputs.push_back(bias_.get());
   }
 
-  return mm_op_.run(mm_inputs, {output.get()});
+  return mm_op_.run(ctx, mm_inputs, {output.get()});
 }
 
 Result<void, std::string> LinearLayer::toDevice(DeviceType dev_type) {

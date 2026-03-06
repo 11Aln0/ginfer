@@ -6,9 +6,10 @@ namespace ginfer::layer {
 RMSNormLayer::RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon)
     : Layer(dev_type, std::move(layer_name)), norm_op_(dev_type, epsilon) {}
 
-Result<void, std::string> RMSNormLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> RMSNormLayer::forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                                TensorRef output) {
   CHECK_EQ(inputs.size(), 1) << "RMSNormLayer requires exactly 1 input tensor.";
-  return norm_op_.run({inputs[0].get(), gamma_.get()}, {output.get()});
+  return norm_op_.run(ctx, {inputs[0].get(), gamma_.get()}, {output.get()});
 }
 
 void RMSNormLayer::setWeight(const TensorRef& gamma) { gamma_ = gamma; }

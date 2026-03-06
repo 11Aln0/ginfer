@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "ginfer/common/context.h"
 #include "ginfer/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -26,7 +27,7 @@ TensorRef test_argmax_op_cuda(TensorRef input_tensor) {
 
   std::vector<const Tensor*> inputs = {input_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = argmax_op.run(inputs, outputs);
+  auto status = argmax_op.run(common::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "ArgmaxOp run failed: " << status.err();
 
   output_tensor->toDevice(DeviceType::kDeviceCPU);

@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include "ginfer/common/context.h"
 #include "ginfer/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -30,7 +31,7 @@ TensorRef test_gqa_op_cuda(TensorRef q_tensor, TensorRef k_tensor, TensorRef v_t
   // Run computation
   std::vector<const Tensor*> inputs = {q_tensor.get(), k_tensor.get(), v_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = gqa_op.run(inputs, outputs);
+  auto status = gqa_op.run(common::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "GQAOp run failed: " << status.err();
 
   // Copy result back to CPU

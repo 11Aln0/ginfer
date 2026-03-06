@@ -12,7 +12,8 @@ EncoderLayer::EncoderLayer(DeviceType dev_type, std::string layer_name, float rm
       attn_norm(dev_type, "attn_norm", rms_norm_eps),
       add(dev_type) {}
 
-Result<void, std::string> EncoderLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> EncoderLayer::forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                                TensorRef output) {
   CHECK(inputs.size() == 5) << "EncoderLayer requires exactly 5 input tensors.";
   const auto& hidden_state = inputs[0];  // [seq_len, hidden_size]
   const auto& sin_cache = inputs[1];     // [seq_len, head_dim / 2]
@@ -25,13 +26,13 @@ Result<void, std::string> EncoderLayer::forward(const std::vector<TensorRef>& in
   TensorRef attn_out = intermediates_.attn_out->slice(0, 0, seq_len);
   TensorRef norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
 
-  RETURN_ON_ERR(attn_norm.forward({hidden_state}, norm_out));
-  RETURN_ON_ERR(self_attn.forward({norm_out, sin_cache, cos_cache, k_cache, v_cache}, attn_out));
-  RETURN_ON_ERR(add.run({hidden_state.get(), attn_out.get()}, {attn_out.get()}));
-  RETURN_ON_ERR(mlp_norm.forward({attn_out}, norm_out));
-  RETURN_ON_ERR(mlp.forward({norm_out}, output));
+  RETURN_ON_ERR(attn_norm.forward(ctx, {hidden_state}, norm_out));
+  RETURN_ON_ERR(self_attn.forward(ctx, {norm_out, sin_cache, cos_cache, k_cache, v_cache}, attn_out));
+  RETURN_ON_ERR(add.run(ctx, {hidden_state.get(), attn_out.get()}, {attn_out.get()}));
+  RETURN_ON_ERR(mlp_norm.forward(ctx, {attn_out}, norm_out));
+  RETURN_ON_ERR(mlp.forward(ctx, {norm_out}, output));
 
-  return add.run({attn_out.get(), output.get()}, {output.get()});
+  return add.run(ctx, {attn_out.get(), output.get()}, {output.get()});
 }
 
 void EncoderLayer::setWeight(const Weight& weight) {

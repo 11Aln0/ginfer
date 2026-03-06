@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <vector>
+#include "ginfer/common/context.h"
 #include "ginfer/op/op.h"
 #include "ginfer/tensor/tensor.h"
 
@@ -12,15 +13,18 @@ TEST(OpTest, AddOpCUDA) {
   EXPECT_EQ(add_op.opType(), ginfer::op::OpType::kOpAdd);
   EXPECT_EQ(add_op.getDeviceType(), DeviceType::kDeviceCUDA);
 
-  auto a_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
+  auto a_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}),
+                                              DeviceType::kDeviceCPU);
   ASSERT_TRUE(a_res.ok()) << a_res.err();
   auto a = a_res.value();
 
-  auto b_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
+  auto b_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}),
+                                              DeviceType::kDeviceCPU);
   ASSERT_TRUE(b_res.ok()) << b_res.err();
   auto b = b_res.value();
 
-  auto c_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}), DeviceType::kDeviceCPU);
+  auto c_res = ginfer::tensor::Tensor::create(DataType::kDataTypeFloat32, ginfer::tensor::Shape({127, 128}),
+                                              DeviceType::kDeviceCPU);
   ASSERT_TRUE(c_res.ok()) << c_res.err();
   auto c = c_res.value();
 
@@ -39,7 +43,7 @@ TEST(OpTest, AddOpCUDA) {
 
   std::vector<const ginfer::tensor::Tensor*> inputs = {a.get(), b.get()};
   std::vector<ginfer::tensor::Tensor*> outputs = {c.get()};
-  auto status = add_op.run(inputs, outputs);
+  auto status = add_op.run(ginfer::common::InferContext{}, inputs, outputs);
   ASSERT_TRUE(status.ok()) << status.err();
 
   c->toDevice(DeviceType::kDeviceCPU);

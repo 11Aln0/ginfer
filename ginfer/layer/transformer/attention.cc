@@ -18,7 +18,8 @@ AttentionLayer::AttentionLayer(DeviceType dev_type, std::string layer_name, int 
       num_kv_heads_(num_kv_heads),
       head_dim_(head_dim) {}
 
-Result<void, std::string> AttentionLayer::forward(const std::vector<TensorRef>& inputs, TensorRef output) {
+Result<void, std::string> AttentionLayer::forward(const common::InferContext& ctx, const std::vector<TensorRef>& inputs,
+                                                  TensorRef output) {
   CHECK(inputs.size() == 5) << "AttentionLayer requires exactly 5 input tensors.";
   const auto& hidden_state = inputs[0];  // [seq_len, hidden_size]
   const auto& sin_cache = inputs[1];     // [seq_len, head_dim]
@@ -39,16 +40,16 @@ Result<void, std::string> AttentionLayer::forward(const std::vector<TensorRef>& 
   const TensorRef v = v_cache->slice(0, kv_seq_len - q_seq_len, kv_seq_len);
   TensorRef gqa_out = intermediates_.gqa_out->slice(0, 0, q_seq_len);
 
-  RETURN_ON_ERR(q_proj.forward({hidden_state}, q));
-  RETURN_ON_ERR(k_proj.forward({hidden_state}, k));
-  RETURN_ON_ERR(v_proj.forward({hidden_state}, v));
+  RETURN_ON_ERR(q_proj.forward(ctx, {hidden_state}, q));
+  RETURN_ON_ERR(k_proj.forward(ctx, {hidden_state}, k));
+  RETURN_ON_ERR(v_proj.forward(ctx, {hidden_state}, v));
 
-  RETURN_ON_ERR(rope_op.run({q.get(), sin_cache.get(), cos_cache.get()}, {q.get()}));
-  RETURN_ON_ERR(rope_op.run({k.get(), sin_cache.get(), cos_cache.get()}, {k.get()}));
-  RETURN_ON_ERR(gqa_op.run({q.get(), k_cache.get(), v_cache.get()}, {gqa_out.get()}));
+  RETURN_ON_ERR(rope_op.run(ctx, {q.get(), sin_cache.get(), cos_cache.get()}, {q.get()}));
+  RETURN_ON_ERR(rope_op.run(ctx, {k.get(), sin_cache.get(), cos_cache.get()}, {k.get()}));
+  RETURN_ON_ERR(gqa_op.run(ctx, {q.get(), k_cache.get(), v_cache.get()}, {gqa_out.get()}));
 
   gqa_out = gqa_out->reshape(hidden_state->shape());  // reshape back to [seq_len, num_heads * head_dim]
-  return o_proj.forward({gqa_out}, output);
+  return o_proj.forward(ctx, {gqa_out}, output);
 }
 
 // void AttentionLayer::reset() { kv_cache_.offset = 0; }

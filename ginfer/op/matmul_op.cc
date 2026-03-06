@@ -9,7 +9,8 @@ namespace ginfer::op {
 
 MatmulOp::MatmulOp(DeviceType dev_type) : Op(dev_type, OpType::kOpMatmul, "matmul") {}
 
-Result<void, std::string> MatmulOp::run(const std::vector<const Tensor*>& inputs, std::vector<Tensor*> outputs) {
+Result<void, std::string> MatmulOp::run(const common::InferContext& ctx, const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2 || inputs.size() == 3) << "MatmulOp requires exactly 2 or 3 input tensors.";
   CHECK(outputs.size() == 1) << "MatmulOp requires exactly 1 output tensor.";
   const Tensor* A = inputs[0];
