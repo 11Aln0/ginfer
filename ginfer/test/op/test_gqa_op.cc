@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include "ginfer/common/context.h"
-#include "ginfer/op/op.h"
+#include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -10,17 +10,18 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using tensor::DataType;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::tensor::DataType;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
 TensorRef test_gqa_op_cuda(TensorRef q_tensor, TensorRef k_tensor, TensorRef v_tensor) {
-  auto out_res = Tensor::create(q_tensor->dtype(), Shape(q_tensor->shape()), DeviceType::kDeviceCPU);
+  auto out_res =
+      Tensor::create(q_tensor->dtype(), Shape(q_tensor->shape()), DeviceType::kDeviceCPU);
   CHECK(out_res.ok()) << out_res.err();
   auto output_tensor = out_res.value();
 
-  ::ginfer::op::GQAOp gqa_op(DeviceType::kDeviceCUDA);
+  ::ginfer::core::op::GQAOp gqa_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
   q_tensor->toDevice(DeviceType::kDeviceCUDA);

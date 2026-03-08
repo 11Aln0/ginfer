@@ -103,3 +103,46 @@ def test_gqa_varlen_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, s
         print("Max absolute error:", np.max(np.abs(out_cuda - ref_out)))
         print("Max relative error:", np.max(np.abs(out_cuda - ref_out) / (np.abs(ref_out) + 1e-6)))
     np.testing.assert_allclose(out_cuda, ref_out, rtol=rtol, atol=atol)
+
+
+# ==================== Store KV Cache ====================
+
+STORE_KVCACHE_CONFIGS = [
+    # (kv_heads, head_dim)
+    (8, 128),
+    (2, 128),
+    (4,  64),
+]
+
+@pytest.mark.parametrize("kv_heads, head_dim", STORE_KVCACHE_CONFIGS)
+@pytest.mark.parametrize("dtype, atol", [
+    (np.float16,         1e-5),
+    (ml_dtypes.bfloat16, 1e-5),
+])
+def test_store_kvcache_op(dtype, atol, kv_heads, head_dim):
+    total_slots = 64   # physical cache pool size
+    num_tokens  = 16   # tokens to write this step
+
+    slot_mapping = np.random.choice(total_slots, num_tokens, replace=False).astype(np.int32)
+
+    k = np.random.randn(num_tokens, kv_heads, head_dim).astype(dtype)
+    v = np.random.randn(num_tokens, kv_heads, head_dim).astype(dtype)
+
+    # Pre-fill cache with sentinel so untouched slots can be verified
+    k_cache = np.full((total_slots, kv_heads, head_dim), fill_value=99.0, dtype=dtype)
+    v_cache = np.full((total_slots, kv_heads, head_dim), fill_value=99.0, dtype=dtype)
+
+    # Reference: manual scatter
+    ref_k_cache = k_cache.copy()
+    ref_v_cache = v_cache.copy()
+    for i, slot in enumerate(slot_mapping):
+        ref_k_cache[slot] = k[i]
+        ref_v_cache[slot] = v[i]
+
+    # CUDA kernel — results written back in-place into k_cache / v_cache numpy arrays
+    ginfer_test.test_store_kvcache_op_cuda(k, v, k_cache, v_cache, slot_mapping)
+
+    np.testing.assert_allclose(k_cache.astype(np.float32),
+                               ref_k_cache.astype(np.float32), atol=atol)
+    np.testing.assert_allclose(v_cache.astype(np.float32),
+                               ref_v_cache.astype(np.float32), atol=atol)

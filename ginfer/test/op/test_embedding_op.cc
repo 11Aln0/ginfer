@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include "ginfer/common/context.h"
-#include "ginfer/op/op.h"
+#include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -10,10 +10,10 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using tensor::DataType;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::tensor::DataType;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
 TensorRef test_embedding_op_cuda(TensorRef input_tensor, TensorRef weight_tensor) {
   const Shape& input_shape = input_tensor->shape();
@@ -30,7 +30,7 @@ TensorRef test_embedding_op_cuda(TensorRef input_tensor, TensorRef weight_tensor
   CHECK(out_res.ok()) << out_res.err();
   auto output_tensor = out_res.value();
 
-  ::ginfer::op::EmbeddingOp embedding_op(DeviceType::kDeviceCUDA);
+  ::ginfer::core::op::EmbeddingOp embedding_op(DeviceType::kDeviceCUDA);
 
   input_tensor->toDevice(DeviceType::kDeviceCUDA);
   weight_tensor->toDevice(DeviceType::kDeviceCUDA);

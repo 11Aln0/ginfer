@@ -7,7 +7,7 @@
 #include <functional>
 #include <tuple>
 #include <type_traits>
-#include "ginfer/tensor/traits.h"
+#include "ginfer/core/tensor/traits.h"
 #include "ginfer/test/pybind/tensor_converter.h"
 
 namespace ginfer::test::pybind {
@@ -50,21 +50,23 @@ struct ArgConverter {
   static T convert(const PyArgType& arg) { return arg.cast<T>(); }
 };
 
+template <>
+struct ArgConverter<core::tensor::TensorRef> {
+  static core::tensor::TensorRef convert(const PyArgType& arg) {
+    return NumpyToTensorConverter::convert(arg.cast<py::array>());
+  }
+};
+
 template <typename T>
 struct ReturnValConverter {
   static py::object convert(const T& val) { return py::cast(val); }
 };
 
 template <>
-struct ArgConverter<tensor::TensorRef> {
-  static tensor::TensorRef convert(const PyArgType& arg) {
-    return NumpyToTensorConverter::convert(arg.cast<py::array>());
+struct ReturnValConverter<core::tensor::TensorRef> {
+  static py::object convert(const core::tensor::TensorRef val) {
+    return NumpyToTensorConverter::convert_back(val);
   }
-};
-
-template <>
-struct ReturnValConverter<tensor::TensorRef> {
-  static py::object convert(const tensor::TensorRef val) { return NumpyToTensorConverter::convert_back(val); }
 };
 
 template <typename F>
@@ -79,18 +81,27 @@ class TensorFuncBridge {
     if (args.size() != args_cnt) {
       throw std::runtime_error("Parameter count mismatch");
     }
-    return ReturnValConverter<ReturnType>::convert(callImpl(fn, args, std::make_index_sequence<args_cnt>{}));
+    if constexpr (std::is_void_v<ReturnType>) {
+      callImpl(fn, args, std::make_index_sequence<args_cnt>{});
+      return py::none();
+    } else {
+      return ReturnValConverter<ReturnType>::convert(
+          callImpl(fn, args, std::make_index_sequence<args_cnt>{}));
+    }
   }
 
  private:
   template <size_t... Indices>
   static ReturnType callImpl(F fn, py::args& args, std::index_sequence<Indices...>) {
-    auto params = std::make_tuple(ArgConverter<typename Traits::template ArgsType<Indices>>::convert(args[Indices])...);
+    auto params = std::make_tuple(
+        ArgConverter<typename Traits::template ArgsType<Indices>>::convert(args[Indices])...);
     return std::apply(fn, params);
   }
 };
 
-#define WRAP_TENSOR_FUNC(fn) \
-  [](py::args args) { return ginfer::test::pybind::TensorFuncBridge<decltype(&fn)>::call(&fn, args); }
+#define WRAP_TENSOR_FUNC(fn)                                                       \
+  [](py::args args) {                                                              \
+    return ginfer::test::pybind::TensorFuncBridge<decltype(&fn)>::call(&fn, args); \
+  }
 
 }  // namespace ginfer::test::pybind

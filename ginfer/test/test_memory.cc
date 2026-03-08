@@ -1,16 +1,16 @@
 #include <gtest/gtest.h>
 #include <cstddef>
 
-#include "ginfer/memory/alloc_strategy.h"
-#include "ginfer/memory/allocator_factory.h"
-#include "ginfer/memory/buffer.h"
+#include "ginfer/core/memory/alloc_strategy.h"
+#include "ginfer/core/memory/allocator_factory.h"
+#include "ginfer/core/memory/buffer.h"
 
 namespace ginfer::test::memory {
 
 using std::byte;
 
 TEST(MemoryTest, DefaultCUDAAllocator) {
-  auto allocator = ginfer::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
   ASSERT_NE(allocator, nullptr);
   auto res = allocator->alloc(1024);
   ASSERT_TRUE(res.ok()) << "Allocation failed with error: " << res.err();
@@ -20,7 +20,7 @@ TEST(MemoryTest, DefaultCUDAAllocator) {
 }
 
 TEST(MemoryTest, PooledCUDAAllocator) {
-  using namespace ginfer::memory;
+  using namespace ginfer::core::memory;
   using PooledCUDADAllocator = PooledAllocStrategy<CUDADeviceAllocator>;
   using PooledGlobalCUDAAllocator = GlobalDeviceAllocator<PooledCUDADAllocator>;
   auto allocator = PooledGlobalCUDAAllocator::getInstance();
@@ -61,7 +61,7 @@ TEST(MemoryTest, PooledCUDAAllocator) {
 }
 
 TEST(MemoryTest, CPUAllocator) {
-  auto allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(allocator, nullptr);
   auto res = allocator->alloc(1024);
   ASSERT_TRUE(res.ok()) << "Allocation failed with error: " << res.err();
@@ -71,8 +71,8 @@ TEST(MemoryTest, CPUAllocator) {
 }
 
 TEST(MemoryTest, CUDABuffer) {
-  using ginfer::memory::Buffer;
-  using ginfer::memory::DeviceType;
+  using ginfer::core::memory::Buffer;
+  using ginfer::core::memory::DeviceType;
   auto res = Buffer::create(1024, DeviceType::kDeviceCUDA);
   ASSERT_TRUE(res.ok()) << "Buffer creation failed with error: " << res.err();
   std::shared_ptr<Buffer> buf = res.value();
@@ -80,7 +80,8 @@ TEST(MemoryTest, CUDABuffer) {
   ASSERT_EQ(buf->size(), 1024);
   ASSERT_NE(buf->ptr(), nullptr);
 
-  using PooledGlobalCUDAAllocator = ginfer::memory::GlobalDeviceAllocator<ginfer::memory::PooledAllocStrategy<ginfer::memory::CUDADeviceAllocator>>;
+  using PooledGlobalCUDAAllocator = ginfer::core::memory::GlobalDeviceAllocator<
+      ginfer::core::memory::PooledAllocStrategy<ginfer::core::memory::CUDADeviceAllocator>>;
   auto res1 = Buffer::create(1024, PooledGlobalCUDAAllocator::getInstance());
   ASSERT_TRUE(res1.ok()) << res1.err();
   std::shared_ptr<Buffer> buf1 = res1.value();
@@ -88,7 +89,7 @@ TEST(MemoryTest, CUDABuffer) {
   ASSERT_EQ(buf1->size(), 1024);
   ASSERT_NE(buf1->ptr(), nullptr);
 
-  auto res2 = Buffer::create(2048, ginfer::memory::DefaultGlobalCUDAAllocator::getInstance());
+  auto res2 = Buffer::create(2048, ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance());
   ASSERT_TRUE(res2.ok()) << res2.err();
   std::shared_ptr<Buffer> buf2 = res2.value();
   ASSERT_EQ(buf2->devType(), DeviceType::kDeviceCUDA);
@@ -97,23 +98,24 @@ TEST(MemoryTest, CUDABuffer) {
 }
 
 TEST(MemoryTest, CPUBuffer) {
-  auto allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(allocator, nullptr);
   {
-    auto res = ginfer::memory::Buffer::create(1024, allocator);
+    auto res = ginfer::core::memory::Buffer::create(1024, allocator);
     ASSERT_TRUE(res.ok()) << res.err();
-    std::shared_ptr<ginfer::memory::Buffer> buffer = res.value();
-    ASSERT_EQ(buffer->devType(), ginfer::memory::DeviceType::kDeviceCPU);
+    std::shared_ptr<ginfer::core::memory::Buffer> buffer = res.value();
+    ASSERT_EQ(buffer->devType(), ginfer::core::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(buffer->size(), 1024);
     ASSERT_NE(buffer->ptr(), nullptr);
   }
 
   {
     float* ptr = new float[32];
-    auto res = ginfer::memory::Buffer::create(32 * sizeof(float), (byte*)ptr, ginfer::memory::DeviceType::kDeviceCPU);
+    auto res = ginfer::core::memory::Buffer::create(32 * sizeof(float), (byte*)ptr,
+                                                    ginfer::core::memory::DeviceType::kDeviceCPU);
     ASSERT_TRUE(res.ok()) << res.err();
-    std::shared_ptr<ginfer::memory::Buffer> ext_buffer = res.value();
-    ASSERT_EQ(ext_buffer->devType(), ginfer::memory::DeviceType::kDeviceCPU);
+    std::shared_ptr<ginfer::core::memory::Buffer> ext_buffer = res.value();
+    ASSERT_EQ(ext_buffer->devType(), ginfer::core::memory::DeviceType::kDeviceCPU);
     ASSERT_EQ(ext_buffer->size(), 32 * sizeof(float));
     ASSERT_EQ(ext_buffer->ptr(), (byte*)ptr);
     delete[] ptr;

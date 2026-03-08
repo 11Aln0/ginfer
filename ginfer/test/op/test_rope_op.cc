@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include "ginfer/common/context.h"
-#include "ginfer/op/op.h"
+#include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -10,31 +10,33 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using tensor::DataType;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::tensor::DataType;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
-TensorRef test_rope_op_cuda(TensorRef input_tensor, int head_dim, int start_pos, int end_pos, float rope_theta) {
-  auto out_res = Tensor::create(input_tensor->dtype(), Shape(input_tensor->shape()), DeviceType::kDeviceCPU);
+TensorRef test_rope_op_cuda(
+    TensorRef input_tensor, int head_dim, int start_pos, int end_pos, float rope_theta) {
+  auto out_res =
+      Tensor::create(input_tensor->dtype(), Shape(input_tensor->shape()), DeviceType::kDeviceCPU);
   CHECK(out_res.ok()) << out_res.err();
   auto output_tensor = out_res.value();
 
   int max_seq_len = end_pos;
 
   // Create sin/cos cache tensors
-  auto sin_res =
-      Tensor::create(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCUDA);
+  auto sin_res = Tensor::create(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}),
+                                DeviceType::kDeviceCUDA);
   CHECK(sin_res.ok()) << sin_res.err();
   auto sin_cache = sin_res.value();
 
-  auto cos_res =
-      Tensor::create(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}), DeviceType::kDeviceCUDA);
+  auto cos_res = Tensor::create(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}),
+                                DeviceType::kDeviceCUDA);
   CHECK(cos_res.ok()) << cos_res.err();
   auto cos_cache = cos_res.value();
 
   // Compute sin/cos cache
-  ::ginfer::op::RotaryEmbeddingOp rotary_embed_op(DeviceType::kDeviceCUDA, rope_theta);
+  ::ginfer::core::op::RotaryEmbeddingOp rotary_embed_op(DeviceType::kDeviceCUDA, rope_theta);
   auto pos_res = Tensor::create(DataType::kDataTypeInt64, Shape({2}), DeviceType::kDeviceCPU);
   CHECK(pos_res.ok()) << pos_res.err();
   auto pos_ids = pos_res.value();
@@ -46,7 +48,7 @@ TensorRef test_rope_op_cuda(TensorRef input_tensor, int head_dim, int start_pos,
   CHECK(embed_status.ok()) << "RotaryEmbeddingOp run failed: " << embed_status.err();
 
   // Run ROPE
-  ::ginfer::op::ROPEOp rope_op(DeviceType::kDeviceCUDA);
+  ::ginfer::core::op::ROPEOp rope_op(DeviceType::kDeviceCUDA);
 
   input_tensor->toDevice(DeviceType::kDeviceCUDA);
   output_tensor->toDevice(DeviceType::kDeviceCUDA);

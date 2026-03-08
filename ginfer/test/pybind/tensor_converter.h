@@ -5,7 +5,7 @@
 #include <array>
 #include <cstddef>
 #include "ginfer/common/errors.h"
-#include "ginfer/tensor/tensor.h"
+#include "ginfer/core/tensor/tensor.h"
 #include "ginfer/test/pybind/type.h"
 
 namespace ginfer::test::pybind {
@@ -13,13 +13,13 @@ namespace ginfer::test::pybind {
 namespace py = pybind11;
 
 using common::DeviceType;
-using memory::Buffer;
-using tensor::DataType;
-using tensor::dTypeSize;
-using tensor::Layout;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::memory::Buffer;
+using core::tensor::DataType;
+using core::tensor::dTypeSize;
+using core::tensor::Layout;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
 class NumpyToTensorConverter {
  public:
@@ -31,8 +31,10 @@ class NumpyToTensorConverter {
     }
 
     DataType dtype = type::numpyDtypeToTensorDtype(arr.dtype());
-    int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) * dTypeSize(dtype);
-    DECLARE_OR_THROW(buf, Buffer::create(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU));
+    int64_t bytes = std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int64_t>()) *
+                    dTypeSize(dtype);
+    DECLARE_OR_THROW(buf,
+                     Buffer::create(bytes, (std::byte*)arr.mutable_data(), DeviceType::kDeviceCPU));
 
     if ((bool)(arr.flags() & py::array::f_style)) {
       std::reverse(shape.begin(), shape.end());

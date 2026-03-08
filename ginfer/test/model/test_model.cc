@@ -1,10 +1,10 @@
 #include <glog/logging.h>
 #include <tokenizers_cpp.h>
 #include <vector>
-#include "ginfer/model/model_factory.h"
-#include "ginfer/model/qwen2.h"
-#include "ginfer/model/tokenizer/auto_tokenizer.h"
-#include "ginfer/op/op.h"
+#include "ginfer/core/model/model_factory.h"
+#include "ginfer/core/model/qwen2.h"
+#include "ginfer/core/model/tokenizer/auto_tokenizer.h"
+#include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -15,15 +15,16 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using memory::Buffer;
-using tensor::DataType;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::memory::Buffer;
+using core::tensor::DataType;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
-std::vector<int32_t> model_generate(const std::string& model_path, TensorRef input_ids,
+std::vector<int32_t> model_generate(const std::string& model_path,
+                                    TensorRef input_ids,
                                     std::pair<int64_t, int64_t> pos_id_range) {
-  auto loader = model::ModelFactory::createLoader(model_path);
+  auto loader = core::model::ModelFactory::createLoader(model_path);
   auto model = loader->load();
   auto to_device_res = model->toDevice(DeviceType::kDeviceCUDA);
   CHECK(to_device_res.ok()) << "Model toDevice failed: " << to_device_res.err();
@@ -31,7 +32,8 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   std::vector<int32_t> token_ids;
 
   // Move input tensors to CUDA (model is on CUDA in this test)
-  auto input_ids_dev_res = Tensor::create(DataType::kDataTypeInt32, Shape({1}), DeviceType::kDeviceCUDA);
+  auto input_ids_dev_res =
+      Tensor::create(DataType::kDataTypeInt32, Shape({1}), DeviceType::kDeviceCUDA);
   CHECK(input_ids_dev_res.ok()) << input_ids_dev_res.err();
   auto input_ids_dev = input_ids_dev_res.value();
   input_ids->toDevice(DeviceType::kDeviceCUDA);
@@ -62,7 +64,8 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   return token_ids;
 }
 
-TensorRef test_model_generate_cuda(const std::string& model_path, TensorRef input_ids,
+TensorRef test_model_generate_cuda(const std::string& model_path,
+                                   TensorRef input_ids,
                                    std::pair<int64_t, int64_t>& pos_id_range) {
   auto token_ids = model_generate(model_path, input_ids, pos_id_range);
   int64_t token_count = token_ids.size();
@@ -79,7 +82,7 @@ TensorRef test_model_generate_cuda(const std::string& model_path, TensorRef inpu
 
 std::string test_model_infer_cuda(const std::string& model_path, const std::string& prompt) {
   // Tokenize prompt
-  auto tokenizer = std::make_unique<model::tokenizer::AutoTokenizer>(model_path);
+  auto tokenizer = std::make_unique<core::model::tokenizer::AutoTokenizer>(model_path);
   auto conversation = nlohmann::json::array({{{"role", "user"}, {"content", prompt}}});
   auto input_content = tokenizer->applyChatTemplate(conversation);
   auto input_ids_vec = tokenizer->encode(input_content);
@@ -89,8 +92,8 @@ std::string test_model_infer_cuda(const std::string& model_path, const std::stri
   auto buf = buf_res.value();
   std::memcpy(buf->ptr(), input_ids_vec.data(), buf->size());
 
-  auto input_ids_res =
-      Tensor::create(DataType::kDataTypeInt32, Shape({static_cast<int64_t>(input_ids_vec.size())}), buf);
+  auto input_ids_res = Tensor::create(DataType::kDataTypeInt32,
+                                      Shape({static_cast<int64_t>(input_ids_vec.size())}), buf);
   CHECK(input_ids_res.ok()) << input_ids_res.err();
   auto input_ids = input_ids_res.value();
 

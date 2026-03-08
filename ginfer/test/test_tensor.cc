@@ -2,8 +2,8 @@
 #include <gtest/gtest.h>
 #include <cstddef>
 
-#include "ginfer/memory/allocator_factory.h"
-#include "ginfer/tensor/tensor.h"
+#include "ginfer/core/memory/allocator_factory.h"
+#include "ginfer/core/tensor/tensor.h"
 
 namespace ginfer::test::tensor {
 
@@ -12,18 +12,18 @@ using std::byte;
 TEST(TensorTest, fromBuffer) {
   // cpu test
 
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
   float* ptr1 = new float[128];
-  auto cpu_buffer_res =
-      ginfer::memory::Buffer::create(128 * sizeof(float), (byte*)ptr1, ginfer::memory::DeviceType::kDeviceCPU);
+  auto cpu_buffer_res = ginfer::core::memory::Buffer::create(
+      128 * sizeof(float), (byte*)ptr1, ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_TRUE(cpu_buffer_res.ok());
-  ginfer::tensor::Shape shape{32, 4};
-  auto cpu_tensor_res =
-      ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape, cpu_buffer_res.value());
+  ginfer::core::tensor::Shape shape{32, 4};
+  auto cpu_tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeFloat32, shape, cpu_buffer_res.value());
   ASSERT_TRUE(cpu_tensor_res.ok());
   auto cpu_tensor = cpu_tensor_res.value();
-  ASSERT_EQ(cpu_tensor->dtype(), ginfer::tensor::DataType::kDataTypeFloat32);
+  ASSERT_EQ(cpu_tensor->dtype(), ginfer::core::tensor::DataType::kDataTypeFloat32);
   ASSERT_EQ(cpu_tensor->shape().ndim(), 2);
   ASSERT_EQ(cpu_tensor->shape()[0], 32);
   ASSERT_EQ(cpu_tensor->shape()[1], 4);
@@ -37,19 +37,19 @@ TEST(TensorTest, fromBuffer) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto cuda_allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
   ASSERT_NE(cuda_allocator, nullptr);
   float* ptr2 = nullptr;
   cudaError_t err = cudaMallocManaged(reinterpret_cast<void**>(&ptr2), 128 * sizeof(float));
   ASSERT_EQ(err, cudaSuccess);
-  auto cuda_buffer_res =
-      ginfer::memory::Buffer::create(128 * sizeof(float), (byte*)ptr2, ginfer::memory::DeviceType::kDeviceCUDA);
+  auto cuda_buffer_res = ginfer::core::memory::Buffer::create(
+      128 * sizeof(float), (byte*)ptr2, ginfer::core::memory::DeviceType::kDeviceCUDA);
   ASSERT_TRUE(cuda_buffer_res.ok());
-  auto cuda_tensor_res =
-      ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape, cuda_buffer_res.value());
+  auto cuda_tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeFloat32, shape, cuda_buffer_res.value());
   ASSERT_TRUE(cuda_tensor_res.ok());
   auto cuda_tensor = cuda_tensor_res.value();
-  ASSERT_EQ(cuda_tensor->dtype(), ginfer::tensor::DataType::kDataTypeFloat32);
+  ASSERT_EQ(cuda_tensor->dtype(), ginfer::core::tensor::DataType::kDataTypeFloat32);
   ASSERT_EQ(cuda_tensor->shape().ndim(), 2);
   ASSERT_EQ(cuda_tensor->shape()[0], 32);
   ASSERT_EQ(cuda_tensor->shape()[1], 4);
@@ -65,14 +65,15 @@ TEST(TensorTest, fromBuffer) {
 TEST(TensorTest, fromAllocator) {
   // cpu test
 
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
-  ginfer::tensor::Shape shape{32, 4};
+  ginfer::core::tensor::Shape shape{32, 4};
   auto cpu_tensor_res =
-      ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU);
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCPU);
   ASSERT_TRUE(cpu_tensor_res.ok());
   auto cpu_tensor = cpu_tensor_res.value();
-  ASSERT_EQ(cpu_tensor->dtype(), ginfer::tensor::DataType::kDataTypeFloat32);
+  ASSERT_EQ(cpu_tensor->dtype(), ginfer::core::tensor::DataType::kDataTypeFloat32);
   ASSERT_EQ(cpu_tensor->shape().ndim(), 2);
   ASSERT_EQ(cpu_tensor->shape()[0], 32);
   ASSERT_EQ(cpu_tensor->shape()[1], 4);
@@ -85,13 +86,14 @@ TEST(TensorTest, fromAllocator) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto cuda_allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
   ASSERT_NE(cuda_allocator, nullptr);
-  auto cuda_tensor_res = ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape,
-                                                        ginfer::common::DeviceType::kDeviceCUDA);
+  auto cuda_tensor_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCUDA);
   ASSERT_TRUE(cuda_tensor_res.ok());
   auto cuda_tensor = cuda_tensor_res.value();
-  ASSERT_EQ(cuda_tensor->dtype(), ginfer::tensor::DataType::kDataTypeFloat32);
+  ASSERT_EQ(cuda_tensor->dtype(), ginfer::core::tensor::DataType::kDataTypeFloat32);
   ASSERT_EQ(cuda_tensor->shape().ndim(), 2);
   ASSERT_EQ(cuda_tensor->shape()[0], 32);
   ASSERT_EQ(cuda_tensor->shape()[1], 4);
@@ -104,14 +106,15 @@ TEST(TensorTest, fromAllocator) {
 }
 
 TEST(TensorTest, toDev) {
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
-  ginfer::tensor::Shape shape{16, 8};
+  ginfer::core::tensor::Shape shape{16, 8};
   auto tensor_res =
-      ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape, ginfer::common::DeviceType::kDeviceCPU);
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCPU);
   ASSERT_TRUE(tensor_res.ok());
   auto tensor = tensor_res.value();
-  ASSERT_EQ(tensor->dtype(), ginfer::tensor::DataType::kDataTypeFloat32);
+  ASSERT_EQ(tensor->dtype(), ginfer::core::tensor::DataType::kDataTypeFloat32);
   ASSERT_EQ(tensor->shape().ndim(), 2);
   ASSERT_EQ(tensor->shape()[0], 16);
   ASSERT_EQ(tensor->shape()[1], 8);
@@ -119,19 +122,20 @@ TEST(TensorTest, toDev) {
   ASSERT_EQ(tensor->nbytes(), 128 * sizeof(float));
 
   // to cuda
-  tensor->toDevice(ginfer::memory::DeviceType::kDeviceCUDA);
+  tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCUDA);
   // to cpu
-  tensor->toDevice(ginfer::memory::DeviceType::kDeviceCPU);
+  tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
 
   // ASSERT_EQ(cpu_tensor.shape)
 }
 
 TEST(TensorTest, strides) {
-  auto cpu_allocator = ginfer::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
   ASSERT_NE(cpu_allocator, nullptr);
-  ginfer::tensor::Shape shape{4, 3, 2};
-  auto rmt_res = ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape,
-                                                ginfer::common::DeviceType::kDeviceCPU);
+  ginfer::core::tensor::Shape shape{4, 3, 2};
+  auto rmt_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCPU);
   ASSERT_TRUE(rmt_res.ok());
   auto row_major_tensor = rmt_res.value();
   auto row_strides = row_major_tensor->strides();
@@ -149,9 +153,10 @@ TEST(TensorTest, strides) {
 }
 
 TEST(TensorTest, slice) {
-  ginfer::tensor::Shape shape{4, 3, 2};
-  auto tensor_res = ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape,
-                                                   ginfer::common::DeviceType::kDeviceCPU);
+  ginfer::core::tensor::Shape shape{4, 3, 2};
+  auto tensor_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCPU);
   ASSERT_TRUE(tensor_res.ok());
   auto tensor = tensor_res.value();
 
@@ -210,9 +215,10 @@ TEST(TensorTest, slice) {
 }
 
 TEST(TensorTest, reshape) {
-  ginfer::tensor::Shape shape{4, 3, 2};
-  auto tensor_res = ginfer::tensor::Tensor::create(ginfer::tensor::DataType::kDataTypeFloat32, shape,
-                                                   ginfer::common::DeviceType::kDeviceCPU);
+  ginfer::core::tensor::Shape shape{4, 3, 2};
+  auto tensor_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
+                                           ginfer::common::DeviceType::kDeviceCPU);
   ASSERT_TRUE(tensor_res.ok());
   auto tensor = tensor_res.value();
 
@@ -222,7 +228,7 @@ TEST(TensorTest, reshape) {
   }
 
   // Reshape to {6, 4}
-  auto reshaped = tensor->reshape(ginfer::tensor::Shape{6, 4});
+  auto reshaped = tensor->reshape(ginfer::core::tensor::Shape{6, 4});
   ASSERT_EQ(reshaped->shape().ndim(), 2);
   ASSERT_EQ(reshaped->shape()[0], 6);
   ASSERT_EQ(reshaped->shape()[1], 4);
@@ -241,7 +247,7 @@ TEST(TensorTest, reshape) {
   }
 
   // Reshape to flat {24}
-  auto flat = tensor->reshape(ginfer::tensor::Shape{24});
+  auto flat = tensor->reshape(ginfer::core::tensor::Shape{24});
   ASSERT_EQ(flat->shape().ndim(), 1);
   ASSERT_EQ(flat->shape()[0], 24);
   ASSERT_EQ(flat->size(), 24);
@@ -250,7 +256,7 @@ TEST(TensorTest, reshape) {
   ASSERT_EQ(flat_strides[0], 1);
 
   // Reshape to higher rank {2, 3, 2, 2}
-  auto higher = tensor->reshape(ginfer::tensor::Shape{2, 3, 2, 2});
+  auto higher = tensor->reshape(ginfer::core::tensor::Shape{2, 3, 2, 2});
   ASSERT_EQ(higher->shape().ndim(), 4);
   ASSERT_EQ(higher->shape()[0], 2);
   ASSERT_EQ(higher->shape()[1], 3);
@@ -259,7 +265,7 @@ TEST(TensorTest, reshape) {
   ASSERT_EQ(higher->size(), 24);
 
   // Reshape with mismatched numel should fail
-  // ASSERT_THROW(tensor.reshape(ginfer::tensor::Shape{5, 5}), std::exception);
+  // ASSERT_THROW(tensor.reshape(ginfer::core::tensor::Shape{5, 5}), std::exception);
 }
 
 }  // namespace ginfer::test::tensor

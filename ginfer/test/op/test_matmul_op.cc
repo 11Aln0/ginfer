@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include "ginfer/common/context.h"
-#include "ginfer/op/op.h"
+#include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -10,10 +10,10 @@ namespace py = pybind11;
 namespace ginfer::test::pybind {
 
 using common::DeviceType;
-using tensor::DataType;
-using tensor::Shape;
-using tensor::Tensor;
-using tensor::TensorRef;
+using core::tensor::DataType;
+using core::tensor::Shape;
+using core::tensor::Tensor;
+using core::tensor::TensorRef;
 
 TensorRef test_matmul_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   const Shape& a_shape = a_tensor->shape();
@@ -26,7 +26,7 @@ TensorRef test_matmul_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   CHECK(c_res.ok()) << c_res.err();
   auto c_tensor = c_res.value();
 
-  ::ginfer::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
+  ::ginfer::core::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
   a_tensor->toDevice(DeviceType::kDeviceCUDA);
@@ -45,7 +45,9 @@ TensorRef test_matmul_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   return c_tensor;
 }
 
-TensorRef test_matmul_op_with_bias_cuda(TensorRef a_tensor, TensorRef b_tensor, TensorRef bias_tensor) {
+TensorRef test_matmul_op_with_bias_cuda(TensorRef a_tensor,
+                                        TensorRef b_tensor,
+                                        TensorRef bias_tensor) {
   const Shape& a_shape = a_tensor->shape();
   const Shape& b_shape = b_tensor->shape();
   auto shape = Shape({a_shape[0], b_shape[1]});
@@ -56,7 +58,7 @@ TensorRef test_matmul_op_with_bias_cuda(TensorRef a_tensor, TensorRef b_tensor, 
   CHECK(c_res.ok()) << c_res.err();
   auto c_tensor = c_res.value();
 
-  ::ginfer::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
+  ::ginfer::core::op::MatmulOp matmul_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
   a_tensor->toDevice(DeviceType::kDeviceCUDA);

@@ -22,10 +22,5 @@ endfunction()
 
 add_pathlib_with_deps(common ./common fmt::fmt nlohmann_json::nlohmann_json glog::glog CUDA::cudart concurrentqueue tokenizers_cpp jinja)
 add_pathlib_with_deps(utils ./utils common)
-add_subdirectory(memory)
-add_pathlib_with_deps(tensor ./tensor memory)
-
-add_subdirectory(op)
-add_subdirectory(layer)
-add_subdirectory(model)
+add_subdirectory(core)
 add_subdirectory(test)
