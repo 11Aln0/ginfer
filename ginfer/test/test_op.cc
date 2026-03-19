@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <vector>
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/core/tensor/tensor.h"
 
@@ -43,7 +43,7 @@ TEST(OpTest, AddOpCUDA) {
 
   std::vector<const ginfer::core::tensor::Tensor*> inputs = {a.get(), b.get()};
   std::vector<ginfer::core::tensor::Tensor*> outputs = {c.get()};
-  auto status = add_op.run(ginfer::common::InferContext{}, inputs, outputs);
+  auto status = add_op.run(ginfer::core::InferContext{}, inputs, outputs);
   ASSERT_TRUE(status.ok()) << status.err();
 
   c->toDevice(DeviceType::kDeviceCPU);

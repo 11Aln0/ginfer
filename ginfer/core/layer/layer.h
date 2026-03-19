@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/common/device.h"
 #include "ginfer/common/errors.h"
 #include "ginfer/core/op/op.h"
@@ -23,7 +23,7 @@ class BaseLayer {
 
   DeviceType getDeviceType() const;
 
-  virtual Result<void, std::string> forward(const common::InferContext& ctx,
+  virtual Result<void, std::string> forward(const core::InferContext& ctx,
                                             const std::vector<TensorRef>& inputs,
                                             TensorRef output) = 0;
 
@@ -51,7 +51,7 @@ class LinearLayer : public Layer {
  public:
   LinearLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Result<void, std::string> forward(const common::InferContext& ctx,
+  virtual Result<void, std::string> forward(const core::InferContext& ctx,
                                             const std::vector<TensorRef>& inputs,
                                             TensorRef output) override;
 
@@ -70,7 +70,7 @@ class RMSNormLayer : public Layer {
  public:
   RMSNormLayer(DeviceType dev_type, std::string layer_name, float epsilon);
 
-  virtual Result<void, std::string> forward(const common::InferContext& ctx,
+  virtual Result<void, std::string> forward(const core::InferContext& ctx,
                                             const std::vector<TensorRef>& inputs,
                                             TensorRef output) override;
 
@@ -87,7 +87,7 @@ class EmbeddingLayer : public Layer {
  public:
   EmbeddingLayer(DeviceType dev_type, std::string layer_name);
 
-  virtual Result<void, std::string> forward(const common::InferContext& ctx,
+  virtual Result<void, std::string> forward(const core::InferContext& ctx,
                                             const std::vector<TensorRef>& inputs,
                                             TensorRef output) override;
 

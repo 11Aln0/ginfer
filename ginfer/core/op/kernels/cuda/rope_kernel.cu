@@ -74,6 +74,7 @@ __global__ void rotaryEmbeddingImpl(
 template <typename T>
 __global__ void ROPEImpl(T* output,
                          const T* input,
+                         const int* positions,
                          const float* sin_cache,
                          const float* cos_cache,
                          int total_num_heads,  // seq_len * nhead
@@ -86,7 +87,7 @@ __global__ void ROPEImpl(T* output,
   int iter_stride = blockDim.x * gridDim.x / rope_half_dim;
 
   for (int h = tid / rope_half_dim; h < total_num_heads; h += iter_stride) {
-    int i = h / num_heads;
+    int i = positions[h / num_heads];
     float sin_val = sin_cache[i * rope_half_dim + j];
     float cos_val = cos_cache[i * rope_half_dim + j];
 
@@ -158,13 +159,16 @@ void Llama3RotaryEmbeddingKernel(const Context& ctx,
       policy, sin_cache_data, cos_cache_data, start_pos, end_pos, half_head_dim);
 }
 
-// input [seq_len, nhead, head_dim]
+// input: [seq_len, nhead, head_dim]
+// positions: [seq_len]
+// sin_cache/cos_cache: [max_position_embeddings, head_dim / 2]
 template <typename T, typename Context>
 void ROPEKernel(const Context& ctx,
                 const tensor::Tensor& input,
-                tensor::Tensor& output,
+                const tensor::Tensor& positions,
                 const tensor::Tensor& sin_cache,
-                const tensor::Tensor& cos_cache) {
+                const tensor::Tensor& cos_cache,
+                tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "ROPEKernel only supports CUDA device type.";
 
@@ -178,16 +182,17 @@ void ROPEKernel(const Context& ctx,
       std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
 
   const T* input_data = input.data<T>();
-  T* output_data = output.data<T>();
+  const int* positions_data = positions.data<int>();
   const float* sin_cache_data = sin_cache.data<float>();
   const float* cos_cache_data = cos_cache.data<float>();
+  T* output_data = output.data<T>();
 
   int block_size = 256;
   int grid_size = std::min((total_num_heads * (head_dim / 2) + block_size - 1) / block_size, 512);
 
   ROPEImpl<T><<<grid_size, block_size, 0, cuda_ctx.getStream()>>>(
-      output_data, input_data, sin_cache_data, cos_cache_data, total_num_heads, num_heads,
-      head_dim);
+      output_data, input_data, positions_data, sin_cache_data, cos_cache_data, total_num_heads,
+      num_heads, head_dim);
 }
 
 REGISTER_KERNEL(rotary_embedding,

@@ -7,7 +7,7 @@ namespace ginfer::core::op {
 
 GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA, "gqa") {}
 
-Result<void, std::string> GQAOp::run(const common::InferContext& ctx,
+Result<void, std::string> GQAOp::run(const core::InferContext& ctx,
                                      const std::vector<const Tensor*>& inputs,
                                      std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 3) << "GQAOp requires exactly 3 input tensors.";

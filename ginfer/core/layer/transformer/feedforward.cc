@@ -9,7 +9,7 @@ FeedForwardLayer::FeedForwardLayer(DeviceType dev_type, std::string layer_name)
       swiglu_op(dev_type),
       down_proj(dev_type, "down_proj") {}
 
-Result<void, std::string> FeedForwardLayer::forward(const common::InferContext& ctx,
+Result<void, std::string> FeedForwardLayer::forward(const core::InferContext& ctx,
                                                     const std::vector<TensorRef>& inputs,
                                                     TensorRef output) {
   const auto& input = inputs[0];  // [seq_len, hidden_size]

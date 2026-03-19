@@ -21,7 +21,7 @@ void LinearLayer::setWeight(const TensorRef& weight) {
 
 void LinearLayer::setBias(const TensorRef& bias) { bias_ = bias; }
 
-Result<void, std::string> LinearLayer::forward(const common::InferContext& ctx,
+Result<void, std::string> LinearLayer::forward(const core::InferContext& ctx,
                                                const std::vector<TensorRef>& inputs,
                                                TensorRef output) {
   CHECK_EQ(inputs.size(), 1) << "LinearLayer requires exactly 1 input tensor.";

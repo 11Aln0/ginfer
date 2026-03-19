@@ -7,7 +7,7 @@ namespace ginfer::core::op {
 RMSNormOp::RMSNormOp(DeviceType dev_type, float epsilon)
     : Op(dev_type, OpType::kOpRMSNorm, "rmsnorm"), epsilon_(epsilon) {}
 
-Result<void, std::string> RMSNormOp::run(const common::InferContext& ctx,
+Result<void, std::string> RMSNormOp::run(const core::InferContext& ctx,
                                          const std::vector<const Tensor*>& inputs,
                                          std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "RMSNormOp requires exactly 2 input tensors.";

@@ -2,6 +2,7 @@
 
 #include <fmt/core.h>
 
+#include <glog/logging.h>
 #include <string>
 #include <variant>
 
@@ -165,4 +166,11 @@ class Result {
     }                                    \
   } while (0)
 
+#define THROW_ON_ERR(expr)                             \
+  do {                                                 \
+    auto _res = (expr);                                \
+    if (!_res.ok()) {                                  \
+      throw std::runtime_error(std::move(_res).err()); \
+    }                                                  \
+  } while (0)
 }  // namespace ginfer

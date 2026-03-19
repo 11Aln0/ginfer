@@ -7,7 +7,7 @@ namespace ginfer::core::op {
 RotaryEmbeddingOp::RotaryEmbeddingOp(DeviceType dev_type, float rope_theta)
     : Op(dev_type, OpType::kOpCustom, "rotary_embedding"), rope_theta_(rope_theta) {}
 
-Result<void, std::string> RotaryEmbeddingOp::run(const common::InferContext& ctx,
+Result<void, std::string> RotaryEmbeddingOp::run(const core::InferContext& ctx,
                                                  const std::vector<const Tensor*>& inputs,
                                                  std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "RotaryEmbeddingOp requires exactly 1 input tensor.";
@@ -38,7 +38,7 @@ Llama3RotaryEmbeddingOp::Llama3RotaryEmbeddingOp(DeviceType dev_type,
       low_freq_factor_(low_freq_factor),
       old_ctx_len_(old_ctx_len) {}
 
-Result<void, std::string> Llama3RotaryEmbeddingOp::run(const common::InferContext& ctx,
+Result<void, std::string> Llama3RotaryEmbeddingOp::run(const core::InferContext& ctx,
                                                        const std::vector<const Tensor*>& inputs,
                                                        std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "Llama3RotaryEmbeddingOp requires exactly 1 input tensor.";
@@ -59,15 +59,17 @@ Result<void, std::string> Llama3RotaryEmbeddingOp::run(const common::InferContex
 
 ROPEOp::ROPEOp(DeviceType dev_type) : Op(dev_type, OpType::kOpROPE, "rope") {}
 
-Result<void, std::string> ROPEOp::run(const common::InferContext& ctx,
+Result<void, std::string> ROPEOp::run(const core::InferContext& ctx,
                                       const std::vector<const Tensor*>& inputs,
                                       std::vector<Tensor*> outputs) {
-  CHECK(inputs.size() == 3) << "ROPEOp requires exactly 3 input tensors.";
+  CHECK(inputs.size() == 4)
+      << "ROPEOp requires exactly 4 input tensors (input, positions, sin_cache, cos_cache).";
   CHECK(outputs.size() == 1) << "ROPEOp requires exactly 1 output tensor.";
 
-  const Tensor* input = inputs[0];  // [seq_len, num_heads or num_kv_heads, head_dim]
-  const Tensor* sin_cache = inputs[1];
-  const Tensor* cos_cache = inputs[2];
+  const Tensor* input = inputs[0];      // [seq_len, num_heads or num_kv_heads, head_dim]
+  const Tensor* positions = inputs[1];  // [seq_len]
+  const Tensor* sin_cache = inputs[2];
+  const Tensor* cos_cache = inputs[3];
 
   common::DeviceType dev_type = getDeviceType();
 
@@ -75,7 +77,7 @@ Result<void, std::string> ROPEOp::run(const common::InferContext& ctx,
       kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::ROPEKernelFuncType>(
           "ROPE", input->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *outputs[0], *sin_cache, *cos_cache);
+  kernel(*dev_ctx, *input, *positions, *sin_cache, *cos_cache, *outputs[0]);
 
   return Ok<void>();
 }

@@ -9,7 +9,7 @@ namespace ginfer::core::op {
 
 MatmulOp::MatmulOp(DeviceType dev_type) : Op(dev_type, OpType::kOpMatmul, "matmul") {}
 
-Result<void, std::string> MatmulOp::run(const common::InferContext& ctx,
+Result<void, std::string> MatmulOp::run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2 || inputs.size() == 3)

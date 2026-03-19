@@ -6,7 +6,7 @@ namespace ginfer::core::op {
 
 ArgmaxOp::ArgmaxOp(DeviceType dev_type) : Op(dev_type, OpType::kOpArgmax, "argmax") {}
 
-Result<void, std::string> ArgmaxOp::run(const common::InferContext& ctx,
+Result<void, std::string> ArgmaxOp::run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 1) << "ArgmaxOp requires exactly 1 input tensor.";

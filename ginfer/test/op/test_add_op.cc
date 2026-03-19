@@ -1,5 +1,5 @@
 #include <glog/logging.h>
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -30,7 +30,7 @@ TensorRef test_add_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   // Run computation
   std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get()};
   std::vector<Tensor*> outputs = {c_tensor.get()};
-  auto status = add_op.run(common::InferContext{}, inputs, outputs);
+  auto status = add_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "AddOp run failed: " << status.err();
 
   // Copy result back to CPU

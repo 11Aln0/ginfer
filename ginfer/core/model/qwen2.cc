@@ -24,7 +24,7 @@ Qwen2Config Qwen2ModelLoader::loadConfig() {
   config.head_dim = json.value("head_dim", config.hidden_size / config.num_heads);
   config.intermediate_size = json.at("intermediate_size").get<int>();
   config.vocab_size = json.at("vocab_size").get<int>();
-  // config.max_seq_len = json.at("max_position_embeddings").get<size_t>();
+  config.max_position_embeddings = json.at("max_position_embeddings").get<int>();
   config.max_seq_len = 4096;  // TODO temporary fix for qwen2 models with longer context
   config.rms_norm_eps = json.value("rms_norm_eps", 1e-6f);
   config.rope_theta = json.value("rope_theta", 10000.0f);

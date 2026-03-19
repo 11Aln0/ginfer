@@ -1,5 +1,14 @@
 # CPM
-include(cmake/CPM.cmake)
+set(CPM_DOWNLOAD_VERSION 0.42.0)
+set(CPM_DOWNLOAD_URL "https://github.com/cpm-cmake/CPM.cmake/releases/download/v${CPM_DOWNLOAD_VERSION}/CPM.cmake")
+set(CPM_CACHE_FILE "${CMAKE_BINARY_DIR}/CPM_${CPM_DOWNLOAD_VERSION}.cmake")
+
+if(NOT EXISTS ${CPM_CACHE_FILE})
+  message(STATUS "Downloading CPM.cmake v${CPM_DOWNLOAD_VERSION}...")
+  file(DOWNLOAD ${CPM_DOWNLOAD_URL} ${CPM_CACHE_FILE})
+endif()
+
+include(${CPM_CACHE_FILE})
 set(CPM_USE_LOCAL_PACKAGES ON)
 set(CPM_SOURCE_CACHE "$ENV{HOME}/.cache/CPM")
 
@@ -39,3 +48,20 @@ CPMAddPackage(
     "JINJA_USE_EXTERNAL_JSON ON"
     "JINJA_BUILD_TESTS OFF"
 )
+
+CPMAddPackage(
+  NAME xxhash
+  GITHUB_REPOSITORY Cyan4973/xxHash
+  VERSION 0.8.2
+  DOWNLOAD_ONLY YES
+)
+
+if(xxhash_ADDED)
+  set(XXHASH_BUILD_XXHSUM OFF CACHE BOOL "" FORCE)
+  set(XXHASH_BUILD_ENABLE_INLINE_API OFF CACHE BOOL "" FORCE)
+  add_subdirectory(
+    ${xxhash_SOURCE_DIR}/cmake_unofficial
+    ${xxhash_BINARY_DIR}
+    EXCLUDE_FROM_ALL
+  )
+endif()

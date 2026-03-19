@@ -6,7 +6,7 @@ namespace ginfer::core::op {
 
 EmbeddingOp::EmbeddingOp(DeviceType dev_type) : Op(dev_type, OpType::kOpEmbedding, "embedding") {}
 
-Result<void, std::string> EmbeddingOp::run(const common::InferContext& ctx,
+Result<void, std::string> EmbeddingOp::run(const core::InferContext& ctx,
                                            const std::vector<const Tensor*>& inputs,
                                            std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "EmbeddingOp requires exactly 2 input tensors.";

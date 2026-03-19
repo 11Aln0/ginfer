@@ -1,6 +1,8 @@
 #include <glog/logging.h>
 #include <tokenizers_cpp.h>
+#include <ranges>
 #include <vector>
+#include "ginfer/common/errors.h"
 #include "ginfer/core/model/model_factory.h"
 #include "ginfer/core/model/qwen2.h"
 #include "ginfer/core/model/tokenizer/auto_tokenizer.h"
@@ -16,68 +18,138 @@ namespace ginfer::test::pybind {
 
 using common::DeviceType;
 using core::memory::Buffer;
+using core::memory::getDeviceAllocator;
+using core::memory::PooledAllocStrategy;
 using core::tensor::DataType;
 using core::tensor::Shape;
 using core::tensor::Tensor;
 using core::tensor::TensorRef;
 
-std::vector<int32_t> model_generate(const std::string& model_path,
-                                    TensorRef input_ids,
-                                    std::pair<int64_t, int64_t> pos_id_range) {
+auto host_allocator = getDeviceAllocator<PooledAllocStrategy>(DeviceType::kDeviceCPU);
+auto dev_allocator = getDeviceAllocator<PooledAllocStrategy>(DeviceType::kDeviceCUDA);
+
+void setCuSeqlen(core::InferContext& ctx, int seqlen_q, int seqlen_kv) {
+  DECLARE_OR_THROW(cu_seqlens_q,
+                   Tensor::create(DataType::kDataTypeInt32, Shape({2}), host_allocator));
+  DECLARE_OR_THROW(cu_seqlens_kv,
+                   Tensor::create(DataType::kDataTypeInt32, Shape({2}), host_allocator));
+  cu_seqlens_q->data<int32_t>()[0] = 0;
+  cu_seqlens_q->data<int32_t>()[1] = seqlen_q;
+  cu_seqlens_kv->data<int32_t>()[0] = 0;
+  cu_seqlens_kv->data<int32_t>()[1] = seqlen_kv;
+  THROW_ON_ERR(cu_seqlens_q->toDevice(dev_allocator));
+  THROW_ON_ERR(cu_seqlens_kv->toDevice(dev_allocator));
+  ctx.cu_seqlens_q = cu_seqlens_q;
+  ctx.cu_seqlens_kv = cu_seqlens_kv;
+}
+
+void setSlotMapping(core::InferContext& ctx, int num_slots) {
+  DECLARE_OR_THROW(slot_mapping,
+                   Tensor::create(DataType::kDataTypeInt32, Shape({num_slots}), host_allocator));
+  for (int i : std::views::iota(0, num_slots)) {
+    slot_mapping->data<int32_t>()[i] = i;
+  }
+  THROW_ON_ERR(slot_mapping->toDevice(dev_allocator));
+  ctx.slot_mapping = slot_mapping;
+}
+
+void setBlockTable(core::InferContext& ctx, int seq_lens, int block_size = 16) {
+  int num_blocks = (seq_lens + block_size - 1) / block_size;
+  DECLARE_OR_THROW(block_tables,
+                   Tensor::create(DataType::kDataTypeInt32, Shape({num_blocks}), host_allocator));
+  for (int i : std::views::iota(0, num_blocks)) {
+    block_tables->data<int32_t>()[i] = i;
+  }
+  THROW_ON_ERR(block_tables->toDevice(dev_allocator));
+  ctx.block_tables = block_tables;
+}
+
+void setInferCtx(core::InferContext& ctx, int seqlen_q, int seqlen_kv, int block_size = 16) {
+  setCuSeqlen(ctx, seqlen_q, seqlen_kv);
+  setSlotMapping(ctx, seqlen_q);
+  setBlockTable(ctx, seqlen_kv, block_size);
+}
+
+void allocKVCache(std::shared_ptr<core::model::Model>& model,
+                  int num_blocks,
+                  int block_size,
+                  int num_kv_heads,
+                  int head_dim) {
+  auto dtype = model->getDtype();
+  for (int i = 0; i < model->getNumLayers(); ++i) {
+    DECLARE_OR_THROW(k_cache,
+                     Tensor::create(dtype, Shape({num_blocks, block_size, num_kv_heads, head_dim}),
+                                    dev_allocator));
+
+    DECLARE_OR_THROW(v_cache,
+                     Tensor::create(dtype, Shape({num_blocks, block_size, num_kv_heads, head_dim}),
+                                    dev_allocator));
+    model->setKVCache(i, k_cache, v_cache);
+  }
+}
+
+std::vector<int32_t> model_generate(const std::string& model_path, TensorRef input_ids) {
+  const int block_size = 16;
+  const int num_blocks = 4096 / block_size;  // support up to 4096 sequence length
+
   auto loader = core::model::ModelFactory::createLoader(model_path);
   auto model = loader->load();
-  auto to_device_res = model->toDevice(DeviceType::kDeviceCUDA);
-  CHECK(to_device_res.ok()) << "Model toDevice failed: " << to_device_res.err();
+  THROW_ON_ERR(model->toDevice(DeviceType::kDeviceCUDA));
+  auto [num_heads, num_kv_heads, head_dim] = model->getAttentionConfig();
+  allocKVCache(model, num_blocks, block_size, num_kv_heads, head_dim);
 
-  std::vector<int32_t> token_ids;
+  std::vector<int32_t> new_token_ids;
+  core::InferContext infer_ctx;
 
-  // Move input tensors to CUDA (model is on CUDA in this test)
-  auto input_ids_dev_res =
-      Tensor::create(DataType::kDataTypeInt32, Shape({1}), DeviceType::kDeviceCUDA);
-  CHECK(input_ids_dev_res.ok()) << input_ids_dev_res.err();
-  auto input_ids_dev = input_ids_dev_res.value();
-  input_ids->toDevice(DeviceType::kDeviceCUDA);
+  auto next_positions = [&](TensorRef positions) -> TensorRef {
+    THROW_ON_ERR(positions->toDevice(host_allocator));
+    int len = positions->shape()[0];
+    auto ret = positions->slice(0, len - 1, len);
+    ret->data<int32_t>()[0]++;
+    THROW_ON_ERR(ret->toDevice(dev_allocator));
+    return ret;
+  };
 
-  // Prepare output tensor
+  auto input_seqlen = input_ids->shape()[0];
+  DECLARE_OR_THROW(positions,
+                   Tensor::create(DataType::kDataTypeInt32, Shape({input_seqlen}), host_allocator));
+  for (int i : std::views::iota(0, input_seqlen)) {
+    positions->data<int32_t>()[i] = i;
+  }
+  THROW_ON_ERR(positions->toDevice(dev_allocator));
+
   // prefill
-  auto res = model->predict(input_ids, pos_id_range);
-  CHECK(res.ok()) << "Model predict failed: " << res.err();
-  int32_t next_token_id = res.value();
-  input_ids->toDevice(DeviceType::kDeviceCPU);
+  setInferCtx(infer_ctx, input_seqlen, input_seqlen, block_size);
+  THROW_ON_ERR(input_ids->toDevice(dev_allocator));
+  DECLARE_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
+  THROW_ON_ERR(input_ids->toDevice(host_allocator));
   input_ids = input_ids->slice(0, 0, 1);
-  input_ids->data<int32_t>()[0] = next_token_id;  // Update
+  input_ids->data<int32_t>()[0] = next_token_id;
 
   // decode loop
   while (!model->isEosToken(next_token_id)) {
-    // LOG(INFO) << "Predicted token id: " << next_token_id;
-    token_ids.push_back(next_token_id);
-    pos_id_range = {pos_id_range.second + 1, pos_id_range.second + 1};
-    input_ids_dev->copyFrom(*input_ids);
-    auto res = model->predict(input_ids_dev, pos_id_range);
-    CHECK(res.ok()) << "Model predict failed: " << res.err();
-    next_token_id = res.value();
-    input_ids->data<int32_t>()[0] = next_token_id;  // Update
+    new_token_ids.push_back(next_token_id);
+    setInferCtx(infer_ctx, 1, input_seqlen + new_token_ids.size(), block_size);
+    THROW_ON_ERR(input_ids->toDevice(dev_allocator));
+    positions = next_positions(positions);
+    ASSIGN_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
+    THROW_ON_ERR(input_ids->toDevice(host_allocator));
+    input_ids->data<int32_t>()[0] = next_token_id;
   }
+  new_token_ids.push_back(next_token_id);
 
-  token_ids.push_back(next_token_id);
-
-  return token_ids;
+  return new_token_ids;
 }
 
-TensorRef test_model_generate_cuda(const std::string& model_path,
-                                   TensorRef input_ids,
-                                   std::pair<int64_t, int64_t>& pos_id_range) {
-  auto token_ids = model_generate(model_path, input_ids, pos_id_range);
+TensorRef test_model_generate_cuda(const std::string& model_path, TensorRef input_ids) {
+  auto token_ids = model_generate(model_path, input_ids);
   int64_t token_count = token_ids.size();
 
-  auto buf_res = Buffer::create(token_count * sizeof(int32_t), DeviceType::kDeviceCPU);
-  CHECK(buf_res.ok()) << buf_res.err();
-  auto buf = buf_res.value();
+  DECLARE_OR_THROW(buf, Buffer::create(token_count * sizeof(int32_t), DeviceType::kDeviceCPU));
   std::memcpy(buf->ptr(), token_ids.data(), buf->size());
 
-  auto out_res = Tensor::create(DataType::kDataTypeInt32, Shape({token_count}), buf);
-  CHECK(out_res.ok()) << out_res.err();
-  return out_res.value();
+  DECLARE_OR_THROW(out, Tensor::create(DataType::kDataTypeInt32, Shape({token_count}), buf));
+  return out;
 }
 
 std::string test_model_infer_cuda(const std::string& model_path, const std::string& prompt) {
@@ -87,18 +159,15 @@ std::string test_model_infer_cuda(const std::string& model_path, const std::stri
   auto input_content = tokenizer->applyChatTemplate(conversation);
   auto input_ids_vec = tokenizer->encode(input_content);
 
-  auto buf_res = Buffer::create(input_ids_vec.size() * sizeof(int32_t), DeviceType::kDeviceCPU);
-  CHECK(buf_res.ok()) << buf_res.err();
-  auto buf = buf_res.value();
+  DECLARE_OR_THROW(buf,
+                   Buffer::create(input_ids_vec.size() * sizeof(int32_t), DeviceType::kDeviceCPU));
   std::memcpy(buf->ptr(), input_ids_vec.data(), buf->size());
 
-  auto input_ids_res = Tensor::create(DataType::kDataTypeInt32,
-                                      Shape({static_cast<int64_t>(input_ids_vec.size())}), buf);
-  CHECK(input_ids_res.ok()) << input_ids_res.err();
-  auto input_ids = input_ids_res.value();
+  DECLARE_OR_THROW(input_ids,
+                   Tensor::create(DataType::kDataTypeInt32,
+                                  Shape({static_cast<int64_t>(input_ids_vec.size())}), buf));
 
-  std::pair<int64_t, int64_t> pos_id_range{0, static_cast<int64_t>(input_ids_vec.size()) - 1};
-  auto next_token_ids = model_generate(model_path, input_ids, pos_id_range);
+  auto next_token_ids = model_generate(model_path, input_ids);
   auto all_token_ids = input_ids_vec;
   all_token_ids.insert(all_token_ids.end(), next_token_ids.begin(), next_token_ids.end());
   return tokenizer->decode(all_token_ids, true);

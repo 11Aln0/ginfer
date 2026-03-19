@@ -7,7 +7,7 @@ EmbeddingLayer::EmbeddingLayer(DeviceType dev_type, std::string layer_name)
 
 void EmbeddingLayer::setWeight(const TensorRef& weight) { weight_ = weight; }
 
-Result<void, std::string> EmbeddingLayer::forward(const common::InferContext& ctx,
+Result<void, std::string> EmbeddingLayer::forward(const core::InferContext& ctx,
                                                   const std::vector<TensorRef>& inputs,
                                                   TensorRef output) {
   CHECK_EQ(inputs.size(), 1) << "EmbeddingLayer requires exactly 1 input tensor.";

@@ -6,7 +6,7 @@ namespace ginfer::core::op {
 
 AddOp::AddOp(DeviceType dev_type) : Op(dev_type, OpType::kOpAdd, "add") {}
 
-Result<void, std::string> AddOp::run(const common::InferContext& ctx,
+Result<void, std::string> AddOp::run(const core::InferContext& ctx,
                                      const std::vector<const Tensor*>& inputs,
                                      std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "AddOp requires exactly 2 input tensors.";

@@ -21,6 +21,8 @@ class AttentionLayer : public Layer {
 
   struct Intermediates {
     TensorRef q_proj_out;  // [max_seq_len, num_heads * head_dim]
+    TensorRef k_proj_out;  // [max_seq_len, num_kv_heads * head_dim]
+    TensorRef v_proj_out;  // [max_seq_len, num_kv_heads * head_dim]
     TensorRef gqa_out;     // [max_seq_len, num_heads * head_dim]
     // TensorRef o_proj_out;  // [max_seq_len, hidden_size]
   };
@@ -29,7 +31,7 @@ class AttentionLayer : public Layer {
   AttentionLayer(
       DeviceType dev_type, std::string layer_name, int num_heads, int num_kv_heads, int head_dim);
 
-  Result<void, std::string> forward(const common::InferContext& ctx,
+  Result<void, std::string> forward(const core::InferContext& ctx,
                                     const std::vector<TensorRef>& inputs,
                                     TensorRef output) override;
 
@@ -39,16 +41,22 @@ class AttentionLayer : public Layer {
 
   void setIntermediates(const Intermediates& intermediates);
 
+  void setKVCache(TensorRef& k_cache, TensorRef& v_cache);
+
  private:
   Intermediates intermediates_;
 
   op::ROPEOp rope_op;
-  op::GQAOp gqa_op;
+  op::GQAVarlenOp gqa_varlen_op;
+  op::StoreKVCacheOp store_kv_op;
 
   LinearLayer q_proj;
   LinearLayer k_proj;
   LinearLayer v_proj;
   LinearLayer o_proj;
+
+  TensorRef k_cache_;
+  TensorRef v_cache_;
 
   int num_heads_;
   int num_kv_heads_;
@@ -72,7 +80,7 @@ class FeedForwardLayer : public Layer {
  public:
   FeedForwardLayer(DeviceType dev_type, std::string layer_name);
 
-  Result<void, std::string> forward(const common::InferContext& ctx,
+  Result<void, std::string> forward(const core::InferContext& ctx,
                                     const std::vector<TensorRef>& inputs,
                                     TensorRef output) override;
 
@@ -115,7 +123,7 @@ class EncoderLayer : public Layer {
                int num_kv_heads,
                int head_dim);
 
-  Result<void, std::string> forward(const common::InferContext& ctx,
+  Result<void, std::string> forward(const core::InferContext& ctx,
                                     const std::vector<TensorRef>& inputs,
                                     TensorRef output) override;
 

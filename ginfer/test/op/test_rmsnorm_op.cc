@@ -1,7 +1,7 @@
 #include <glog/logging.h>
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/memory/allocator_factory.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -36,7 +36,7 @@ TensorRef test_rmsnorm_op_cuda(TensorRef input_tensor, TensorRef gamma_tensor, f
   // Run computation
   std::vector<const Tensor*> inputs = {input_tensor.get(), gamma_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = rmsnorm_op.run(common::InferContext{}, inputs, outputs);
+  auto status = rmsnorm_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "RMSNormOp run failed: " << status.err();
 
   // Copy result back to CPU

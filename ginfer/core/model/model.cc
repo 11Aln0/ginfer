@@ -1,9 +1,38 @@
 #include "ginfer/core/model/model.h"
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/memory/allocator_factory.h"
 
 namespace ginfer::core::model {
 
+// Model
+Model::Model(ModelConfig config, common::DeviceType dev_type)
+    : config_(std::move(config)), dev_type_(dev_type) {}
+
+Result<void, std::string> Model::toDevice(common::DeviceType dev_type) {
+  dev_type_ = dev_type;
+  return Ok<void>();
+}
+
+int Model::getVocabSize() const { return config_.vocab_size; }
+
+int Model::getNumLayers() const { return config_.nlayer; }
+
+tensor::DataType Model::getDtype() const { return config_.dtype; }
+
+std::tuple<int, int, int> Model::getAttentionConfig() const {
+  return {config_.num_heads, config_.num_kv_heads, config_.head_dim};
+}
+
+bool Model::isEosToken(int32_t token_id) const {
+  for (auto id : config_.eos_token_ids) {
+    if (id == token_id) return true;
+  }
+  return false;
+}
+
+// end Model
+
+// LlamaArchModel
 LlamaArchModel::LlamaArchModel(LlamaArchModelConfig config, common::DeviceType dev_type)
     : config_(config),
       dev_type_(dev_type),
@@ -19,27 +48,6 @@ LlamaArchModel::LlamaArchModel(LlamaArchModelConfig config, common::DeviceType d
   }
 }
 
-Result<void, std::string> LlamaArchModel::lazyAllocKVCache() {
-  if (kv_cache_allocated_) return Ok<void>();
-  kv_cache_.offset = 0;
-  const auto& c = config_;
-  int64_t max_seq_len = static_cast<int64_t>(c.max_seq_len);
-  // init k,v cache
-  for (int i = 0; i < config_.nlayer; ++i) {
-    TensorRef k, v;
-    ASSIGN_OR_RETURN(
-        k, Tensor::create(config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim},
-                          dev_type_));
-    ASSIGN_OR_RETURN(
-        v, Tensor::create(config_.dtype, tensor::Shape{max_seq_len, c.num_kv_heads, c.head_dim},
-                          dev_type_));
-    kv_cache_.k.push_back(std::move(k));
-    kv_cache_.v.push_back(std::move(v));
-  }
-  kv_cache_allocated_ = true;
-  return Ok<void>();
-}
-
 Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   if (intermediates_allocated_) return Ok<void>();
 
@@ -48,17 +56,14 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   using tensor::Shape;
   using tensor::Tensor;
 
-  int64_t max_seq_len = static_cast<int64_t>(config_.max_seq_len);
-  int64_t head_dim = static_cast<int64_t>(config_.head_dim);
+  int max_position_embeddings = config_.max_position_embeddings;
+  int max_seq_len = config_.max_seq_len;
+  int head_dim = config_.head_dim;
   auto dtype = config_.dtype;
   auto dev_type = dev_type_;
 
   auto& i = intermediates_;
   DECLARE_OR_RETURN(t0, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
-  ASSIGN_OR_RETURN(i.sin, Tensor::create(DataType::kDataTypeFloat32,
-                                         Shape{max_seq_len, head_dim / 2}, dev_type));
-  ASSIGN_OR_RETURN(i.cos, Tensor::create(DataType::kDataTypeFloat32,
-                                         Shape{max_seq_len, head_dim / 2}, dev_type));
   ASSIGN_OR_RETURN(i.embed_out,
                    Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
   ASSIGN_OR_RETURN(i.lm_head_out, Tensor::create(dtype, Shape{1, config_.vocab_size}, dev_type));
@@ -67,8 +72,15 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
 
   DECLARE_OR_RETURN(
       t1, Tensor::create(dtype, Shape{max_seq_len, config_.num_heads * head_dim}, dev_type));
+  DECLARE_OR_RETURN(
+      t_k, Tensor::create(dtype, Shape{max_seq_len, config_.num_kv_heads * head_dim}, dev_type));
+  DECLARE_OR_RETURN(
+      t_v, Tensor::create(dtype, Shape{max_seq_len, config_.num_kv_heads * head_dim}, dev_type));
+
   layer::transformer::AttentionLayer::Intermediates attn_intermediates = {
       .q_proj_out = t1,
+      .k_proj_out = t_k,
+      .v_proj_out = t_v,
       .gqa_out = t1,
   };
 
@@ -99,41 +111,37 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   return Ok<void>();
 }
 
-Result<std::pair<TensorRef, TensorRef>, std::string> LlamaArchModel::getPositionEmbedding(
-    TensorRef sin_cache, TensorRef cos_cache, std::pair<int64_t, int64_t> pos_id_range) {
-  auto [start, end] = pos_id_range;
-  auto sin = sin_cache->slice(0, 0, end - start + 1);
-  auto cos = cos_cache->slice(0, 0, end - start + 1);
+void LlamaArchModel::setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) {
+  CHECK_THROW(layer_id >= 0 && layer_id < config_.nlayer, "Invalid layer id: {}", layer_id);
+  encoder_layers[layer_id].getAttentionLayer().setKVCache(k_cache, v_cache);
+}
+
+Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding() {
+  if (pos_embedding_initialized_) return Ok<void>();
   auto allocator =
       memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU);
   DECLARE_OR_RETURN(pos_ids,
                     Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, allocator));
-  pos_ids->data<int64_t>()[0] = start;
-  pos_ids->data<int64_t>()[1] = end;
-  getRotaryEmbeddingOp().run(common::InferContext{}, {pos_ids.get()}, {sin.get(), cos.get()});
-  return Ok(std::pair<TensorRef, TensorRef>{sin, cos});
+  pos_ids->data<int64_t>()[0] = 0;
+  pos_ids->data<int64_t>()[1] = config_.max_position_embeddings - 1;
+  getRotaryEmbeddingOp().run(core::InferContext{}, {pos_ids.get()}, {sin.get(), cos.get()});
+  pos_embedding_initialized_ = true;
+  return Ok<void>();
 }
 
-Result<void, std::string> LlamaArchModel::forward(const TensorRef input_ids,
-                                                  std::pair<int64_t, int64_t> pos_id_range,
+Result<void, std::string> LlamaArchModel::forward(const core::InferContext& infer_ctx,
+                                                  const TensorRef input_ids,
+                                                  const TensorRef positions,
                                                   TensorRef output) {
   int64_t seq_len = input_ids->shape()[0];
-  DECLARE_OR_RETURN(sin_cos,
-                    getPositionEmbedding(intermediates_.sin, intermediates_.cos, pos_id_range));
-  auto [sin, cos] = sin_cos;
 
   auto embed_out = intermediates_.embed_out->slice(0, 0, seq_len);
-  common::InferContext infer_ctx;
   RETURN_ON_ERR(embed_tokens.forward(infer_ctx, {input_ids}, embed_out));
   TensorRef hidden_state = embed_out;
   for (int i = 0; i < config_.nlayer; ++i) {
     auto& encoder = encoder_layers[i];
-    auto k_cache = kv_cache_.k[i]->slice(0, 0, kv_cache_.offset + seq_len);
-    auto v_cache = kv_cache_.v[i]->slice(0, 0, kv_cache_.offset + seq_len);
-    RETURN_ON_ERR(
-        encoder.forward(infer_ctx, {hidden_state, sin, cos, k_cache, v_cache}, hidden_state));
+    RETURN_ON_ERR(encoder.forward(infer_ctx, {hidden_state, positions, sin, cos}, hidden_state));
   }
-  kv_cache_.offset += seq_len;
   return final_rmsnorm.forward(infer_ctx, {hidden_state}, output);
 }
 
@@ -149,32 +157,35 @@ Result<void, std::string> LlamaArchModel::toDevice(common::DeviceType dev_type) 
   return argmax_op.toDevice(dev_type);
 }
 
-Result<int32_t, std::string> LlamaArchModel::predict(const tensor::TensorRef token_ids,
-                                                     std::pair<int64_t, int64_t> pos_id_range) {
+Result<int32_t, std::string> LlamaArchModel::predict(const core::InferContext& infer_ctx,
+                                                     const tensor::TensorRef token_ids,
+                                                     const tensor::TensorRef positions) {
   RETURN_ON_ERR(lazyAllocIntermediates());
-  RETURN_ON_ERR(lazyAllocKVCache());
+  RETURN_ON_ERR(lazyInitPosEmbedding());
 
   int64_t seq_len = token_ids->shape()[0];
   CHECK_LE(seq_len, static_cast<int64_t>(config_.max_seq_len))
       << "Input token_ids length exceeds max_seq_len.";
-  auto input_ids = token_ids->slice(0, 0, seq_len);
-  input_ids->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(dev_type_));
+  CHECK(positions != nullptr) << "positions must not be null";
+  CHECK_EQ(positions->shape()[0], seq_len) << "positions length must equal input token_ids length.";
 
   // forward
   auto norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
   auto lm_head_out = intermediates_.lm_head_out;
-  RETURN_ON_ERR(forward(input_ids, pos_id_range, norm_out));
-  norm_out = norm_out->slice(0, seq_len - 1,
-                             seq_len);  // only need the last token's hidden state for LM head
-  RETURN_ON_ERR(lm_head.forward(common::InferContext{}, {norm_out}, lm_head_out));
+  RETURN_ON_ERR(forward(infer_ctx, token_ids, positions, norm_out));
+  // only need the last token's hidden state for LM head
+  norm_out = norm_out->slice(0, seq_len - 1, seq_len);
+  RETURN_ON_ERR(lm_head.forward(infer_ctx, {norm_out}, lm_head_out));
 
   // get next token id (argmax)
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
-  RETURN_ON_ERR(argmax_op.run(common::InferContext{}, {lm_head_out.get()}, {argmax_out.get()}));
+  RETURN_ON_ERR(argmax_op.run(infer_ctx, {lm_head_out.get()}, {argmax_out.get()}));
   argmax_out->toDevice(
       memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU));
 
   return Ok(argmax_out->data<int32_t>()[0]);
 }
+
+// end LlamaArchModel
 
 }  // namespace ginfer::core::model

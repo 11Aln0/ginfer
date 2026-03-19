@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <tuple>
 #include <vector>
 #include "ginfer/common/errors.h"
 #include "ginfer/core/layer/layer.h"
@@ -19,8 +20,14 @@ struct ModelConfig {
  public:
   tensor::DataType dtype;
 
+  int nlayer;
   int vocab_size;
-  size_t max_seq_len;
+  int max_position_embeddings;
+  int max_seq_len;
+
+  int num_heads;
+  int num_kv_heads;
+  int head_dim;
 
   std::vector<int32_t> eos_token_ids;
 };
@@ -32,34 +39,33 @@ class Model {
   explicit Model(ModelConfig config, common::DeviceType dev_type)
       : config_(std::move(config)), dev_type_(dev_type) {}
 
-  virtual Result<int32_t, std::string> predict(const tensor::TensorRef token_ids,
-                                               std::pair<int64_t, int64_t> pos_id_range) = 0;
+  virtual Result<int32_t, std::string> predict(const core::InferContext& infer_ctx,
+                                               const tensor::TensorRef token_ids,
+                                               const tensor::TensorRef positions) = 0;
 
-  virtual Result<void, std::string> toDevice(common::DeviceType dev_type) {
-    dev_type_ = dev_type;
-    return Ok<void>();
-  }
+  virtual Result<void, std::string> toDevice(common::DeviceType dev_type);
 
-  int getVocabSize() const { return config_.vocab_size; }
+  int getVocabSize() const;
 
-  bool isEosToken(int32_t token_id) const {
-    for (auto id : config_.eos_token_ids) {
-      if (id == token_id) return true;
-    }
-    return false;
-  }
+  int getNumLayers() const;
 
+  tensor::DataType getDtype() const;
+
+  std::tuple<int, int, int> getAttentionConfig() const;
+
+  bool isEosToken(int32_t token_id) const;
+
+  // K/V Cache Tensor: [num_kvcache_blocks, block_size, num_kv_heads * head_dim]
+  virtual void setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) = 0;
+
+ private:
  private:
   ModelConfig config_;
   common::DeviceType dev_type_;
 };
 
 struct LlamaArchModelConfig : public ModelConfig {
-  int nlayer;
   int hidden_size;
-  int num_heads;
-  int num_kv_heads;
-  int head_dim;
   int intermediate_size;
 
   float rms_norm_eps;
@@ -72,50 +78,47 @@ class LlamaArchModel : public Model {
  public:
   LlamaArchModel(LlamaArchModelConfig config, common::DeviceType dev_type);
 
-  Result<int32_t, std::string> predict(const tensor::TensorRef token_ids,
-                                       std::pair<int64_t, int64_t> pos_id_range) override;
+  Result<int32_t, std::string> predict(const core::InferContext& infer_ctx,
+                                       const tensor::TensorRef token_ids,
+                                       const tensor::TensorRef positions) override;
 
   Result<void, std::string> toDevice(common::DeviceType dev_type) override;
 
+  void setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) override;
+
  private:
   struct Intermediates {
-    TensorRef sin;          // [max_seq_len, head_dim]
-    TensorRef cos;          // [max_seq_len, head_dim]
     TensorRef embed_out;    // [max_seq_len, hidden_size]
     TensorRef norm_out;     // [max_seq_len, hidden_size]
     TensorRef lm_head_out;  // [max_seq_len, vocab_size]
     TensorRef argmax_out;   // [1]
   };
 
-  struct KVCache {
-    std::vector<TensorRef> k;  // [max_seq_len, num_kv_heads * head_dim] * nlayer
-    std::vector<TensorRef> v;  // [max_seq_len, num_kv_heads * head_dim] * nlayer
-    int64_t offset;
-  };
-
  private:
   // mem
   Result<void, std::string> lazyAllocIntermediates();
-  Result<void, std::string> lazyAllocKVCache();
+  // Result<void, std::string> lazyAllocKVCache();
 
-  Result<std::pair<TensorRef, TensorRef>, std::string> getPositionEmbedding(
-      TensorRef sin_cache, TensorRef cos_cache, std::pair<int64_t, int64_t> pos_id_range);
+  Result<void, std::string> lazyInitPosEmbedding();
 
   // forward
-  Result<void, std::string> forward(const TensorRef input_ids,
-                                    std::pair<int64_t, int64_t> pos_id_range,
+  Result<void, std::string> forward(const core::InferContext& infer_ctx,
+                                    const TensorRef input_ids,
+                                    const TensorRef positions,
                                     TensorRef output);
 
  private:
   LlamaArchModelConfig config_;
   common::DeviceType dev_type_;
   bool intermediates_allocated_ = false;
-  bool kv_cache_allocated_ = false;
 
   Intermediates intermediates_;
-  KVCache kv_cache_;
 
  protected:
+  TensorRef sin;
+  TensorRef cos;
+  bool pos_embedding_initialized_ = false;
+
   virtual op::Op& getRotaryEmbeddingOp() = 0;
 
  protected:

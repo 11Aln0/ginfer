@@ -28,9 +28,10 @@ void Llama3RotaryEmbeddingKernel(const Context& ctx,
 template <typename T, typename Context>
 void ROPEKernel(const Context& ctx,
                 const tensor::Tensor& input,
-                tensor::Tensor& output,
+                const tensor::Tensor& positions,
                 const tensor::Tensor& sin_cache,
-                const tensor::Tensor& cos_cache);
+                const tensor::Tensor& cos_cache,
+                tensor::Tensor& output);
 
 using Llama3RotaryEmbeddingKernelFuncType =
     decltype(&Llama3RotaryEmbeddingKernel<float, common::DeviceContext>);

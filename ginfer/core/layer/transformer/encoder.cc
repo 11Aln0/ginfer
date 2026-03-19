@@ -16,15 +16,14 @@ EncoderLayer::EncoderLayer(DeviceType dev_type,
       attn_norm(dev_type, "attn_norm", rms_norm_eps),
       add(dev_type) {}
 
-Result<void, std::string> EncoderLayer::forward(const common::InferContext& ctx,
+Result<void, std::string> EncoderLayer::forward(const core::InferContext& ctx,
                                                 const std::vector<TensorRef>& inputs,
                                                 TensorRef output) {
-  CHECK(inputs.size() == 5) << "EncoderLayer requires exactly 5 input tensors.";
+  CHECK(inputs.size() == 4) << "EncoderLayer requires exactly 4 input tensors.";
   const auto& hidden_state = inputs[0];  // [seq_len, hidden_size]
-  const auto& sin_cache = inputs[1];     // [seq_len, head_dim / 2]
-  const auto& cos_cache = inputs[2];     // [seq_len, head_dim / 2]
-  const auto& k_cache = inputs[3];       // [kv_cache_off + seq_len, num_kv_heads * head_dim]
-  const auto& v_cache = inputs[4];       // [kv_cache_off + seq_len, num_kv_heads * head_dim]
+  const auto& positions = inputs[1];     // [seq_len]
+  const auto& sin_cache = inputs[2];     // [seq_len, head_dim / 2]
+  const auto& cos_cache = inputs[3];     // [seq_len, head_dim / 2]
 
   int64_t seq_len = hidden_state->shape()[0];
 
@@ -32,8 +31,7 @@ Result<void, std::string> EncoderLayer::forward(const common::InferContext& ctx,
   TensorRef norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
 
   RETURN_ON_ERR(attn_norm.forward(ctx, {hidden_state}, norm_out));
-  RETURN_ON_ERR(
-      self_attn.forward(ctx, {norm_out, sin_cache, cos_cache, k_cache, v_cache}, attn_out));
+  RETURN_ON_ERR(self_attn.forward(ctx, {norm_out, positions, sin_cache, cos_cache}, attn_out));
   RETURN_ON_ERR(add.run(ctx, {hidden_state.get(), attn_out.get()}, {attn_out.get()}));
   RETURN_ON_ERR(mlp_norm.forward(ctx, {attn_out}, norm_out));
   RETURN_ON_ERR(mlp.forward(ctx, {norm_out}, output));

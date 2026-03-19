@@ -10,7 +10,7 @@ namespace ginfer::core::op {
 GQAVarlenOp::GQAVarlenOp(DeviceType dev_type, int paged_block_size)
     : Op(dev_type, OpType::kOpGQA, "gqa_varlen"), paged_block_size_(paged_block_size) {}
 
-Result<void, std::string> GQAVarlenOp::run(const common::InferContext& ctx,
+Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
                                            const std::vector<const Tensor*>& inputs,
                                            std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 6) << "GQAVarlenOp requires exactly 6 input tensors.";
@@ -41,7 +41,7 @@ Result<void, std::string> GQAVarlenOp::run(const common::InferContext& ctx,
 StoreKVCacheOp::StoreKVCacheOp(DeviceType dev_type)
     : Op(dev_type, OpType::kOpCustom, "store_kvcache") {}
 
-Result<void, std::string> StoreKVCacheOp::run(const common::InferContext& ctx,
+Result<void, std::string> StoreKVCacheOp::run(const core::InferContext& ctx,
                                               const std::vector<const Tensor*>& inputs,
                                               std::vector<Tensor*> outputs) {
   // inputs: [k, v, k_cache, v_cache, slot_mapping]  — all in-place, no outputs

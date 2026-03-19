@@ -52,13 +52,11 @@ def hf_infer(
 def test_model_generate_cuda():
     # <｜User｜>Who are you?<｜Assistant｜><think>
     input_ids = np.array([151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
-    seq_len = len(input_ids)
-    pos_id_range = (0, seq_len - 1) # closed interval
     
     hf_model, _, = load_hf_model(MODEL_PATH, device_name="cuda:0")
     ref_token_ids = hf_generate(torch.tensor([input_ids], device="cuda:0"), hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0).tolist()
     
-    next_token_ids = ginfer_test.test_model_generate_cuda(MODEL_PATH, input_ids, pos_id_range)
+    next_token_ids = ginfer_test.test_model_generate_cuda(MODEL_PATH, input_ids)
     token_ids = np.concatenate([input_ids, next_token_ids])
     
 

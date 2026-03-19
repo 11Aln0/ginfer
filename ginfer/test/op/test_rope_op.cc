@@ -1,5 +1,5 @@
 #include <glog/logging.h>
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -44,7 +44,7 @@ TensorRef test_rope_op_cuda(
   pos_ids->data<int64_t>()[1] = end_pos;
   std::vector<const Tensor*> embed_inputs = {pos_ids.get()};
   std::vector<Tensor*> embed_outputs = {sin_cache.get(), cos_cache.get()};
-  auto embed_status = rotary_embed_op.run(common::InferContext{}, embed_inputs, embed_outputs);
+  auto embed_status = rotary_embed_op.run(core::InferContext{}, embed_inputs, embed_outputs);
   CHECK(embed_status.ok()) << "RotaryEmbeddingOp run failed: " << embed_status.err();
 
   // Run ROPE
@@ -55,7 +55,7 @@ TensorRef test_rope_op_cuda(
 
   std::vector<const Tensor*> inputs = {input_tensor.get(), sin_cache.get(), cos_cache.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = rope_op.run(common::InferContext{}, inputs, outputs);
+  auto status = rope_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "ROPEOp run failed: " << status.err();
 
   output_tensor->toDevice(DeviceType::kDeviceCPU);

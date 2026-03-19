@@ -1,6 +1,6 @@
 #include <glog/logging.h>
 #include <vector>
-#include "ginfer/common/context.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
@@ -55,7 +55,7 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
                                        cu_seqlens_kv_tensor.get(),
                                        block_tables_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = op.run(common::InferContext{}.setMaxSeqlenQ(max_seqlen_q), inputs, outputs);
+  auto status = op.run(core::InferContext{}.setMaxSeqlenQ(max_seqlen_q), inputs, outputs);
   CHECK(status.ok()) << "GQAVarlenOp run failed: " << status.err();
 
   output_tensor->toDevice(DeviceType::kDeviceCPU);
@@ -99,7 +99,7 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
   std::vector<const Tensor*> inputs = {k_tensor.get(), v_tensor.get(), k_cache_gpu.get(),
                                        v_cache_gpu.get(), slot_mapping_tensor.get()};
   std::vector<Tensor*> outputs = {};
-  auto status = op.run(common::InferContext{}, inputs, outputs);
+  auto status = op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "StoreKVCacheOp run failed: " << status.err();
 
   // Copy GPU results back into the original CPU tensors (numpy buffers)

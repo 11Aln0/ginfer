@@ -6,7 +6,7 @@ namespace ginfer::core::op {
 
 SwiGLUOp::SwiGLUOp(DeviceType dev_type) : Op(dev_type, OpType::kOpSwiGLU, "swiglu") {}
 
-Result<void, std::string> SwiGLUOp::run(const common::InferContext& ctx,
+Result<void, std::string> SwiGLUOp::run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) {
   CHECK(inputs.size() == 2) << "SwiGLUOp requires exactly 2 input tensors (gate, up).";
