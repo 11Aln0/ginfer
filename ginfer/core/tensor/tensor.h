@@ -19,7 +19,7 @@ using ginfer::core::memory::DeviceAllocator;
 using ginfer::core::memory::DeviceType;
 using TensorRef = std::shared_ptr<tensor::Tensor>;
 
-class Tensor {
+class Tensor : public std::enable_shared_from_this<Tensor> {
  public:
   static Result<TensorRef, std::string> create(DataType dtype,
                                                Shape shape,
@@ -43,11 +43,14 @@ class Tensor {
 
   std::vector<ptrdiff_t> strides() const;
 
-  Result<void, std::string> toDevice(DeviceType dev_type);
+  bool isContiguous() const;
 
-  Result<void, std::string> toDevice(memory::DeviceAllocator* allocator);
+  Result<TensorRef, std::string> toDevice(DeviceType dev_type, bool preserveLayout = true);
 
-  void copyFrom(const Tensor& src);
+  Result<TensorRef, std::string> toDevice(memory::DeviceAllocator* allocator,
+                                          bool preserveLayout = true);
+
+  void copyFrom(const TensorRef& src);
 
   template <typename T>
   T* data() {
@@ -59,9 +62,9 @@ class Tensor {
     return reinterpret_cast<const T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));
   }
 
-  std::shared_ptr<Tensor> slice(int dim, int64_t start, int64_t end) const;
-  std::shared_ptr<Tensor> reshape(const Shape& new_shape) const;
-  std::shared_ptr<Tensor> permute(const std::vector<size_t>& new_order) const;
+  TensorRef slice(int dim, int64_t start, int64_t end) const;
+  TensorRef reshape(const Shape& new_shape) const;
+  TensorRef permute(const std::vector<size_t>& new_order) const;
 
  private:
   explicit Tensor(DataType dtype, Shape shape, std::shared_ptr<memory::Buffer> buffer);
@@ -72,6 +75,9 @@ class Tensor {
   explicit Tensor(DataType dtype, Shape shape, memory::DeviceAllocator* allocator);
 
   void calcStrides();
+
+  Result<TensorRef, std::string> toDeviceDense(memory::DeviceAllocator* allocator);
+  Result<TensorRef, std::string> toDevicePreserveLayout(memory::DeviceAllocator* allocator);
 
  private:
   DataType dtype_ = DataType::kDataTypeUnknown;

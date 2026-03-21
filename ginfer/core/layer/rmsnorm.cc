@@ -16,8 +16,9 @@ Result<void, std::string> RMSNormLayer::forward(const core::InferContext& ctx,
 void RMSNormLayer::setWeight(const TensorRef& gamma) { gamma_ = gamma; }
 
 Result<void, std::string> RMSNormLayer::toDevice(DeviceType dev_type) {
-  gamma_->toDevice(dev_type);
-  return norm_op_.toDevice(dev_type);
+  ASSIGN_OR_RETURN(gamma_, gamma_->toDevice(dev_type));
+  RETURN_ON_ERR(norm_op_.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 }  // namespace ginfer::core::layer

@@ -59,7 +59,8 @@ Result<void, std::string> EncoderLayer::toDevice(DeviceType dev_type) {
   RETURN_ON_ERR(mlp.toDevice(dev_type));
   RETURN_ON_ERR(mlp_norm.toDevice(dev_type));
   RETURN_ON_ERR(attn_norm.toDevice(dev_type));
-  return add.toDevice(dev_type);
+  RETURN_ON_ERR(add.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 AttentionLayer& EncoderLayer::getAttentionLayer() { return self_attn; }

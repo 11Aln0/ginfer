@@ -23,16 +23,16 @@ TensorRef test_swiglu_op_cuda(TensorRef gate_tensor, TensorRef up_tensor) {
 
   ::ginfer::core::op::SwiGLUOp swiglu_op(DeviceType::kDeviceCUDA);
 
-  gate_tensor->toDevice(DeviceType::kDeviceCUDA);
-  up_tensor->toDevice(DeviceType::kDeviceCUDA);
-  output_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(gate_tensor, gate_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(up_tensor, up_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   std::vector<const Tensor*> inputs = {gate_tensor.get(), up_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
   auto status = swiglu_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "SwiGLUOp run failed: " << status.err();
 
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
   return output_tensor;
 }
 

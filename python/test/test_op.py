@@ -175,7 +175,7 @@ def test_argmax_op_cuda(dtype, size):
     (127, 10000, 512)
 ])
 def test_embedding_op_cuda(dtype, seq_len, vocab_size, embedding_dim):
-    indices = np.random.randint(0, vocab_size, size=(seq_len,)).astype(np.int64)
+    indices = np.random.randint(0, vocab_size, size=(seq_len,)).astype(np.int32)
     weight = np.random.randn(vocab_size, embedding_dim).astype(dtype)
     out = ginfer_test.test_embedding_op_cuda(indices, weight)
     ref = weight[indices]

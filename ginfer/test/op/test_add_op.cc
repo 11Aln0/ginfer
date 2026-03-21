@@ -23,9 +23,9 @@ TensorRef test_add_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   ::ginfer::core::op::AddOp add_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  a_tensor->toDevice(DeviceType::kDeviceCUDA);
-  b_tensor->toDevice(DeviceType::kDeviceCUDA);
-  c_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(a_tensor, a_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(b_tensor, b_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(c_tensor, c_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // Run computation
   std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get()};
@@ -34,7 +34,7 @@ TensorRef test_add_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   CHECK(status.ok()) << "AddOp run failed: " << status.err();
 
   // Copy result back to CPU
-  c_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(c_tensor, c_tensor->toDevice(DeviceType::kDeviceCPU));
 
   return c_tensor;
 }

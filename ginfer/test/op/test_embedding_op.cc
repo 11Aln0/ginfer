@@ -32,16 +32,16 @@ TensorRef test_embedding_op_cuda(TensorRef input_tensor, TensorRef weight_tensor
 
   ::ginfer::core::op::EmbeddingOp embedding_op(DeviceType::kDeviceCUDA);
 
-  input_tensor->toDevice(DeviceType::kDeviceCUDA);
-  weight_tensor->toDevice(DeviceType::kDeviceCUDA);
-  output_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(input_tensor, input_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(weight_tensor, weight_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   std::vector<const Tensor*> inputs = {input_tensor.get(), weight_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
   auto status = embedding_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "EmbeddingOp run failed: " << status.err();
 
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
   return output_tensor;
 }
 

@@ -76,8 +76,8 @@ void Scheduler::postprocess(std::vector<Sequence::Ptr>& seqs,
     if (token_id == eos) {
       block_mgr.release(seq);
       seq->state = SequenceState::kFinished;
-      running.erase(std::find(running.begin(), running.end(),
-                              [&seq](const auto& s) { return s->seq_id == seq->seq_id; }));
+      running.erase(std::find_if(running.begin(), running.end(),
+                                 [&seq](const auto& s) { return s->seq_id == seq->seq_id; }));
     }
   }
 }

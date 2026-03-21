@@ -118,6 +118,14 @@ void LlamaArchModel::setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_c
 
 Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding() {
   if (pos_embedding_initialized_) return Ok<void>();
+  ASSIGN_OR_RETURN(
+      sin, Tensor::create(tensor::DataType::kDataTypeFloat32,
+                          tensor::Shape{config_.max_position_embeddings, config_.head_dim / 2},
+                          dev_type_));
+  ASSIGN_OR_RETURN(
+      cos, Tensor::create(tensor::DataType::kDataTypeFloat32,
+                          tensor::Shape{config_.max_position_embeddings, config_.head_dim / 2},
+                          dev_type_));
   auto allocator =
       memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU);
   DECLARE_OR_RETURN(pos_ids,
@@ -168,6 +176,7 @@ Result<int32_t, std::string> LlamaArchModel::predict(const core::InferContext& i
       << "Input token_ids length exceeds max_seq_len.";
   CHECK(positions != nullptr) << "positions must not be null";
   CHECK_EQ(positions->shape()[0], seq_len) << "positions length must equal input token_ids length.";
+  CHECK(token_ids->dtype() == tensor::DataType::kDataTypeInt32) << "token_ids dtype must be int32";
 
   // forward
   auto norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
@@ -180,10 +189,11 @@ Result<int32_t, std::string> LlamaArchModel::predict(const core::InferContext& i
   // get next token id (argmax)
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
   RETURN_ON_ERR(argmax_op.run(infer_ctx, {lm_head_out.get()}, {argmax_out.get()}));
-  argmax_out->toDevice(
-      memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU));
+  ASSIGN_OR_RETURN(argmax_out,
+                   argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(
+                       memory::DeviceType::kDeviceCPU)));
 
-  return Ok(argmax_out->data<int32_t>()[0]);
+  return Ok(static_cast<int32_t>(argmax_out->data<int64_t>()[0]));  // TODO argmax return int32_t
 }
 
 // end LlamaArchModel

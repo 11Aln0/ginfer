@@ -181,6 +181,9 @@ void ROPEKernel(const Context& ctx,
   int total_num_heads =
       std::accumulate(input_shape.begin(), input_shape.end() - 1, 1, std::multiplies<int>());
 
+  CHECK(positions.shape()[0] == input_shape[0])
+      << "Positions tensor must have the same sequence length as input.";
+
   const T* input_data = input.data<T>();
   const int* positions_data = positions.data<int>();
   const float* sin_cache_data = sin_cache.data<float>();

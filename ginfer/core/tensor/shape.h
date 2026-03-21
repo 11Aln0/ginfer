@@ -29,13 +29,7 @@ class Shape {
   int64_t operator[](int64_t idx) const { return dims_.at(idx); }
   int64_t& operator[](int64_t idx) { return dims_.at(idx); }
 
-  bool operator==(const Shape& other) const {
-    if (ndim() != other.ndim()) return false;
-    for (size_t i = 0; i < ndim(); ++i) {
-      if (dims_[i] != other.dims_[i]) return false;
-    }
-    return true;
-  }
+  bool operator==(const Shape& other) const { return this->dims_ == other.dims_; }
 
   auto begin() const { return dims_.begin(); }
   auto end() const { return dims_.end(); }

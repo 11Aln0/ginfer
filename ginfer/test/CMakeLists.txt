@@ -18,7 +18,7 @@ file(GLOB PYBIND_MODEL_TEST_SOURCES "model/test_*.cc")
 pybind11_add_module(ginfer_test ${PYBIND_SOURCES} ${PYBIND_OP_TEST_SOURCES} ${PYBIND_MODEL_TEST_SOURCES})
 target_link_libraries(ginfer_test PRIVATE 
     pybind11::module 
-    model
+    core
     -Wl,--whole-archive kernel -Wl,--no-whole-archive
 )
 set_target_properties(ginfer_test PROPERTIES

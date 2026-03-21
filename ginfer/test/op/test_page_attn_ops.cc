@@ -40,13 +40,13 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
 
   ::ginfer::core::op::GQAVarlenOp op(DeviceType::kDeviceCUDA, paged_block_size);
 
-  q_tensor->toDevice(DeviceType::kDeviceCUDA);
-  k_tensor->toDevice(DeviceType::kDeviceCUDA);
-  v_tensor->toDevice(DeviceType::kDeviceCUDA);
-  cu_seqlens_q_tensor->toDevice(DeviceType::kDeviceCUDA);
-  cu_seqlens_kv_tensor->toDevice(DeviceType::kDeviceCUDA);
-  block_tables_tensor->toDevice(DeviceType::kDeviceCUDA);
-  output_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(q_tensor, q_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(k_tensor, k_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(v_tensor, v_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(cu_seqlens_q_tensor, cu_seqlens_q_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(cu_seqlens_kv_tensor, cu_seqlens_kv_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(block_tables_tensor, block_tables_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   std::vector<const Tensor*> inputs = {q_tensor.get(),
                                        k_tensor.get(),
@@ -58,7 +58,7 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
   auto status = op.run(core::InferContext{}.setMaxSeqlenQ(max_seqlen_q), inputs, outputs);
   CHECK(status.ok()) << "GQAVarlenOp run failed: " << status.err();
 
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
   return output_tensor;
 }
 
@@ -78,9 +78,9 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
                                 TensorRef slot_mapping_tensor) {
   ::ginfer::core::op::StoreKVCacheOp op(DeviceType::kDeviceCUDA);
 
-  k_tensor->toDevice(DeviceType::kDeviceCUDA);
-  v_tensor->toDevice(DeviceType::kDeviceCUDA);
-  slot_mapping_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(k_tensor, k_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(v_tensor, v_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(slot_mapping_tensor, slot_mapping_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // k_cache / v_cache: create separate GPU copies so the original CPU tensors
   // (which wrap the numpy buffer) remain intact for copyFrom at the end.
@@ -88,13 +88,11 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
                                         DeviceType::kDeviceCUDA);
   CHECK(k_cache_gpu_res.ok()) << k_cache_gpu_res.err();
   auto k_cache_gpu = k_cache_gpu_res.value();
-  k_cache_gpu->copyFrom(*k_cache_tensor);  // CPU → GPU
 
   auto v_cache_gpu_res = Tensor::create(v_cache_tensor->dtype(), Shape(v_cache_tensor->shape()),
                                         DeviceType::kDeviceCUDA);
   CHECK(v_cache_gpu_res.ok()) << v_cache_gpu_res.err();
   auto v_cache_gpu = v_cache_gpu_res.value();
-  v_cache_gpu->copyFrom(*v_cache_tensor);  // CPU → GPU
 
   std::vector<const Tensor*> inputs = {k_tensor.get(), v_tensor.get(), k_cache_gpu.get(),
                                        v_cache_gpu.get(), slot_mapping_tensor.get()};
@@ -103,8 +101,8 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
   CHECK(status.ok()) << "StoreKVCacheOp run failed: " << status.err();
 
   // Copy GPU results back into the original CPU tensors (numpy buffers)
-  k_cache_tensor->copyFrom(*k_cache_gpu);  // GPU → CPU
-  v_cache_tensor->copyFrom(*v_cache_gpu);  // GPU → CPU
+  k_cache_tensor->copyFrom(k_cache_gpu);  // GPU → CPU
+  v_cache_tensor->copyFrom(v_cache_gpu);  // GPU → CPU
 }
 
 REGISTER_PYBIND_TEST(test_gqa_varlen_op_cuda);

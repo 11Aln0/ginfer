@@ -37,16 +37,24 @@ TEST(OpTest, AddOpCUDA) {
     c_ref[i] = a_data[i] + b_data[i];
   }
 
-  a->toDevice(DeviceType::kDeviceCUDA);
-  b->toDevice(DeviceType::kDeviceCUDA);
-  c->toDevice(DeviceType::kDeviceCUDA);
+  auto a_dev_res = a->toDevice(DeviceType::kDeviceCUDA);
+  ASSERT_TRUE(a_dev_res.ok()) << a_dev_res.err();
+  a = a_dev_res.value();
+  auto b_dev_res = b->toDevice(DeviceType::kDeviceCUDA);
+  ASSERT_TRUE(b_dev_res.ok()) << b_dev_res.err();
+  b = b_dev_res.value();
+  auto c_dev_res = c->toDevice(DeviceType::kDeviceCUDA);
+  ASSERT_TRUE(c_dev_res.ok()) << c_dev_res.err();
+  c = c_dev_res.value();
 
   std::vector<const ginfer::core::tensor::Tensor*> inputs = {a.get(), b.get()};
   std::vector<ginfer::core::tensor::Tensor*> outputs = {c.get()};
   auto status = add_op.run(ginfer::core::InferContext{}, inputs, outputs);
   ASSERT_TRUE(status.ok()) << status.err();
 
-  c->toDevice(DeviceType::kDeviceCPU);
+  auto c_cpu_res = c->toDevice(DeviceType::kDeviceCPU);
+  ASSERT_TRUE(c_cpu_res.ok()) << c_cpu_res.err();
+  c = c_cpu_res.value();
 
   auto c_data = c->data<float>();
 

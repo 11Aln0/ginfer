@@ -25,8 +25,8 @@ Result<void, std::string> AttentionLayer::forward(const core::InferContext& ctx,
   CHECK(inputs.size() == 4) << "AttentionLayer requires exactly 4 input tensors.";
   const auto& hidden_state = inputs[0];  // [seq_len, hidden_size]
   const auto& positions = inputs[1];     // [seq_len]
-  const auto& sin_cache = inputs[2];     // [seq_len, head_dim]
-  const auto& cos_cache = inputs[3];     // [seq_len, head_dim]
+  const auto& sin_cache = inputs[2];     // [seq_len, head_dim / 2]
+  const auto& cos_cache = inputs[3];     // [seq_len, head_dim / 2]
 
   int64_t seq_len = hidden_state->shape()[0];
 
@@ -67,6 +67,8 @@ Result<void, std::string> AttentionLayer::forward(const core::InferContext& ctx,
       << "block_tables is required in InferContext for AttentionLayer.";
   CHECK(k_cache_ != nullptr && v_cache_ != nullptr)
       << "KV cache tensors must be set before calling AttentionLayer forward.";
+  CHECK(ctx.slot_mapping.value()->shape()[0] == k->shape()[0])
+      << "slot_mapping length must match the sequence length of k/v tensors.";
 
   // Store into KV cache
   RETURN_ON_ERR(store_kv_op.run(

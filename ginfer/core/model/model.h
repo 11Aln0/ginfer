@@ -36,8 +36,7 @@ class Model {
  public:
   Model() = delete;
 
-  explicit Model(ModelConfig config, common::DeviceType dev_type)
-      : config_(std::move(config)), dev_type_(dev_type) {}
+  explicit Model(ModelConfig config, common::DeviceType dev_type);
 
   virtual Result<int32_t, std::string> predict(const core::InferContext& infer_ctx,
                                                const tensor::TensorRef token_ids,
@@ -58,7 +57,6 @@ class Model {
   // K/V Cache Tensor: [num_kvcache_blocks, block_size, num_kv_heads * head_dim]
   virtual void setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) = 0;
 
- private:
  private:
   ModelConfig config_;
   common::DeviceType dev_type_;

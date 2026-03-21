@@ -22,7 +22,7 @@ TensorRef test_rope_op_cuda(
   CHECK(out_res.ok()) << out_res.err();
   auto output_tensor = out_res.value();
 
-  int max_seq_len = end_pos;
+  int max_seq_len = end_pos - start_pos + 1;
 
   // Create sin/cos cache tensors
   auto sin_res = Tensor::create(DataType::kDataTypeFloat32, Shape({max_seq_len, head_dim / 2}),
@@ -50,15 +50,27 @@ TensorRef test_rope_op_cuda(
   // Run ROPE
   ::ginfer::core::op::ROPEOp rope_op(DeviceType::kDeviceCUDA);
 
-  input_tensor->toDevice(DeviceType::kDeviceCUDA);
-  output_tensor->toDevice(DeviceType::kDeviceCUDA);
+  int seq_len = input_tensor->shape()[0];
+  auto positions_res =
+      Tensor::create(DataType::kDataTypeInt32, Shape({seq_len}), DeviceType::kDeviceCPU);
+  CHECK(positions_res.ok()) << positions_res.err();
+  auto positions = positions_res.value();
+  auto positions_data = positions->data<int32_t>();
+  for (int i = 0; i < seq_len; ++i) {
+    positions_data[i] = start_pos + i;
+  }
 
-  std::vector<const Tensor*> inputs = {input_tensor.get(), sin_cache.get(), cos_cache.get()};
+  ASSIGN_OR_THROW(input_tensor, input_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(positions, positions->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
+
+  std::vector<const Tensor*> inputs = {input_tensor.get(), positions.get(), sin_cache.get(),
+                                       cos_cache.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
   auto status = rope_op.run(core::InferContext{}, inputs, outputs);
   CHECK(status.ok()) << "ROPEOp run failed: " << status.err();
 
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
   return output_tensor;
 }
 

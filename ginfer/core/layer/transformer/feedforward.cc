@@ -40,7 +40,8 @@ Result<void, std::string> FeedForwardLayer::toDevice(DeviceType dev_type) {
   RETURN_ON_ERR(gate_proj.toDevice(dev_type));
   RETURN_ON_ERR(up_proj.toDevice(dev_type));
   RETURN_ON_ERR(swiglu_op.toDevice(dev_type));
-  return down_proj.toDevice(dev_type);
+  RETURN_ON_ERR(down_proj.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 }  // namespace ginfer::core::layer::transformer

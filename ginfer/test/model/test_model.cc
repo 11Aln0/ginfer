@@ -37,37 +37,49 @@ void setCuSeqlen(core::InferContext& ctx, int seqlen_q, int seqlen_kv) {
   cu_seqlens_q->data<int32_t>()[1] = seqlen_q;
   cu_seqlens_kv->data<int32_t>()[0] = 0;
   cu_seqlens_kv->data<int32_t>()[1] = seqlen_kv;
-  THROW_ON_ERR(cu_seqlens_q->toDevice(dev_allocator));
-  THROW_ON_ERR(cu_seqlens_kv->toDevice(dev_allocator));
+  ASSIGN_OR_THROW(cu_seqlens_q, cu_seqlens_q->toDevice(dev_allocator));
+  ASSIGN_OR_THROW(cu_seqlens_kv, cu_seqlens_kv->toDevice(dev_allocator));
   ctx.cu_seqlens_q = cu_seqlens_q;
   ctx.cu_seqlens_kv = cu_seqlens_kv;
 }
 
-void setSlotMapping(core::InferContext& ctx, int num_slots) {
-  DECLARE_OR_THROW(slot_mapping,
-                   Tensor::create(DataType::kDataTypeInt32, Shape({num_slots}), host_allocator));
-  for (int i : std::views::iota(0, num_slots)) {
-    slot_mapping->data<int32_t>()[i] = i;
+void setSlotMapping(core::InferContext& ctx, int num_slots, bool is_prefill) {
+  TensorRef slot_mapping;
+  if (is_prefill) {
+    ASSIGN_OR_THROW(slot_mapping,
+                    Tensor::create(DataType::kDataTypeInt32, Shape({num_slots}), host_allocator));
+    for (int i : std::views::iota(0, num_slots)) {
+      slot_mapping->data<int32_t>()[i] = i;
+    }
+  } else {
+    ASSIGN_OR_THROW(slot_mapping,
+                    Tensor::create(DataType::kDataTypeInt32, Shape({1}), host_allocator));
+    slot_mapping->data<int32_t>()[0] = num_slots - 1;
   }
-  THROW_ON_ERR(slot_mapping->toDevice(dev_allocator));
+
+  ASSIGN_OR_THROW(slot_mapping, slot_mapping->toDevice(dev_allocator));
   ctx.slot_mapping = slot_mapping;
 }
 
 void setBlockTable(core::InferContext& ctx, int seq_lens, int block_size = 16) {
   int num_blocks = (seq_lens + block_size - 1) / block_size;
-  DECLARE_OR_THROW(block_tables,
-                   Tensor::create(DataType::kDataTypeInt32, Shape({num_blocks}), host_allocator));
+  DECLARE_OR_THROW(block_tables, Tensor::create(DataType::kDataTypeInt32, Shape({1, num_blocks}),
+                                                host_allocator));
   for (int i : std::views::iota(0, num_blocks)) {
     block_tables->data<int32_t>()[i] = i;
   }
-  THROW_ON_ERR(block_tables->toDevice(dev_allocator));
+  ASSIGN_OR_THROW(block_tables, block_tables->toDevice(dev_allocator));
   ctx.block_tables = block_tables;
 }
 
-void setInferCtx(core::InferContext& ctx, int seqlen_q, int seqlen_kv, int block_size = 16) {
+void setMaxSeqLenQ(core::InferContext& ctx, int seqlen_q) { ctx.max_seqlen_q = seqlen_q; }
+
+void setInferCtx(
+    core::InferContext& ctx, bool is_prefill, int seqlen_q, int seqlen_kv, int block_size) {
   setCuSeqlen(ctx, seqlen_q, seqlen_kv);
-  setSlotMapping(ctx, seqlen_q);
+  setSlotMapping(ctx, seqlen_kv, is_prefill);
   setBlockTable(ctx, seqlen_kv, block_size);
+  setMaxSeqLenQ(ctx, seqlen_q);
 }
 
 void allocKVCache(std::shared_ptr<core::model::Model>& model,
@@ -102,11 +114,12 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   core::InferContext infer_ctx;
 
   auto next_positions = [&](TensorRef positions) -> TensorRef {
-    THROW_ON_ERR(positions->toDevice(host_allocator));
+    ASSIGN_OR_THROW(positions, positions->toDevice(host_allocator));
     int len = positions->shape()[0];
     auto ret = positions->slice(0, len - 1, len);
     ret->data<int32_t>()[0]++;
-    THROW_ON_ERR(ret->toDevice(dev_allocator));
+    // LOG(INFO) << "Next position: " << ret->data<int32_t>()[0];
+    ASSIGN_OR_THROW(ret, ret->toDevice(dev_allocator));
     return ret;
   };
 
@@ -116,24 +129,26 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   for (int i : std::views::iota(0, input_seqlen)) {
     positions->data<int32_t>()[i] = i;
   }
-  THROW_ON_ERR(positions->toDevice(dev_allocator));
+  ASSIGN_OR_THROW(positions, positions->toDevice(dev_allocator));
 
   // prefill
-  setInferCtx(infer_ctx, input_seqlen, input_seqlen, block_size);
-  THROW_ON_ERR(input_ids->toDevice(dev_allocator));
+  setInferCtx(infer_ctx, /* is_prefill */ true, input_seqlen, input_seqlen, block_size);
+  ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
   DECLARE_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
-  THROW_ON_ERR(input_ids->toDevice(host_allocator));
+  ASSIGN_OR_THROW(input_ids, input_ids->toDevice(host_allocator));
   input_ids = input_ids->slice(0, 0, 1);
   input_ids->data<int32_t>()[0] = next_token_id;
 
   // decode loop
   while (!model->isEosToken(next_token_id)) {
+    // LOG(INFO) << "Generated token id: " << next_token_id;
     new_token_ids.push_back(next_token_id);
-    setInferCtx(infer_ctx, 1, input_seqlen + new_token_ids.size(), block_size);
-    THROW_ON_ERR(input_ids->toDevice(dev_allocator));
+    setInferCtx(infer_ctx, /* is_prefill */ false, 1, input_seqlen + new_token_ids.size(),
+                block_size);
+    ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
     positions = next_positions(positions);
     ASSIGN_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
-    THROW_ON_ERR(input_ids->toDevice(host_allocator));
+    ASSIGN_OR_THROW(input_ids, input_ids->toDevice(host_allocator));
     input_ids->data<int32_t>()[0] = next_token_id;
   }
   new_token_ids.push_back(next_token_id);

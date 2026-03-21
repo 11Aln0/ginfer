@@ -122,9 +122,13 @@ TEST(TensorTest, toDev) {
   ASSERT_EQ(tensor->nbytes(), 128 * sizeof(float));
 
   // to cuda
-  tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCUDA);
+  auto cuda_res = tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCUDA);
+  ASSERT_TRUE(cuda_res.ok()) << cuda_res.err();
+  tensor = cuda_res.value();
   // to cpu
-  tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
+  auto cpu_res = tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(cpu_res.ok()) << cpu_res.err();
+  tensor = cpu_res.value();
 
   // ASSERT_EQ(cpu_tensor.shape)
 }
@@ -148,8 +152,8 @@ TEST(TensorTest, strides) {
   auto col_strides = col_major_tensor->strides();
   ASSERT_EQ(col_strides.size(), 3);
   ASSERT_EQ(col_strides[0], 1);
-  ASSERT_EQ(col_strides[1], 4);
-  ASSERT_EQ(col_strides[2], 12);
+  ASSERT_EQ(col_strides[1], 2);
+  ASSERT_EQ(col_strides[2], 6);
 }
 
 TEST(TensorTest, slice) {

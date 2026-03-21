@@ -24,13 +24,11 @@ class Buffer : public ginfer::common::NoCopyable, std::enable_shared_from_this<B
                                                              DeviceAllocator* allocator);
 
  public:
+  void copyFrom(const std::shared_ptr<Buffer>& src);
   void copyFrom(const Buffer& src);
 
-  void copyFrom(const Buffer* src);
-
-  void copyFrom(const Buffer& src, size_t size);
-
-  void copyFrom(const Buffer* src, size_t size);
+  void copyFrom(const std::shared_ptr<Buffer>& src, int64_t src_off, int64_t dst_off, size_t size);
+  void copyFrom(const Buffer& src, int64_t src_off, int64_t dst_off, size_t size);
 
   virtual ~Buffer();
 

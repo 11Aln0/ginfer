@@ -73,6 +73,15 @@ __device__ __forceinline__ void loadKVPagedTile(const T* __restrict__ p_global,
       *reinterpret_cast<AccessT*>(sptr) = zero_vec;
     }
   }
+
+  // if (threadIdx.x == 0 && blockIdx.z == 0 && blockIdx.y == 0) {
+  //   printf("------------- GQA -------------\n");
+  //   for (int i = 0; i < kv_seqlen; i++) {
+  //     printf("seq: %d, k/v: %f \n", i,
+  //            static_cast<float>(p_smem[i * head_dim]));  // print the first element of each K
+  //            vector
+  //   }
+  // }
 }
 
 #define MMA_M 16
@@ -518,6 +527,13 @@ void GQAVarlenKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "GQAVarlenKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+
+  auto cu_seqlens_q_cpu = cu_seqlens_q;
+  cu_seqlens_q_cpu.toDevice(common::DeviceType::kDeviceCPU);
+  auto cu_seqlens_kv_cpu = cu_seqlens_kv;
+  cu_seqlens_kv_cpu.toDevice(common::DeviceType::kDeviceCPU);
+  auto block_tables_cpu = block_tables;
+  block_tables_cpu.toDevice(common::DeviceType::kDeviceCPU);
 
   const auto& q_shape = q.shape();
   const int batch = cu_seqlens_q.shape()[0] - 1;  // batch + 1

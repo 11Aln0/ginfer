@@ -15,8 +15,9 @@ Result<void, std::string> EmbeddingLayer::forward(const core::InferContext& ctx,
 }
 
 Result<void, std::string> EmbeddingLayer::toDevice(DeviceType dev_type) {
-  weight_->toDevice(dev_type);
-  return embed_op_.toDevice(dev_type);
+  ASSIGN_OR_RETURN(weight_, weight_->toDevice(dev_type));
+  RETURN_ON_ERR(embed_op_.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 }  // namespace ginfer::core::layer

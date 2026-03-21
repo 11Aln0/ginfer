@@ -35,11 +35,12 @@ Result<void, std::string> LinearLayer::forward(const core::InferContext& ctx,
 }
 
 Result<void, std::string> LinearLayer::toDevice(DeviceType dev_type) {
-  weight_->toDevice(dev_type);
+  ASSIGN_OR_RETURN(weight_, weight_->toDevice(dev_type));
   if (bias_ != nullptr) {
-    bias_->toDevice(dev_type);
+    ASSIGN_OR_RETURN(bias_, bias_->toDevice(dev_type));
   }
-  return mm_op_.toDevice(dev_type);
+  RETURN_ON_ERR(mm_op_.toDevice(dev_type));
+  return Layer::toDevice(dev_type);
 }
 
 }  // namespace ginfer::core::layer

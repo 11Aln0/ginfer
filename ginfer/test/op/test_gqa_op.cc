@@ -24,10 +24,10 @@ TensorRef test_gqa_op_cuda(TensorRef q_tensor, TensorRef k_tensor, TensorRef v_t
   ::ginfer::core::op::GQAOp gqa_op(DeviceType::kDeviceCUDA);
 
   // Move tensors to GPU
-  q_tensor->toDevice(DeviceType::kDeviceCUDA);
-  k_tensor->toDevice(DeviceType::kDeviceCUDA);
-  v_tensor->toDevice(DeviceType::kDeviceCUDA);
-  output_tensor->toDevice(DeviceType::kDeviceCUDA);
+  ASSIGN_OR_THROW(q_tensor, q_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(k_tensor, k_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(v_tensor, v_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // Run computation
   std::vector<const Tensor*> inputs = {q_tensor.get(), k_tensor.get(), v_tensor.get()};
@@ -36,7 +36,7 @@ TensorRef test_gqa_op_cuda(TensorRef q_tensor, TensorRef k_tensor, TensorRef v_t
   CHECK(status.ok()) << "GQAOp run failed: " << status.err();
 
   // Copy result back to CPU
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
 
   return output_tensor;
 }

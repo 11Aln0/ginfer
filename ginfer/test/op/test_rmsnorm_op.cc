@@ -29,9 +29,9 @@ TensorRef test_rmsnorm_op_cuda(TensorRef input_tensor, TensorRef gamma_tensor, f
   auto cu_allocator =
       ginfer::core::memory::getDeviceAllocator<ginfer::core::memory::PooledAllocStrategy>(
           DeviceType::kDeviceCUDA);
-  input_tensor->toDevice(cu_allocator);
-  gamma_tensor->toDevice(cu_allocator);
-  output_tensor->toDevice(cu_allocator);
+  ASSIGN_OR_THROW(input_tensor, input_tensor->toDevice(cu_allocator));
+  ASSIGN_OR_THROW(gamma_tensor, gamma_tensor->toDevice(cu_allocator));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(cu_allocator));
 
   // Run computation
   std::vector<const Tensor*> inputs = {input_tensor.get(), gamma_tensor.get()};
@@ -40,7 +40,7 @@ TensorRef test_rmsnorm_op_cuda(TensorRef input_tensor, TensorRef gamma_tensor, f
   CHECK(status.ok()) << "RMSNormOp run failed: " << status.err();
 
   // Copy result back to CPU
-  output_tensor->toDevice(DeviceType::kDeviceCPU);
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
 
   return output_tensor;
 }
