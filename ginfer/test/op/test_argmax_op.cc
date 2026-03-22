@@ -16,7 +16,13 @@ using core::tensor::Tensor;
 using core::tensor::TensorRef;
 
 TensorRef test_argmax_op_cuda(TensorRef input_tensor) {
-  auto out_res = Tensor::create(DataType::kDataTypeInt64, Shape({1}), DeviceType::kDeviceCPU);
+  const Shape& input_shape = input_tensor->shape();
+  CHECK(input_shape.ndim() == 1 || input_shape.ndim() == 2)
+      << "Argmax test only supports 1D and 2D input tensors.";
+
+  std::vector<int64_t> out_dims = {input_shape.ndim() == 1 ? 1 : input_shape[0]};
+  auto out_res =
+      Tensor::create(DataType::kDataTypeInt64, Shape(out_dims), DeviceType::kDeviceCPU);
   CHECK(out_res.ok()) << out_res.err();
   auto output_tensor = out_res.value();
 

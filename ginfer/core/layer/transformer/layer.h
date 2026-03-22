@@ -154,4 +154,30 @@ class EncoderLayer : public Layer {
   FeedForwardLayer mlp;
 };
 
+class LMHeadLayer : public Layer {
+ public:
+  struct Intermediates {
+    TensorRef last_hidden_state;  // [max_batch_size, hidden_size]
+  };
+
+ public:
+  LMHeadLayer(DeviceType dev_type, std::string layer_name);
+
+  Result<void, std::string> forward(const core::InferContext& ctx,
+                                    const std::vector<TensorRef>& inputs,
+                                    TensorRef output) override;
+
+  Result<void, std::string> toDevice(DeviceType dev_type) override;
+
+  void setWeight(const TensorRef& weight);
+
+  void setIntermediates(const Intermediates& intermediates);
+
+ private:
+  Intermediates intermediates_;
+
+  LinearLayer lm_head_proj;
+  op::SelectLastTokenOp token_select_op;
+};
+
 }  // namespace ginfer::core::layer::transformer

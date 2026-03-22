@@ -1,7 +1,7 @@
 #include <glog/logging.h>
-#include "ginfer/core/op/kernels/argmax_kernel.h"
 #include "ginfer/core/op/kernels/cuda/vectorize.cuh"
 #include "ginfer/core/op/kernels/kernel_registry.h"
+#include "ginfer/core/op/kernels/kernels.h"
 
 namespace ginfer::core::op::kernel {
 
@@ -9,7 +9,7 @@ __forceinline__ __device__ void warp_reduce_argmax(float& val, int64_t& idx) {
 #pragma unroll
   for (int offset = 16; offset > 0; offset /= 2) {
     float other_val = __shfl_down_sync(0xFFFFFFFF, val, offset);
-    size_t other_idx = __shfl_down_sync(0xFFFFFFFF, idx, offset);
+    int64_t other_idx = __shfl_down_sync(0xFFFFFFFF, idx, offset);
     if (other_val > val) {
       val = other_val;
       idx = other_idx;
@@ -50,11 +50,9 @@ __forceinline__ __device__ void block_reduce_argmax(float& val,
 }
 
 template <typename T, int vec_size = DefaultVecSize<T>::value>
-__global__ void argmaxKernelImpl(const T* input, int64_t* output_idx, size_t size) {
+__device__ void argmaxInner(const T* input, int64_t* output_idx, size_t inner_dim) {
   __shared__ int64_t max_idx[32];
   __shared__ float max_val[32];
-
-  uint32_t tid = threadIdx.x;
 
   float thread_max_val = -INFINITY;
   int64_t thread_max_idx = 0;
@@ -62,8 +60,8 @@ __global__ void argmaxKernelImpl(const T* input, int64_t* output_idx, size_t siz
   using AccessT = AlignedVector<T, vec_size>;
   const AccessT* input_vec = reinterpret_cast<const AccessT*>(input);
 
-  size_t total_vec_size = size / vec_size;
-  for (size_t i = tid; i < total_vec_size; i += blockDim.x) {
+  size_t bound = inner_dim / vec_size;
+  for (size_t i = threadIdx.x; i < bound; i += blockDim.x) {
     const AccessT data = input_vec[i];
 #pragma unroll
     for (int j = 0; j < vec_size; j++) {
@@ -79,31 +77,62 @@ __global__ void argmaxKernelImpl(const T* input, int64_t* output_idx, size_t siz
   block_reduce_argmax(thread_max_val, thread_max_idx, max_val, max_idx);
 
   if (threadIdx.x == 0) {
-    output_idx[0] = thread_max_idx;
+    *output_idx = thread_max_idx;
   }
+}
+
+template <typename T, int vec_size>
+__global__ void argmax1DKernelImpl(const T* input, int64_t* output_idx, size_t size) {
+  argmaxInner<T, vec_size>(input, output_idx, size);
+}
+
+template <typename T, int vec_size>
+__global__ void argmax2DKernelImpl(const T* input,
+                                   int64_t* output_idx,
+                                   size_t outer_dim,
+                                   size_t inner_dim) {
+  int64_t outer_idx = blockIdx.x;
+  const T* outer_input = input + outer_idx * inner_dim;
+  int64_t* outer_output_idx = output_idx + outer_idx;
+  argmaxInner<T, vec_size>(outer_input, outer_output_idx, inner_dim);
 }
 
 template <typename T, typename Context>
 void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tensor& output_idx) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
-      << "addKernel only supports CUDA device type.";
+      << "argmaxKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
-  size_t size = input.size();
+  constexpr int vec_size = DefaultVecSize<T>::value;
 
-  // Validate input length is multiple of vectorization size on host side.
-  // `vec_size` is a compile-time constant derived from T, so use it here.
-  static constexpr int vec_size = DefaultVecSize<T>::value;
-  CHECK(size % vec_size == 0) << "Input size must be multiple of vector size";
+  const auto& shape = input.shape();
+  int ndim = shape.ndim();
+  CHECK(ndim == 1 || ndim == 2) << "Only 1D and 2D tensors are supported.";
 
   const T* input_data = input.data<T>();
   int64_t* output_idx_data = output_idx.data<int64_t>();
 
-  const int block_dim = 512;
-  const int grid_dim = 1;
+  if (ndim == 1) {
+    size_t size = input.size();
+    CHECK(size % vec_size == 0) << "Input size must be a multiple of vector size for this kernel.";
 
-  argmaxKernelImpl<T, vec_size>
-      <<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(input_data, output_idx_data, size);
+    const int block_dim = 512;
+    const int grid_dim = 1;
+
+    argmax1DKernelImpl<T, vec_size>
+        <<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(input_data, output_idx_data, size);
+  } else {
+    size_t outer_dim = shape[0];
+    size_t inner_dim = shape[1];
+    CHECK(inner_dim % vec_size == 0)
+        << "Inner dimension must be a multiple of vector size for this kernel.";
+
+    const int block_dim = 128;
+    const int grid_dim = static_cast<int>(outer_dim);
+
+    argmax2DKernelImpl<T, vec_size><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(
+        input_data, output_idx_data, outer_dim, inner_dim);
+  }
 }
 
 REGISTER_KERNEL(argmax,

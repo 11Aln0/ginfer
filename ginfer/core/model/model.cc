@@ -66,9 +66,19 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   DECLARE_OR_RETURN(t0, Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
   ASSIGN_OR_RETURN(i.embed_out,
                    Tensor::create(dtype, Shape{max_seq_len, config_.hidden_size}, dev_type));
-  ASSIGN_OR_RETURN(i.lm_head_out, Tensor::create(dtype, Shape{1, config_.vocab_size}, dev_type));
-  ASSIGN_OR_RETURN(i.argmax_out, Tensor::create(DataType::kDataTypeInt64, Shape{1}, dev_type));
+  ASSIGN_OR_RETURN(
+      i.lm_head_out,
+      Tensor::create(dtype, Shape{config_.max_batch_size, config_.vocab_size}, dev_type));
+  ASSIGN_OR_RETURN(i.argmax_out, Tensor::create(DataType::kDataTypeInt64,
+                                                Shape{config_.max_batch_size}, dev_type));
   i.norm_out = t0;
+
+  DECLARE_OR_RETURN(
+      last_hidden_state,
+      Tensor::create(dtype, Shape{config_.max_batch_size, config_.hidden_size}, dev_type));
+  layer::transformer::LMHeadLayer::Intermediates lm_head_intermediates = {
+      .last_hidden_state = last_hidden_state,
+  };
 
   DECLARE_OR_RETURN(
       t1, Tensor::create(dtype, Shape{max_seq_len, config_.num_heads * head_dim}, dev_type));
@@ -106,6 +116,7 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   for (auto& e : encoder_layers) {
     e.setIntermediates(encoder_intermediates);
   }
+  lm_head.setIntermediates(lm_head_intermediates);
 
   intermediates_allocated_ = true;
   return Ok<void>();
@@ -137,20 +148,20 @@ Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding() {
   return Ok<void>();
 }
 
-Result<void, std::string> LlamaArchModel::forward(const core::InferContext& infer_ctx,
+Result<void, std::string> LlamaArchModel::forward(const core::InferContext& ctx,
                                                   const TensorRef input_ids,
                                                   const TensorRef positions,
                                                   TensorRef output) {
   int64_t seq_len = input_ids->shape()[0];
 
   auto embed_out = intermediates_.embed_out->slice(0, 0, seq_len);
-  RETURN_ON_ERR(embed_tokens.forward(infer_ctx, {input_ids}, embed_out));
+  RETURN_ON_ERR(embed_tokens.forward(ctx, {input_ids}, embed_out));
   TensorRef hidden_state = embed_out;
   for (int i = 0; i < config_.nlayer; ++i) {
     auto& encoder = encoder_layers[i];
-    RETURN_ON_ERR(encoder.forward(infer_ctx, {hidden_state, positions, sin, cos}, hidden_state));
+    RETURN_ON_ERR(encoder.forward(ctx, {hidden_state, positions, sin, cos}, hidden_state));
   }
-  return final_rmsnorm.forward(infer_ctx, {hidden_state}, output);
+  return final_rmsnorm.forward(ctx, {hidden_state}, output);
 }
 
 Result<void, std::string> LlamaArchModel::toDevice(common::DeviceType dev_type) {
@@ -165,35 +176,47 @@ Result<void, std::string> LlamaArchModel::toDevice(common::DeviceType dev_type) 
   return argmax_op.toDevice(dev_type);
 }
 
-Result<int32_t, std::string> LlamaArchModel::predict(const core::InferContext& infer_ctx,
-                                                     const tensor::TensorRef token_ids,
-                                                     const tensor::TensorRef positions) {
+Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
+    const core::InferContext& ctx,
+    const tensor::TensorRef token_ids,
+    const tensor::TensorRef positions) {
   RETURN_ON_ERR(lazyAllocIntermediates());
   RETURN_ON_ERR(lazyInitPosEmbedding());
 
   int64_t seq_len = token_ids->shape()[0];
+
   CHECK_LE(seq_len, static_cast<int64_t>(config_.max_seq_len))
       << "Input token_ids length exceeds max_seq_len.";
   CHECK(positions != nullptr) << "positions must not be null";
   CHECK_EQ(positions->shape()[0], seq_len) << "positions length must equal input token_ids length.";
   CHECK(token_ids->dtype() == tensor::DataType::kDataTypeInt32) << "token_ids dtype must be int32";
+  CHECK(ctx.cu_seqlens_q.has_value() && ctx.cu_seqlens_kv.has_value())
+      << "cu_seqlens_q, cu_seqlens_kv are required in InferContext for predict.";
+
+  int64_t batch_size = ctx.cu_seqlens_q.value()->shape()[0] - 1;
+  CHECK_LE(batch_size, static_cast<int64_t>(config_.max_batch_size))
+      << "Batch size exceeds max_batch_size.";
 
   // forward
   auto norm_out = intermediates_.norm_out->slice(0, 0, seq_len);
-  auto lm_head_out = intermediates_.lm_head_out;
-  RETURN_ON_ERR(forward(infer_ctx, token_ids, positions, norm_out));
-  // only need the last token's hidden state for LM head
-  norm_out = norm_out->slice(0, seq_len - 1, seq_len);
-  RETURN_ON_ERR(lm_head.forward(infer_ctx, {norm_out}, lm_head_out));
+  auto lm_head_out = intermediates_.lm_head_out->slice(0, 0, batch_size);
+  RETURN_ON_ERR(forward(ctx, token_ids, positions, norm_out));
+
+  // [total_tokens, vocab_size] -> [batch_size, vocab_size]
+  RETURN_ON_ERR(lm_head.forward(ctx, {norm_out}, lm_head_out));
 
   // get next token id (argmax)
-  auto argmax_out = intermediates_.argmax_out->slice(0, 0, 1);
-  RETURN_ON_ERR(argmax_op.run(infer_ctx, {lm_head_out.get()}, {argmax_out.get()}));
+  auto argmax_out = intermediates_.argmax_out->slice(0, 0, batch_size);
+  RETURN_ON_ERR(argmax_op.run(ctx, {lm_head_out.get()}, {argmax_out.get()}));
   ASSIGN_OR_RETURN(argmax_out,
                    argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(
                        memory::DeviceType::kDeviceCPU)));
 
-  return Ok(static_cast<int32_t>(argmax_out->data<int64_t>()[0]));  // TODO argmax return int32_t
+  std::vector<int32_t> tokens(batch_size);
+  for (int64_t i = 0; i < batch_size; ++i) {
+    tokens[i] = static_cast<int32_t>(argmax_out->data<int64_t>()[i]);
+  }
+  return Ok(tokens);
 }
 
 // end LlamaArchModel

@@ -1,8 +1,8 @@
 #include <cub/block/block_reduce.cuh>
 #include "ginfer/common/check.h"
 #include "ginfer/core/op/kernels/cuda/vectorize.cuh"
-#include "ginfer/core/op/kernels/gemv_kernel.h"
 #include "ginfer/core/op/kernels/kernel_registry.h"
+#include "ginfer/core/op/kernels/kernels.h"
 #include "ginfer/core/tensor/tensor.h"
 
 namespace ginfer::core::op::kernel {

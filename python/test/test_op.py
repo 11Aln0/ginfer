@@ -157,13 +157,13 @@ def test_gqa_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, q_seq_le
 # ==================== Argmax ====================
 
 @pytest.mark.parametrize("dtype", [np.float32, np.float16, ml_dtypes.bfloat16])
-@pytest.mark.parametrize("size", [128, 1024, 4096])
-def test_argmax_op_cuda(dtype, size):
-    data = np.random.randn(size).astype(dtype)
+@pytest.mark.parametrize("tensor_shape", [(128,), (1024,), (4096,), (2, 128), (17, 1024), (33, 4096)])
+def test_argmax_op_cuda(dtype, tensor_shape):
+    data = np.random.randn(*tensor_shape).astype(dtype)
     out = ginfer_test.test_argmax_op_cuda(data)
-    idx = int(out[0])
-    expected = int(np.argmax(data))
-    assert idx == expected
+    expected = np.argmax(data, axis=-1).astype(np.int64) if data.ndim == 2 else np.array([np.argmax(data)], dtype=np.int64)
+    
+    np.testing.assert_array_equal(out, expected)
 
 
 # ==================== Embedding ====================

@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "ginfer/core/context.h"
 #include "ginfer/common/device.h"
 #include "ginfer/common/errors.h"
+#include "ginfer/core/context.h"
 #include "ginfer/core/tensor/tensor.h"
 
 namespace ginfer::core::op {
@@ -131,6 +131,15 @@ class StoreKVCacheOp : public Op {
 class ArgmaxOp : public Op {
  public:
   ArgmaxOp(DeviceType dev_type);
+
+  virtual Result<void, std::string> run(const core::InferContext& ctx,
+                                        const std::vector<const Tensor*>& inputs,
+                                        std::vector<Tensor*> outputs) override;
+};
+
+class SelectLastTokenOp : public Op {
+ public:
+  SelectLastTokenOp(DeviceType dev_type);
 
   virtual Result<void, std::string> run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,

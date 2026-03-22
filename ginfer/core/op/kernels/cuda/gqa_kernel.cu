@@ -2,8 +2,8 @@
 #include <glog/logging.h>
 #include "ginfer/core/op/kernels/cuda/intrinsic.cuh"
 #include "ginfer/core/op/kernels/cuda/vectorize.cuh"
-#include "ginfer/core/op/kernels/gqa_kernel.h"
 #include "ginfer/core/op/kernels/kernel_registry.h"
+#include "ginfer/core/op/kernels/kernels.h"
 
 namespace ginfer::core::op::kernel {
 

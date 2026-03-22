@@ -1,6 +1,6 @@
 #include <glog/logging.h>
-#include "ginfer/core/op/kernels/gqa_kernel.h"
 #include "ginfer/core/op/kernels/kernel_registry.h"
+#include "ginfer/core/op/kernels/kernels.h"
 #include "ginfer/core/op/op.h"
 
 namespace ginfer::core::op {

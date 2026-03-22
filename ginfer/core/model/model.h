@@ -24,6 +24,7 @@ struct ModelConfig {
   int vocab_size;
   int max_position_embeddings;
   int max_seq_len;
+  int max_batch_size = 1;
 
   int num_heads;
   int num_kv_heads;
@@ -38,9 +39,9 @@ class Model {
 
   explicit Model(ModelConfig config, common::DeviceType dev_type);
 
-  virtual Result<int32_t, std::string> predict(const core::InferContext& infer_ctx,
-                                               const tensor::TensorRef token_ids,
-                                               const tensor::TensorRef positions) = 0;
+  virtual Result<std::vector<int32_t>, std::string> predict(const core::InferContext& ctx,
+                                                            const tensor::TensorRef token_ids,
+                                                            const tensor::TensorRef positions) = 0;
 
   virtual Result<void, std::string> toDevice(common::DeviceType dev_type);
 
@@ -76,9 +77,9 @@ class LlamaArchModel : public Model {
  public:
   LlamaArchModel(LlamaArchModelConfig config, common::DeviceType dev_type);
 
-  Result<int32_t, std::string> predict(const core::InferContext& infer_ctx,
-                                       const tensor::TensorRef token_ids,
-                                       const tensor::TensorRef positions) override;
+  Result<std::vector<int32_t>, std::string> predict(const core::InferContext& ctx,
+                                                    const tensor::TensorRef token_ids,
+                                                    const tensor::TensorRef positions) override;
 
   Result<void, std::string> toDevice(common::DeviceType dev_type) override;
 
@@ -88,8 +89,8 @@ class LlamaArchModel : public Model {
   struct Intermediates {
     TensorRef embed_out;    // [max_seq_len, hidden_size]
     TensorRef norm_out;     // [max_seq_len, hidden_size]
-    TensorRef lm_head_out;  // [max_seq_len, vocab_size]
-    TensorRef argmax_out;   // [1]
+    TensorRef lm_head_out;  // [max_batch_size, vocab_size]
+    TensorRef argmax_out;   // [max_batch_size]
   };
 
  private:
@@ -100,7 +101,7 @@ class LlamaArchModel : public Model {
   Result<void, std::string> lazyInitPosEmbedding();
 
   // forward
-  Result<void, std::string> forward(const core::InferContext& infer_ctx,
+  Result<void, std::string> forward(const core::InferContext& ctx,
                                     const TensorRef input_ids,
                                     const TensorRef positions,
                                     TensorRef output);
@@ -124,7 +125,7 @@ class LlamaArchModel : public Model {
   layer::EmbeddingLayer embed_tokens;
   std::vector<layer::transformer::EncoderLayer> encoder_layers;
   layer::RMSNormLayer final_rmsnorm;
-  layer::LinearLayer lm_head;
+  layer::transformer::LMHeadLayer lm_head;
 };
 
 }  // namespace ginfer::core::model

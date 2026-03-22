@@ -134,9 +134,11 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   // prefill
   setInferCtx(infer_ctx, /* is_prefill */ true, input_seqlen, input_seqlen, block_size);
   ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
-  DECLARE_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
+  DECLARE_OR_THROW(next_token_ids, model->predict(infer_ctx, input_ids, positions));
   ASSIGN_OR_THROW(input_ids, input_ids->toDevice(host_allocator));
   input_ids = input_ids->slice(0, 0, 1);
+
+  auto next_token_id = next_token_ids[0];
   input_ids->data<int32_t>()[0] = next_token_id;
 
   // decode loop
@@ -147,8 +149,9 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
                 block_size);
     ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
     positions = next_positions(positions);
-    ASSIGN_OR_THROW(next_token_id, model->predict(infer_ctx, input_ids, positions));
+    ASSIGN_OR_THROW(next_token_ids, model->predict(infer_ctx, input_ids, positions));
     ASSIGN_OR_THROW(input_ids, input_ids->toDevice(host_allocator));
+    next_token_id = next_token_ids[0];
     input_ids->data<int32_t>()[0] = next_token_id;
   }
   new_token_ids.push_back(next_token_id);

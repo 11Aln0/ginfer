@@ -1,7 +1,7 @@
 #include "ginfer/common/device.h"
 #include "ginfer/core/op/kernels/cuda/intrinsic.cuh"
-#include "ginfer/core/op/kernels/gemm_kernel.h"
 #include "ginfer/core/op/kernels/kernel_registry.h"
+#include "ginfer/core/op/kernels/kernels.h"
 #include "ginfer/core/tensor/tensor.h"
 #include "hgemm_NT.cuh"
 
