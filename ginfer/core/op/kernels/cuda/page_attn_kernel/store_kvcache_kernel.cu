@@ -67,10 +67,6 @@ void storeKVCacheKernel(const Context& ctx,
       stride);
 }
 
-REGISTER_KERNEL(storeKVCache,
-                kDeviceCUDA,
-                storeKVCacheKernel,
-                tensor::DataType::kDataTypeBFloat16,
-                tensor::DataType::kDataTypeFloat16);
+REGISTER_KERNEL(storeKVCache, CUDA, storeKVCacheKernel, BFloat16, Float16);
 
 }  // namespace ginfer::core::op::kernel

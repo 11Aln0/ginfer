@@ -14,9 +14,9 @@ void addKernel(const Context& ctx,
                tensor::Tensor& c);
 using AddKernelFuncType = decltype(&addKernel<float, common::DeviceContext>);
 
-template <typename T, typename Context>
+template <typename InT, typename OutT, typename Context>
 void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tensor& output_idx);
-using ArgmaxKernelFuncType = decltype(&argmaxKernel<float, common::DeviceContext>);
+using ArgmaxKernelFuncType = decltype(&argmaxKernel<float, int32_t, common::DeviceContext>);
 
 template <typename T, typename Context>
 void embeddingKernel(const Context& ctx,

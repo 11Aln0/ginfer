@@ -49,15 +49,15 @@ __forceinline__ __device__ void block_reduce_argmax(float& val,
   __syncthreads();
 }
 
-template <typename T, int vec_size = DefaultVecSize<T>::value>
-__device__ void argmaxInner(const T* input, int64_t* output_idx, size_t inner_dim) {
+template <typename InT, typename OutT, int vec_size = DefaultVecSize<InT>::value>
+__device__ void argmaxInner(const InT* input, OutT* output_idx, size_t inner_dim) {
   __shared__ int64_t max_idx[32];
   __shared__ float max_val[32];
 
   float thread_max_val = -INFINITY;
   int64_t thread_max_idx = 0;
 
-  using AccessT = AlignedVector<T, vec_size>;
+  using AccessT = AlignedVector<InT, vec_size>;
   const AccessT* input_vec = reinterpret_cast<const AccessT*>(input);
 
   size_t bound = inner_dim / vec_size;
@@ -77,40 +77,40 @@ __device__ void argmaxInner(const T* input, int64_t* output_idx, size_t inner_di
   block_reduce_argmax(thread_max_val, thread_max_idx, max_val, max_idx);
 
   if (threadIdx.x == 0) {
-    *output_idx = thread_max_idx;
+    *output_idx = static_cast<OutT>(thread_max_idx);
   }
 }
 
-template <typename T, int vec_size>
-__global__ void argmax1DKernelImpl(const T* input, int64_t* output_idx, size_t size) {
-  argmaxInner<T, vec_size>(input, output_idx, size);
+template <typename InT, typename OutT, int vec_size>
+__global__ void argmax1DKernelImpl(const InT* input, OutT* output_idx, size_t size) {
+  argmaxInner<InT, OutT, vec_size>(input, output_idx, size);
 }
 
-template <typename T, int vec_size>
-__global__ void argmax2DKernelImpl(const T* input,
-                                   int64_t* output_idx,
+template <typename InT, typename OutT, int vec_size>
+__global__ void argmax2DKernelImpl(const InT* input,
+                                   OutT* output_idx,
                                    size_t outer_dim,
                                    size_t inner_dim) {
   int64_t outer_idx = blockIdx.x;
-  const T* outer_input = input + outer_idx * inner_dim;
-  int64_t* outer_output_idx = output_idx + outer_idx;
-  argmaxInner<T, vec_size>(outer_input, outer_output_idx, inner_dim);
+  const InT* outer_input = input + outer_idx * inner_dim;
+  OutT* outer_output_idx = output_idx + outer_idx;
+  argmaxInner<InT, OutT, vec_size>(outer_input, outer_output_idx, inner_dim);
 }
 
-template <typename T, typename Context>
+template <typename InT, typename OutT, typename Context>
 void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tensor& output_idx) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "argmaxKernel only supports CUDA device type.";
   auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
-  constexpr int vec_size = DefaultVecSize<T>::value;
+  constexpr int vec_size = DefaultVecSize<InT>::value;
 
   const auto& shape = input.shape();
   int ndim = shape.ndim();
   CHECK(ndim == 1 || ndim == 2) << "Only 1D and 2D tensors are supported.";
 
-  const T* input_data = input.data<T>();
-  int64_t* output_idx_data = output_idx.data<int64_t>();
+  const InT* input_data = input.data<InT>();
+  OutT* output_idx_data = output_idx.data<OutT>();
 
   if (ndim == 1) {
     size_t size = input.size();
@@ -119,7 +119,7 @@ void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tenso
     const int block_dim = 512;
     const int grid_dim = 1;
 
-    argmax1DKernelImpl<T, vec_size>
+    argmax1DKernelImpl<InT, OutT, vec_size>
         <<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(input_data, output_idx_data, size);
   } else {
     size_t outer_dim = shape[0];
@@ -130,16 +130,18 @@ void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tenso
     const int block_dim = 128;
     const int grid_dim = static_cast<int>(outer_dim);
 
-    argmax2DKernelImpl<T, vec_size><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(
+    argmax2DKernelImpl<InT, OutT, vec_size><<<grid_dim, block_dim, 0, cuda_ctx.getStream()>>>(
         input_data, output_idx_data, outer_dim, inner_dim);
   }
 }
 
-REGISTER_KERNEL(argmax,
-                kDeviceCUDA,
-                argmaxKernel,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL_DIFF_IO(argmax,
+                        CUDA,
+                        argmaxKernel,
+                        (Float16, Int32),
+                        (BFloat16, Int32),
+                        (Float16, Int64),
+                        (BFloat16, Int64));
+;
 
 }  // namespace ginfer::core::op::kernel

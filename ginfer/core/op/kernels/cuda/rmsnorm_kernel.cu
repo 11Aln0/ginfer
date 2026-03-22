@@ -100,11 +100,6 @@ void rmsNormKernel(const Context& ctx,
   }
 }
 
-REGISTER_KERNEL(rmsNorm,
-                kDeviceCUDA,
-                rmsNormKernel,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(rmsNorm, CUDA, rmsNormKernel, Float32, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

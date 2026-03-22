@@ -13,14 +13,15 @@ Result<void, std::string> ArgmaxOp::run(const core::InferContext& ctx,
   CHECK(outputs.size() == 1) << "ArgmaxOp requires exactly 1 output tensor.";
 
   const Tensor* input = inputs[0];
+  Tensor* output = outputs[0];
 
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel =
       kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::ArgmaxKernelFuncType>(
-          "argmax", input->dtype());
+          "argmax", input->dtype(), output->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *outputs[0]);
+  kernel(*dev_ctx, *input, *output);
 
   return Ok<void>();
 }

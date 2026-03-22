@@ -198,21 +198,10 @@ void ROPEKernel(const Context& ctx,
       num_heads, head_dim);
 }
 
-REGISTER_KERNEL(rotary_embedding,
-                kDeviceCUDA,
-                RotaryEmbeddingKernel,
-                tensor::DataType::kDataTypeFloat32);
+REGISTER_KERNEL(rotary_embedding, CUDA, RotaryEmbeddingKernel, Float32);
 
-REGISTER_KERNEL(llama3_rotary_embedding,
-                kDeviceCUDA,
-                Llama3RotaryEmbeddingKernel,
-                tensor::DataType::kDataTypeFloat32);
+REGISTER_KERNEL(llama3_rotary_embedding, CUDA, Llama3RotaryEmbeddingKernel, Float32);
 
-REGISTER_KERNEL(ROPE,
-                kDeviceCUDA,
-                ROPEKernel,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(ROPE, CUDA, ROPEKernel, Float32, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

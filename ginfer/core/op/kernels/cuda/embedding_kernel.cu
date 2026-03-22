@@ -49,11 +49,6 @@ void embeddingKernel(const Context& ctx,
       input_data, weight_data, output_data, num_indices, embedding_dim);
 }
 
-REGISTER_KERNEL(embedding,
-                kDeviceCUDA,
-                embeddingKernel,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(embedding, CUDA, embeddingKernel, Float16, Float32, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

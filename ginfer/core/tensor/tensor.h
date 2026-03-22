@@ -52,12 +52,12 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   void copyFrom(const TensorRef& src);
 
-  template <typename T>
+  template <typename T = void>
   T* data() {
     return reinterpret_cast<T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));
   }
 
-  template <typename T>
+  template <typename T = void>
   const T* data() const {
     return reinterpret_cast<const T*>(buffer_->ptr() + offset_ * dTypeSize(dtype_));
   }

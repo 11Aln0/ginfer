@@ -58,12 +58,6 @@ void addKernel(const Context& ctx,
   // CHECK(err == cudaSuccess) << "CUDA kernel launch failed: " << cudaGetErrorString(err);
 }
 
-REGISTER_KERNEL(add,
-                kDeviceCUDA,
-                addKernel,
-                tensor::DataType::kDataTypeInt32,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(add, CUDA, addKernel, Int32, Float32, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

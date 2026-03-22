@@ -64,11 +64,6 @@ void selectLastTokenKernel(const Context& ctx,
       input_data, cu_seqlen_q_data, output_data, hidden_dim);
 }
 
-REGISTER_KERNEL(selectLastToken,
-                kDeviceCUDA,
-                selectLastTokenKernel,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(selectLastToken, CUDA, selectLastTokenKernel, Float16, Float32, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

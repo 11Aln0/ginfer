@@ -594,10 +594,6 @@ void GQAVarlenKernel(const Context& ctx,
   dispatcher();
 }
 
-REGISTER_KERNEL(GQAVarlen,
-                kDeviceCUDA,
-                GQAVarlenKernel,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(GQAVarlen, CUDA, GQAVarlenKernel, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

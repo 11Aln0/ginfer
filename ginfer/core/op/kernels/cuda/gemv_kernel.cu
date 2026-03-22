@@ -95,11 +95,6 @@ void gemvKernel(const Context& ctx,
   }
 }
 
-REGISTER_KERNEL(gemv,
-                kDeviceCUDA,
-                gemvKernel,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(gemv, CUDA, gemvKernel, Float32, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

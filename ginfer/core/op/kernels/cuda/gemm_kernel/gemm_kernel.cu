@@ -48,10 +48,6 @@ void gemmKernel(const Context& ctx,
   }
 }
 
-REGISTER_KERNEL(gemm,
-                kDeviceCUDA,
-                gemmKernel,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(gemm, CUDA, gemmKernel, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel

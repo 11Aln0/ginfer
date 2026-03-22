@@ -46,6 +46,7 @@ class KernelRegistry {
     return reinterpret_cast<FuncType>(entry.func_ptr);
   }
 
+  // TODO: constraint for diffent input/output dtype
   template <typename FuncType>
   FuncType getKernel(const std::string& name,
                      tensor::DataType in_dtype,
@@ -68,6 +69,17 @@ class KernelRegistry {
   std::unordered_map<KernelInfo, KernelRegistryEntry> kernels_;
 };
 
+#define _UNWRAP(...) __VA_ARGS__
+#define _PAIR_FIRST_IMPL(first, second) first
+#define _PAIR_SECOND_IMPL(first, second) second
+#define _PAIR_FIRST(pair) _PAIR_FIRST_IMPL pair
+#define _PAIR_SECOND(pair) _PAIR_SECOND_IMPL pair
+
+#define _KERNEL_DEVICE_TYPE_IMPL(dev_type) ::ginfer::common::DeviceType::kDevice##dev_type
+#define _KERNEL_DEVICE_TYPE(dev_type) _KERNEL_DEVICE_TYPE_IMPL(dev_type)
+#define _KERNEL_DATA_TYPE_IMPL(dtype) ::ginfer::core::tensor::DataType::kDataType##dtype
+#define _KERNEL_DATA_TYPE(dtype) _KERNEL_DATA_TYPE_IMPL(dtype)
+
 #define _REGISTER_KERNEL_FROM_INFO(dev_type, kernel_info, func)                                  \
   ::ginfer::core::op::kernel::KernelRegistry::getInstance(dev_type)->registerKernel(kernel_info, \
                                                                                     func);
@@ -80,45 +92,84 @@ class KernelRegistry {
 #define _REGISTER_KERNEL_SAME_DTYPE(name, dev_type, func, dtype) \
   _REGISTER_KERNEL_DIFF_DTYPE(name, dev_type, func, dtype, dtype)
 
-#define INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype)                              \
-  (&tpl_func<typename ::ginfer::type::DeviceNativeTypeOf<                               \
-                 dev_type, typename ::ginfer::core::tensor::TypeOf<dtype>::type>::type, \
+#define _REGISTER_KERNEL_DIFF_IO(name, dev_type, func, in_dtype, out_dtype) \
+  _REGISTER_KERNEL_DIFF_DTYPE(name, _KERNEL_DEVICE_TYPE(dev_type), func,    \
+                              _KERNEL_DATA_TYPE(in_dtype), _KERNEL_DATA_TYPE(out_dtype))
+
+#define INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype)                                       \
+  (&tpl_func<typename ::ginfer::type::DeviceNativeTypeOf<                                        \
+                 _KERNEL_DEVICE_TYPE(dev_type),                                                  \
+                 typename ::ginfer::core::tensor::TypeOf<_KERNEL_DATA_TYPE(dtype)>::type>::type, \
              ::ginfer::common::DeviceContext>)
 
-#define _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)                                     \
-  _REGISTER_KERNEL_SAME_DTYPE(name, dev_type, INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype), \
-                              dtype)
+#define INSTANTIATE_KERNEL_FUNC_IO(tpl_func, dev_type, in_dtype, out_dtype)                   \
+  (&tpl_func<                                                                                 \
+      typename ::ginfer::type::DeviceNativeTypeOf<                                            \
+          _KERNEL_DEVICE_TYPE(dev_type),                                                      \
+          typename ::ginfer::core::tensor::TypeOf<_KERNEL_DATA_TYPE(in_dtype)>::type>::type,  \
+      typename ::ginfer::type::DeviceNativeTypeOf<                                            \
+          _KERNEL_DEVICE_TYPE(dev_type),                                                      \
+          typename ::ginfer::core::tensor::TypeOf<_KERNEL_DATA_TYPE(out_dtype)>::type>::type, \
+      ::ginfer::common::DeviceContext>)
 
-#define _REG_TPL_KRNL_DT_1(name, dev_type, tpl_func, dtype) \
-  _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)
-#define _REG_TPL_KRNL_DT_2(name, dev_type, tpl_func, dtype, ...) \
-  _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)          \
-  _REG_TPL_KRNL_DT_1(name, dev_type, tpl_func, __VA_ARGS__)
-#define _REG_TPL_KRNL_DT_3(name, dev_type, tpl_func, dtype, ...) \
-  _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)          \
-  _REG_TPL_KRNL_DT_2(name, dev_type, tpl_func, __VA_ARGS__)
-#define _REG_TPL_KRNL_DT_4(name, dev_type, tpl_func, dtype, ...) \
-  _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)          \
-  _REG_TPL_KRNL_DT_3(name, dev_type, tpl_func, __VA_ARGS__)
-#define _REG_TPL_KRNL_DT_5(name, dev_type, tpl_func, dtype, ...) \
-  _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)          \
-  _REG_TPL_KRNL_DT_4(name, dev_type, tpl_func, __VA_ARGS__)
+#define INSTANTIATE_KERNEL_FUNC_DIFF_IO(tpl_func, dev_type, in_dtype, out_dtype) \
+  INSTANTIATE_KERNEL_FUNC_IO(tpl_func, dev_type, in_dtype, out_dtype)
 
-#define _GET_REGISTER_KERNEL_MACRO(_1, _2, _3, _4, _5, NAME, ...) NAME
+#define _REGISTER_TPL_KERNEL(name, dev_type, tpl_func, dtype)                                  \
+  _REGISTER_KERNEL_DIFF_IO(name, dev_type, INSTANTIATE_KERNEL_FUNC(tpl_func, dev_type, dtype), \
+                           dtype, dtype)
+
+#define _REGISTER_TPL_KERNEL_IO(name, dev_type, tpl_func, pair)                                 \
+  _REGISTER_KERNEL_DIFF_IO(                                                                      \
+      name, dev_type,                                                                            \
+      INSTANTIATE_KERNEL_FUNC_IO(tpl_func, dev_type, _PAIR_FIRST(pair), _PAIR_SECOND(pair)),    \
+      _PAIR_FIRST(pair), _PAIR_SECOND(pair))
+
+// clang-format off
+#define _REG_KRNL_FOREACH_1(action, name, dev_type, tpl_func, x) \
+  action(name, dev_type, tpl_func, x)
+#define _REG_KRNL_FOREACH_2(action, name, dev_type, tpl_func, x, ...) \
+  action(name, dev_type, tpl_func, x)                                  \
+  _REG_KRNL_FOREACH_1(action, name, dev_type, tpl_func, __VA_ARGS__)
+#define _REG_KRNL_FOREACH_3(action, name, dev_type, tpl_func, x, ...) \
+  action(name, dev_type, tpl_func, x)                                  \
+  _REG_KRNL_FOREACH_2(action, name, dev_type, tpl_func, __VA_ARGS__)
+#define _REG_KRNL_FOREACH_4(action, name, dev_type, tpl_func, x, ...) \
+  action(name, dev_type, tpl_func, x)                                  \
+  _REG_KRNL_FOREACH_3(action, name, dev_type, tpl_func, __VA_ARGS__)
+#define _REG_KRNL_FOREACH_5(action, name, dev_type, tpl_func, x, ...) \
+  action(name, dev_type, tpl_func, x)                                  \
+  _REG_KRNL_FOREACH_4(action, name, dev_type, tpl_func, __VA_ARGS__)
+// clang-format on
+
+#define _GET_REGISTER_KERNEL_FOREACH_MACRO(_1, _2, _3, _4, _5, NAME, ...) NAME
+#define _REG_KRNL_FOREACH(action, name, dev_type, tpl_func, ...)                            \
+  _GET_REGISTER_KERNEL_FOREACH_MACRO(__VA_ARGS__, _REG_KRNL_FOREACH_5, _REG_KRNL_FOREACH_4, \
+                                     _REG_KRNL_FOREACH_3, _REG_KRNL_FOREACH_2,              \
+                                     _REG_KRNL_FOREACH_1)                                   \
+  (action, name, dev_type, tpl_func, __VA_ARGS__)
 
 #define CONCAT_KERNEL(a, b, c) a##b##c##Kernel
 #define CONCAT_OBJ(a, b, c) a##b##c##KernelObj
 
-#define REGISTER_KERNEL(name, dev_type, tpl_func, ...)                                       \
-  namespace {                                                                                \
-  struct CONCAT_KERNEL(Register, name, dev_type) {                                           \
-    CONCAT_KERNEL(Register, name, dev_type)() {                                              \
-      _GET_REGISTER_KERNEL_MACRO(__VA_ARGS__, _REG_TPL_KRNL_DT_5, _REG_TPL_KRNL_DT_4,        \
-                                 _REG_TPL_KRNL_DT_3, _REG_TPL_KRNL_DT_2, _REG_TPL_KRNL_DT_1) \
-      (name, common::DeviceType::dev_type, tpl_func, __VA_ARGS__);                           \
-    }                                                                                        \
-  };                                                                                         \
-  static CONCAT_KERNEL(Register, name, dev_type) CONCAT_OBJ(register, name, dev_type);       \
+#define REGISTER_KERNEL(name, dev_type, tpl_func, ...)                                 \
+  namespace {                                                                          \
+  struct CONCAT_KERNEL(Register, name, dev_type) {                                     \
+    CONCAT_KERNEL(Register, name, dev_type)() {                                        \
+      _REG_KRNL_FOREACH(_REGISTER_TPL_KERNEL, name, dev_type, tpl_func, __VA_ARGS__);  \
+    }                                                                                  \
+  };                                                                                   \
+  static CONCAT_KERNEL(Register, name, dev_type) CONCAT_OBJ(register, name, dev_type); \
+  }
+
+#define REGISTER_KERNEL_DIFF_IO(name, dev_type, tpl_func, ...)                                     \
+  namespace {                                                                                      \
+  struct CONCAT_KERNEL(RegisterDiffIO, name, dev_type) {                                           \
+    CONCAT_KERNEL(RegisterDiffIO, name, dev_type)() {                                              \
+      _REG_KRNL_FOREACH(_REGISTER_TPL_KERNEL_IO, name, dev_type, tpl_func, __VA_ARGS__);           \
+    }                                                                                              \
+  };                                                                                               \
+  static CONCAT_KERNEL(RegisterDiffIO, name, dev_type) CONCAT_OBJ(registerDiffIO, name, dev_type); \
   }
 
 }  // namespace ginfer::core::op::kernel

@@ -69,7 +69,7 @@ Result<void, std::string> LlamaArchModel::lazyAllocIntermediates() {
   ASSIGN_OR_RETURN(
       i.lm_head_out,
       Tensor::create(dtype, Shape{config_.max_batch_size, config_.vocab_size}, dev_type));
-  ASSIGN_OR_RETURN(i.argmax_out, Tensor::create(DataType::kDataTypeInt64,
+  ASSIGN_OR_RETURN(i.argmax_out, Tensor::create(DataType::kDataTypeInt32,
                                                 Shape{config_.max_batch_size}, dev_type));
   i.norm_out = t0;
 
@@ -213,9 +213,8 @@ Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
                        memory::DeviceType::kDeviceCPU)));
 
   std::vector<int32_t> tokens(batch_size);
-  for (int64_t i = 0; i < batch_size; ++i) {
-    tokens[i] = static_cast<int32_t>(argmax_out->data<int64_t>()[i]);
-  }
+  std::memcpy(tokens.data(), argmax_out->data(), batch_size * sizeof(int32_t));
+
   return Ok(tokens);
 }
 

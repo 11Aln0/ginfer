@@ -54,11 +54,6 @@ void swigluKernel(const Context& ctx,
                                                                  numel);
 }
 
-REGISTER_KERNEL(swiglu,
-                kDeviceCUDA,
-                swigluKernel,
-                tensor::DataType::kDataTypeFloat32,
-                tensor::DataType::kDataTypeFloat16,
-                tensor::DataType::kDataTypeBFloat16);
+REGISTER_KERNEL(swiglu, CUDA, swigluKernel, Float32, Float16, BFloat16);
 
 }  // namespace ginfer::core::op::kernel
