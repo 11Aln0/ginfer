@@ -4,7 +4,9 @@
 
 namespace ginfer::core::op {
 
-SwiGLUOp::SwiGLUOp(DeviceType dev_type) : Op(dev_type, OpType::kOpSwiGLU, "swiglu") {}
+SwiGLUOp::SwiGLUOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::SwiGluKernelFuncType>(dev_type, OpType::kOpSwiGLU,
+                                                         "swiglu") {}
 
 Result<void, std::string> SwiGLUOp::run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,
@@ -17,9 +19,7 @@ Result<void, std::string> SwiGLUOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::SwiGluKernelFuncType>(
-          "swiglu", gate->dtype());
+  auto kernel = getKernel(dev_type, gate->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *outputs[0], *gate, *up);
 

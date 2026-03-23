@@ -5,7 +5,9 @@
 namespace ginfer::core::op {
 
 SelectLastTokenOp::SelectLastTokenOp(DeviceType dev_type)
-    : Op(dev_type, OpType::kOpCustom, "select_last_token") {}
+    : AutoKernelDispatchOp<kernel::SelectLastTokenKernelFuncType>(dev_type, OpType::kOpCustom,
+                                                                  "select_last_token",
+                                                                  "selectLastToken") {}
 
 Result<void, std::string> SelectLastTokenOp::run(const core::InferContext& ctx,
                                                  const std::vector<const Tensor*>& inputs,
@@ -24,9 +26,7 @@ Result<void, std::string> SelectLastTokenOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)
-          ->getKernel<kernel::SelectLastTokenKernelFuncType>("selectLastToken", input->dtype());
+  auto kernel = getKernel(dev_type, input->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *cu_seqlen_q, *output);
 

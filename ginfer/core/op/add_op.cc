@@ -4,7 +4,8 @@
 
 namespace ginfer::core::op {
 
-AddOp::AddOp(DeviceType dev_type) : Op(dev_type, OpType::kOpAdd, "add") {}
+AddOp::AddOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::AddKernelFuncType>(dev_type, OpType::kOpAdd, "add") {}
 
 Result<void, std::string> AddOp::run(const core::InferContext& ctx,
                                      const std::vector<const Tensor*>& inputs,
@@ -20,8 +21,7 @@ Result<void, std::string> AddOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel = kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::AddKernelFuncType>(
-      "add", dtype);
+  auto kernel = getKernel(dev_type, dtype);
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *inputs[0], *inputs[1], *outputs[0]);
 

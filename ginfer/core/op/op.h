@@ -7,6 +7,10 @@
 #include "ginfer/common/device.h"
 #include "ginfer/common/errors.h"
 #include "ginfer/core/context.h"
+#include "ginfer/core/op/kernels/kernel_dispatcher.h"
+#include "ginfer/core/op/kernels/kernels.h"
+#include "ginfer/core/op/kernels/page_attn_kernel.h"
+#include "ginfer/core/op/kernels/rope_kernel.h"
 #include "ginfer/core/tensor/tensor.h"
 
 namespace ginfer::core::op {
@@ -53,6 +57,33 @@ class Op : public BaseOp {
   using BaseOp::BaseOp;
 };
 
+template <typename KernelFuncType>
+class AutoKernelDispatchOp : public Op {
+ public:
+  AutoKernelDispatchOp(DeviceType dev_type,
+                       OpType op_type,
+                       std::string name,
+                       std::string kernel_name)
+      : dispatcher_(std::move(kernel_name)), Op(dev_type, op_type, std::move(name)) {}
+
+  AutoKernelDispatchOp(DeviceType dev_type, OpType op_type, std::string name)
+      : dispatcher_(name), Op(dev_type, op_type, name) {}
+
+ protected:
+  KernelFuncType getKernel(common::DeviceType dev_type,
+                           tensor::DataType in_dtype,
+                           tensor::DataType out_dtype) {
+    return dispatcher_.getKernel(dev_type, in_dtype, out_dtype);
+  }
+
+  KernelFuncType getKernel(common::DeviceType dev_type, tensor::DataType dtype) {
+    return dispatcher_.getKernel(dev_type, dtype);
+  }
+
+ private:
+  kernel::KernelDispatcher<KernelFuncType> dispatcher_;
+};
+
 class MatmulOp : public Op {
  public:
   MatmulOp(DeviceType dev_type);
@@ -63,9 +94,13 @@ class MatmulOp : public Op {
 
  private:
   bool isGemvMode(const Tensor* A);
+
+ private:
+  kernel::KernelDispatcher<kernel::GemvKernelFuncType> gemv_dispatcher_{"gemv"};
+  kernel::KernelDispatcher<kernel::GemmKernelFuncType> gemm_dispatcher_{"gemm"};
 };
 
-class AddOp : public Op {
+class AddOp : public AutoKernelDispatchOp<kernel::AddKernelFuncType> {
  public:
   AddOp(DeviceType dev_type);
 
@@ -81,7 +116,7 @@ class AddOp : public Op {
   //   std::vector<Tensor*> outputs);
 };
 
-class RMSNormOp : public Op {
+class RMSNormOp : public AutoKernelDispatchOp<kernel::RMSNormKernelFuncType> {
  public:
   RMSNormOp(DeviceType dev_type, float epsilon);
 
@@ -93,7 +128,7 @@ class RMSNormOp : public Op {
   float epsilon_;
 };
 
-class GQAOp : public Op {
+class GQAOp : public AutoKernelDispatchOp<kernel::GQAKernelFuncType> {
  public:
   GQAOp(DeviceType dev_type);
 
@@ -107,7 +142,7 @@ class GQAOp : public Op {
   // int seq_len_;
 };
 
-class GQAVarlenOp : public Op {
+class GQAVarlenOp : public AutoKernelDispatchOp<kernel::GQAVarlenKernelFuncType> {
  public:
   GQAVarlenOp(DeviceType dev_type, int paged_block_size);
 
@@ -119,7 +154,7 @@ class GQAVarlenOp : public Op {
   int paged_block_size_;
 };
 
-class StoreKVCacheOp : public Op {
+class StoreKVCacheOp : public AutoKernelDispatchOp<kernel::StoreKVCacheKernelFuncType> {
  public:
   StoreKVCacheOp(DeviceType dev_type);
 
@@ -128,7 +163,7 @@ class StoreKVCacheOp : public Op {
                                         std::vector<Tensor*> outputs) override;
 };
 
-class ArgmaxOp : public Op {
+class ArgmaxOp : public AutoKernelDispatchOp<kernel::ArgmaxKernelFuncType> {
  public:
   ArgmaxOp(DeviceType dev_type);
 
@@ -137,7 +172,7 @@ class ArgmaxOp : public Op {
                                         std::vector<Tensor*> outputs) override;
 };
 
-class SelectLastTokenOp : public Op {
+class SelectLastTokenOp : public AutoKernelDispatchOp<kernel::SelectLastTokenKernelFuncType> {
  public:
   SelectLastTokenOp(DeviceType dev_type);
 
@@ -146,7 +181,7 @@ class SelectLastTokenOp : public Op {
                                         std::vector<Tensor*> outputs) override;
 };
 
-class EmbeddingOp : public Op {
+class EmbeddingOp : public AutoKernelDispatchOp<kernel::EmbeddingKernelFuncType> {
  public:
   EmbeddingOp(DeviceType dev_type);
 
@@ -155,7 +190,7 @@ class EmbeddingOp : public Op {
                                         std::vector<Tensor*> outputs) override;
 };
 
-class RotaryEmbeddingOp : public Op {
+class RotaryEmbeddingOp : public AutoKernelDispatchOp<kernel::RotaryEmbeddingKernelFuncType> {
  public:
   RotaryEmbeddingOp(DeviceType dev_type, float rope_theta = 10000.0f);
 
@@ -167,7 +202,8 @@ class RotaryEmbeddingOp : public Op {
   float rope_theta_;
 };
 
-class Llama3RotaryEmbeddingOp : public Op {
+class Llama3RotaryEmbeddingOp
+    : public AutoKernelDispatchOp<kernel::Llama3RotaryEmbeddingKernelFuncType> {
  public:
   Llama3RotaryEmbeddingOp(DeviceType dev_type,
                           float rope_theta,
@@ -188,7 +224,7 @@ class Llama3RotaryEmbeddingOp : public Op {
   int old_ctx_len_;
 };
 
-class ROPEOp : public Op {
+class ROPEOp : public AutoKernelDispatchOp<kernel::ROPEKernelFuncType> {
  public:
   ROPEOp(DeviceType dev_type);
 
@@ -206,7 +242,7 @@ class ROPEOp : public Op {
   // std::shared_ptr<Tensor> cos_cache_;
 };
 
-class SwiGLUOp : public Op {
+class SwiGLUOp : public AutoKernelDispatchOp<kernel::SwiGluKernelFuncType> {
  public:
   SwiGLUOp(DeviceType dev_type);
 

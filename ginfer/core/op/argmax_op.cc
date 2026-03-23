@@ -1,10 +1,12 @@
+#include "ginfer/core/op/kernels/kernel_dispatcher.h"
 #include "ginfer/core/op/kernels/kernel_registry.h"
 #include "ginfer/core/op/kernels/kernels.h"
 #include "ginfer/core/op/op.h"
 
 namespace ginfer::core::op {
 
-ArgmaxOp::ArgmaxOp(DeviceType dev_type) : Op(dev_type, OpType::kOpArgmax, "argmax") {}
+ArgmaxOp::ArgmaxOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::ArgmaxKernelFuncType>(dev_type, OpType::kOpArgmax, "argmax") {}
 
 Result<void, std::string> ArgmaxOp::run(const core::InferContext& ctx,
                                         const std::vector<const Tensor*>& inputs,
@@ -17,9 +19,7 @@ Result<void, std::string> ArgmaxOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::ArgmaxKernelFuncType>(
-          "argmax", input->dtype(), output->dtype());
+  auto kernel = getKernel(dev_type, input->dtype(), output->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *output);
 

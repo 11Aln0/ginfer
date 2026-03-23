@@ -4,12 +4,12 @@ namespace ginfer::common {
 
 bool isHostDevice(DeviceType dev_type) { return dev_type == DeviceType::kDeviceCPU; }
 
-std::unique_ptr<DeviceContext> DeviceContext::create(DeviceType dev_type) {
+std::shared_ptr<DeviceContext> DeviceContext::create(DeviceType dev_type) {
   switch (dev_type) {
     case DeviceType::kDeviceCPU:
-      return std::make_unique<CPUDeviceContext>();
+      return std::make_shared<CPUDeviceContext>();
     case DeviceType::kDeviceCUDA:
-      return std::make_unique<CUDADeviceContext>();
+      return std::make_shared<CUDADeviceContext>();
     default:
       throw std::runtime_error("Unsupported device type for DeviceContext creation.");
   }

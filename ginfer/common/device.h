@@ -20,7 +20,7 @@ bool isHostDevice(DeviceType dev_type);
 
 class DeviceContext {
  public:
-  static std::unique_ptr<DeviceContext> create(DeviceType dev_type);
+  static std::shared_ptr<DeviceContext> create(DeviceType dev_type);
 
   explicit DeviceContext(DeviceType dev_type);
 
@@ -49,7 +49,7 @@ class CUDADeviceContext : public DeviceContext {
   cudaStream_t stream_ = nullptr;
 };
 
-template <DeviceType dev_type>
+template <DeviceType Device>
 struct DeviceContextType {
   using type = DeviceContext;
 };

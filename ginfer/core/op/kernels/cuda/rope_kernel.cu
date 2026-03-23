@@ -198,9 +198,9 @@ void ROPEKernel(const Context& ctx,
       num_heads, head_dim);
 }
 
-REGISTER_KERNEL(rotary_embedding, CUDA, RotaryEmbeddingKernel, Float32);
+REGISTER_KERNEL(rotaryEmbedding, CUDA, RotaryEmbeddingKernel, Float32);
 
-REGISTER_KERNEL(llama3_rotary_embedding, CUDA, Llama3RotaryEmbeddingKernel, Float32);
+REGISTER_KERNEL(llama3RotaryEmbedding, CUDA, Llama3RotaryEmbeddingKernel, Float32);
 
 REGISTER_KERNEL(ROPE, CUDA, ROPEKernel, Float32, Float16, BFloat16);
 

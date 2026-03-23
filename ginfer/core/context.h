@@ -2,11 +2,13 @@
 
 #include <memory>
 #include <optional>
+#include "ginfer/common/device.h"
 #include "ginfer/core/tensor/tensor.h"
 
 namespace ginfer::core {
 
 struct InferContext {
+  std::optional<std::shared_ptr<common::DeviceContext>> dev_ctx;
   std::optional<int> max_seqlen_q;
   std::optional<tensor::TensorRef> cu_seqlens_q;
   std::optional<tensor::TensorRef> cu_seqlens_kv;
@@ -37,6 +39,11 @@ struct InferContext {
 
   InferContext& setSlotMapping(tensor::TensorRef& slot_mapping) {
     this->slot_mapping = slot_mapping;
+    return *this;
+  }
+
+  InferContext& setDeviceContext(std::shared_ptr<common::DeviceContext>& dev_ctx) {
+    this->dev_ctx = dev_ctx;
     return *this;
   }
 };

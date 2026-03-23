@@ -26,18 +26,14 @@ Result<void, std::string> MatmulOp::run(const core::InferContext& ctx,
   auto dev_ctx = common::DeviceContext::create(dev_type);
 
   if (isGemvMode(A)) {
-    auto gemv_kernel =
-        kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemvKernelFuncType>(
-            "gemv", A->dtype());
+    auto gemv_kernel = gemv_dispatcher_.getKernel(dev_type, A->dtype());
     if (bias != nullptr) {
       gemv_kernel(*dev_ctx, *A, *B, *bias, *outputs[0]);
     } else {
       gemv_kernel(*dev_ctx, *A, *B, std::nullopt, *outputs[0]);
     }
   } else {
-    auto gemm_kernel =
-        kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GemmKernelFuncType>(
-            "gemm", A->dtype());
+    auto gemm_kernel = gemm_dispatcher_.getKernel(dev_type, A->dtype());
     if (bias != nullptr) {
       gemm_kernel(*dev_ctx, *A, *B, *bias, *outputs[0]);
     } else {

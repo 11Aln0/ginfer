@@ -80,7 +80,7 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
   Result<TensorRef, std::string> toDevicePreserveLayout(memory::DeviceAllocator* allocator);
 
  private:
-  DataType dtype_ = DataType::kDataTypeUnknown;
+  DataType dtype_ = DataType::kDataTypeVoid;
   std::shared_ptr<memory::Buffer> buffer_ = nullptr;
   Shape shape_;
   std::vector<ptrdiff_t> strides_;

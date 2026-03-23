@@ -5,7 +5,8 @@
 namespace ginfer::core::op {
 
 RMSNormOp::RMSNormOp(DeviceType dev_type, float epsilon)
-    : Op(dev_type, OpType::kOpRMSNorm, "rmsnorm"), epsilon_(epsilon) {}
+    : AutoKernelDispatchOp<kernel::RMSNormKernelFuncType>(dev_type, OpType::kOpRMSNorm, "rmsNorm"),
+      epsilon_(epsilon) {}
 
 Result<void, std::string> RMSNormOp::run(const core::InferContext& ctx,
                                          const std::vector<const Tensor*>& inputs,
@@ -25,9 +26,7 @@ Result<void, std::string> RMSNormOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::RMSNormKernelFuncType>(
-          "rmsNorm", input->dtype());
+  auto kernel = getKernel(dev_type, input->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *gamma, *outputs[0], epsilon_);
 

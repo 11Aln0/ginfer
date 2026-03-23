@@ -29,7 +29,7 @@ inline DataType numpyDtypeToTensorDtype(py::dtype np_dtype) {
       {"int32", DataType::kDataTypeInt32},       {"int8", DataType::kDataTypeInt8},
   };
   auto it = dtype_map.find(py::str(np_dtype));
-  return (it != dtype_map.end()) ? it->second : DataType::kDataTypeUnknown;
+  return (it != dtype_map.end()) ? it->second : DataType::kDataTypeVoid;
 }
 
 inline py::dtype tensorDtypeToNumpyDtype(DataType dtype) {

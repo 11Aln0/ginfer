@@ -5,7 +5,8 @@
 
 namespace ginfer::core::op {
 
-GQAOp::GQAOp(DeviceType dev_type) : Op(dev_type, OpType::kOpGQA, "gqa") {}
+GQAOp::GQAOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::GQAKernelFuncType>(dev_type, OpType::kOpGQA, "GQA") {}
 
 Result<void, std::string> GQAOp::run(const core::InferContext& ctx,
                                      const std::vector<const Tensor*>& inputs,
@@ -21,9 +22,7 @@ Result<void, std::string> GQAOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
   auto dev_ctx = common::DeviceContext::create(dev_type);
 
-  auto gqa_kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GQAKernelFuncType>(
-          "GQA", q->dtype());
+  auto gqa_kernel = getKernel(dev_type, q->dtype());
   gqa_kernel(*dev_ctx, *q, *k, *v, *outputs[0]);
 
   return Ok<void>();

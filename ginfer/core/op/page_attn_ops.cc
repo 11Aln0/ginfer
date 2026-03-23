@@ -8,7 +8,8 @@
 namespace ginfer::core::op {
 
 GQAVarlenOp::GQAVarlenOp(DeviceType dev_type, int paged_block_size)
-    : Op(dev_type, OpType::kOpGQA, "gqa_varlen"), paged_block_size_(paged_block_size) {}
+    : AutoKernelDispatchOp<kernel::GQAVarlenKernelFuncType>(dev_type, OpType::kOpGQA, "GQAVarlen"),
+      paged_block_size_(paged_block_size) {}
 
 Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
                                            const std::vector<const Tensor*>& inputs,
@@ -29,9 +30,7 @@ Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
   auto dev_ctx = common::DeviceContext::create(dev_type);
 
-  auto gqa_varlen_kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::GQAVarlenKernelFuncType>(
-          "GQAVarlen", q->dtype());
+  auto gqa_varlen_kernel = getKernel(dev_type, q->dtype());
   gqa_varlen_kernel(*dev_ctx, *q, *k, *v, *cu_seqlens_q, *cu_seqlens_kv, *block_tables,
                     max_seqlen_q, paged_block_size_, *outputs[0]);
 
@@ -39,7 +38,8 @@ Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
 }
 
 StoreKVCacheOp::StoreKVCacheOp(DeviceType dev_type)
-    : Op(dev_type, OpType::kOpCustom, "store_kvcache") {}
+    : AutoKernelDispatchOp<kernel::StoreKVCacheKernelFuncType>(
+          dev_type, OpType::kOpCustom, "storeKVCache") {}
 
 Result<void, std::string> StoreKVCacheOp::run(const core::InferContext& ctx,
                                               const std::vector<const Tensor*>& inputs,
@@ -61,9 +61,7 @@ Result<void, std::string> StoreKVCacheOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
   auto dev_ctx = common::DeviceContext::create(dev_type);
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::StoreKVCacheKernelFuncType>(
-          "storeKVCache", k->dtype());
+  auto kernel = getKernel(dev_type, k->dtype());
   kernel(*dev_ctx, *k, *v, *k_cache, *v_cache, *slot_mapping);
 
   return Ok<void>();

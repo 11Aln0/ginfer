@@ -10,7 +10,7 @@
 namespace ginfer::core::tensor {
 
 enum class DataType : uint8_t {
-  kDataTypeUnknown = 0,
+  kDataTypeVoid = 0,
   kDataTypeFloat32 = 1,
   kDataTypeFloat16 = 2,
   kDataTypeBFloat16 = 3,

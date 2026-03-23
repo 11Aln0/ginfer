@@ -34,8 +34,8 @@ struct KernelInfo {
   KernelInfo()
       : name("unknown_kernel"),
         dev_type(common::DeviceType::kDeviceUnknown),
-        input_dtype(tensor::DataType::kDataTypeUnknown),
-        output_dtype(tensor::DataType::kDataTypeUnknown) {}
+        input_dtype(tensor::DataType::kDataTypeVoid),
+        output_dtype(tensor::DataType::kDataTypeVoid) {}
 
   KernelInfo(const std::string& n,
              tensor::DataType in_type,

@@ -4,7 +4,9 @@
 
 namespace ginfer::core::op {
 
-EmbeddingOp::EmbeddingOp(DeviceType dev_type) : Op(dev_type, OpType::kOpEmbedding, "embedding") {}
+EmbeddingOp::EmbeddingOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::EmbeddingKernelFuncType>(dev_type, OpType::kOpEmbedding,
+                                                            "embedding") {}
 
 Result<void, std::string> EmbeddingOp::run(const core::InferContext& ctx,
                                            const std::vector<const Tensor*>& inputs,
@@ -17,9 +19,7 @@ Result<void, std::string> EmbeddingOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::EmbeddingKernelFuncType>(
-          "embedding", weight->dtype());
+  auto kernel = getKernel(dev_type, weight->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *weight, *outputs[0]);
 

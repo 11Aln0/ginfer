@@ -5,7 +5,9 @@
 namespace ginfer::core::op {
 
 RotaryEmbeddingOp::RotaryEmbeddingOp(DeviceType dev_type, float rope_theta)
-    : Op(dev_type, OpType::kOpCustom, "rotary_embedding"), rope_theta_(rope_theta) {}
+    : AutoKernelDispatchOp<kernel::RotaryEmbeddingKernelFuncType>(
+          dev_type, OpType::kOpCustom, "rotaryEmbedding"),
+      rope_theta_(rope_theta) {}
 
 Result<void, std::string> RotaryEmbeddingOp::run(const core::InferContext& ctx,
                                                  const std::vector<const Tensor*>& inputs,
@@ -15,12 +17,12 @@ Result<void, std::string> RotaryEmbeddingOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
   auto pos_ids_range = inputs[0]->data<int64_t>();
+  Tensor* sin_cache = outputs[0];
+  Tensor* cos_cache = outputs[1];
 
-  auto kernel = kernel::KernelRegistry::getInstance(dev_type)
-                    ->getKernel<kernel::RotaryEmbeddingKernelFuncType>(
-                        "rotary_embedding", tensor::DataType::kDataTypeFloat32);
+  auto kernel = getKernel(dev_type, sin_cache->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *outputs[0], *outputs[1], pos_ids_range[0], pos_ids_range[1], rope_theta_);
+  kernel(*dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_);
 
   return Ok<void>();
 }
@@ -31,7 +33,8 @@ Llama3RotaryEmbeddingOp::Llama3RotaryEmbeddingOp(DeviceType dev_type,
                                                  float high_freq_factor,
                                                  float low_freq_factor,
                                                  int old_ctx_len)
-    : Op(dev_type, OpType::kOpCustom, "llama3_rotary_embedding"),
+    : AutoKernelDispatchOp<kernel::Llama3RotaryEmbeddingKernelFuncType>(
+          dev_type, OpType::kOpCustom, "llama3RotaryEmbedding"),
       rope_theta_(rope_theta),
       factor_(factor),
       high_freq_factor_(high_freq_factor),
@@ -46,18 +49,19 @@ Result<void, std::string> Llama3RotaryEmbeddingOp::run(const core::InferContext&
 
   common::DeviceType dev_type = getDeviceType();
   auto pos_ids_range = inputs[0]->data<int64_t>();
+  Tensor* sin_cache = outputs[0];
+  Tensor* cos_cache = outputs[1];
 
-  auto kernel = kernel::KernelRegistry::getInstance(dev_type)
-                    ->getKernel<kernel::Llama3RotaryEmbeddingKernelFuncType>(
-                        "llama3_rotary_embedding", tensor::DataType::kDataTypeFloat32);
+  auto kernel = getKernel(dev_type, sin_cache->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *outputs[0], *outputs[1], pos_ids_range[0], pos_ids_range[1], rope_theta_,
-         factor_, high_freq_factor_, low_freq_factor_, old_ctx_len_);
+  kernel(*dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_, factor_,
+         high_freq_factor_, low_freq_factor_, old_ctx_len_);
 
   return Ok<void>();
 }
 
-ROPEOp::ROPEOp(DeviceType dev_type) : Op(dev_type, OpType::kOpROPE, "rope") {}
+ROPEOp::ROPEOp(DeviceType dev_type)
+    : AutoKernelDispatchOp<kernel::ROPEKernelFuncType>(dev_type, OpType::kOpROPE, "ROPE") {}
 
 Result<void, std::string> ROPEOp::run(const core::InferContext& ctx,
                                       const std::vector<const Tensor*>& inputs,
@@ -73,9 +77,7 @@ Result<void, std::string> ROPEOp::run(const core::InferContext& ctx,
 
   common::DeviceType dev_type = getDeviceType();
 
-  auto kernel =
-      kernel::KernelRegistry::getInstance(dev_type)->getKernel<kernel::ROPEKernelFuncType>(
-          "ROPE", input->dtype());
+  auto kernel = getKernel(dev_type, input->dtype());
   auto dev_ctx = common::DeviceContext::create(dev_type);
   kernel(*dev_ctx, *input, *positions, *sin_cache, *cos_cache, *outputs[0]);
 
