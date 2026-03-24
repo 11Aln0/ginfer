@@ -17,9 +17,9 @@ class PooledAllocStrategy : public BaseAllocator {
  public:
   PooledAllocStrategy() : free_blocks_(NUM_BUCKETS) {}
 
-  Result<void*, std::string> alloc(size_t size) override { return getOrAllocBlock(size); }
+  Result<void*, std::string> doAlloc(size_t size) override { return getOrAllocBlock(size); }
 
-  void free(void* ptr, size_t size) override {
+  void doFree(void* ptr, size_t size) override {
     int bucket_index = getBucketIndex(roundUpToBlockSize(size));
     free_blocks_[bucket_index].enqueue(ptr);
   }
@@ -29,7 +29,8 @@ class PooledAllocStrategy : public BaseAllocator {
       void* ptr;
       size_t block_size = 1ULL << (i + MIN_BLOCK_SIZE_SHIFT);
       while (free_blocks_[i].try_dequeue(ptr)) {
-        BaseAllocator::free(ptr, block_size);
+        BaseAllocator::doFree(ptr, block_size);
+        this->onRelease(block_size);
       }
     }
   }
@@ -63,8 +64,9 @@ class PooledAllocStrategy : public BaseAllocator {
     if (free_blocks_[bucket_index].try_dequeue(p)) {
       DLOG(INFO) << "Reusing block of size " << aligned_size / 1024.0 << " KB.";
     } else {
-      auto res = BaseAllocator::alloc(aligned_size);
+      auto res = BaseAllocator::doAlloc(aligned_size);
       RETURN_ON_ERR(res);
+      this->onReserve(aligned_size);
       DLOG(INFO) << "Allocated new block of size " << aligned_size / 1024.0 << " KB.";
       p = res.value();
     }

@@ -7,7 +7,7 @@ namespace ginfer::core::memory {
 
 CPUDeviceAllocator::CPUDeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCPU) {}
 
-Result<void*, std::string> CPUDeviceAllocator::alloc(size_t size) {
+Result<void*, std::string> CPUDeviceAllocator::doAlloc(size_t size) {
   if (size == 0) {
     LOG(WARNING) << "Try to allocate 0 bytes.";
     return Ok((void*)nullptr);
@@ -17,7 +17,7 @@ Result<void*, std::string> CPUDeviceAllocator::alloc(size_t size) {
   return Ok(ptr);
 }
 
-void CPUDeviceAllocator::free(void* ptr, size_t size) {
+void CPUDeviceAllocator::doFree(void* ptr, size_t size) {
   (void)size;
   std::free(ptr);
 }

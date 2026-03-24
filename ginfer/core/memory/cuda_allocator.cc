@@ -5,7 +5,7 @@ namespace ginfer::core::memory {
 
 CUDADeviceAllocator::CUDADeviceAllocator() : DeviceAllocator(DeviceType::kDeviceCUDA) {}
 
-Result<void*, std::string> CUDADeviceAllocator::alloc(size_t size) {
+Result<void*, std::string> CUDADeviceAllocator::doAlloc(size_t size) {
   if (size == 0) {
     LOG(WARNING) << "Try to allocate 0 bytes.";
     return Ok((void*)nullptr);
@@ -17,7 +17,7 @@ Result<void*, std::string> CUDADeviceAllocator::alloc(size_t size) {
   return Ok(ptr);
 }
 
-void CUDADeviceAllocator::free(void* ptr, size_t size) {
+void CUDADeviceAllocator::doFree(void* ptr, size_t size) {
   (void)size;
   if (!ptr) {
     LOG(WARNING) << "Try to free a nullptr.";
