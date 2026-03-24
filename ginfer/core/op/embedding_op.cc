@@ -20,8 +20,8 @@ Result<void, std::string> EmbeddingOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, weight->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *weight, *outputs[0]);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *input, *weight, *outputs[0]);
 
   return Ok<void>();
 }

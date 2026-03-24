@@ -42,7 +42,7 @@ struct InferContext {
     return *this;
   }
 
-  InferContext& setDeviceContext(std::shared_ptr<common::DeviceContext>& dev_ctx) {
+  InferContext& setDeviceContext(const std::shared_ptr<common::DeviceContext>& dev_ctx) {
     this->dev_ctx = dev_ctx;
     return *this;
   }

@@ -22,8 +22,8 @@ Result<void, std::string> AddOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, dtype);
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *inputs[0], *inputs[1], *outputs[0]);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *inputs[0], *inputs[1], *outputs[0]);
 
   return Ok<void>();
 }

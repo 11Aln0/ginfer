@@ -42,9 +42,11 @@ TensorRef test_rope_op_cuda(
   auto pos_ids = pos_res.value();
   pos_ids->data<int64_t>()[0] = start_pos;
   pos_ids->data<int64_t>()[1] = end_pos;
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> embed_inputs = {pos_ids.get()};
   std::vector<Tensor*> embed_outputs = {sin_cache.get(), cos_cache.get()};
-  auto embed_status = rotary_embed_op.run(core::InferContext{}, embed_inputs, embed_outputs);
+  auto embed_status =
+      rotary_embed_op.run(core::InferContext{}.setDeviceContext(dev_ctx), embed_inputs, embed_outputs);
   CHECK(embed_status.ok()) << "RotaryEmbeddingOp run failed: " << embed_status.err();
 
   // Run ROPE
@@ -67,7 +69,7 @@ TensorRef test_rope_op_cuda(
   std::vector<const Tensor*> inputs = {input_tensor.get(), positions.get(), sin_cache.get(),
                                        cos_cache.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = rope_op.run(core::InferContext{}, inputs, outputs);
+  auto status = rope_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "ROPEOp run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));

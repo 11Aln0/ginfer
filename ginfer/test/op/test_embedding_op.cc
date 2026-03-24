@@ -36,9 +36,10 @@ TensorRef test_embedding_op_cuda(TensorRef input_tensor, TensorRef weight_tensor
   ASSIGN_OR_THROW(weight_tensor, weight_tensor->toDevice(DeviceType::kDeviceCUDA));
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {input_tensor.get(), weight_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = embedding_op.run(core::InferContext{}, inputs, outputs);
+  auto status = embedding_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "EmbeddingOp run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));

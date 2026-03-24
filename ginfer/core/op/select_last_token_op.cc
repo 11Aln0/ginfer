@@ -27,8 +27,8 @@ Result<void, std::string> SelectLastTokenOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, input->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *cu_seqlen_q, *output);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *input, *cu_seqlen_q, *output);
 
   return Ok<void>();
 }

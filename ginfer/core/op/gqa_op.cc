@@ -20,10 +20,10 @@ Result<void, std::string> GQAOp::run(const core::InferContext& ctx,
       << "Input tensors must have the same data type.";
 
   common::DeviceType dev_type = getDeviceType();
-  auto dev_ctx = common::DeviceContext::create(dev_type);
+  const auto& dev_ctx = getDeviceContext(ctx);
 
   auto gqa_kernel = getKernel(dev_type, q->dtype());
-  gqa_kernel(*dev_ctx, *q, *k, *v, *outputs[0]);
+  gqa_kernel(dev_ctx, *q, *k, *v, *outputs[0]);
 
   return Ok<void>();
 }

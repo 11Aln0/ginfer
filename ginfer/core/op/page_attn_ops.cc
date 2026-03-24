@@ -28,10 +28,10 @@ Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
   int max_seqlen_q = ctx.max_seqlen_q.value();
 
   common::DeviceType dev_type = getDeviceType();
-  auto dev_ctx = common::DeviceContext::create(dev_type);
+  const auto& dev_ctx = getDeviceContext(ctx);
 
   auto gqa_varlen_kernel = getKernel(dev_type, q->dtype());
-  gqa_varlen_kernel(*dev_ctx, *q, *k, *v, *cu_seqlens_q, *cu_seqlens_kv, *block_tables,
+  gqa_varlen_kernel(dev_ctx, *q, *k, *v, *cu_seqlens_q, *cu_seqlens_kv, *block_tables,
                     max_seqlen_q, paged_block_size_, *outputs[0]);
 
   return Ok<void>();
@@ -59,10 +59,10 @@ Result<void, std::string> StoreKVCacheOp::run(const core::InferContext& ctx,
   CHECK(k->dtype() == k_cache->dtype()) << "k and k_cache must have the same data type.";
 
   common::DeviceType dev_type = getDeviceType();
-  auto dev_ctx = common::DeviceContext::create(dev_type);
+  const auto& dev_ctx = getDeviceContext(ctx);
 
   auto kernel = getKernel(dev_type, k->dtype());
-  kernel(*dev_ctx, *k, *v, *k_cache, *v_cache, *slot_mapping);
+  kernel(dev_ctx, *k, *v, *k_cache, *v_cache, *slot_mapping);
 
   return Ok<void>();
 }

@@ -30,9 +30,10 @@ TensorRef test_gqa_op_cuda(TensorRef q_tensor, TensorRef k_tensor, TensorRef v_t
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // Run computation
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {q_tensor.get(), k_tensor.get(), v_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = gqa_op.run(core::InferContext{}, inputs, outputs);
+  auto status = gqa_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "GQAOp run failed: " << status.err();
 
   // Copy result back to CPU

@@ -47,9 +47,10 @@ TEST(OpTest, AddOpCUDA) {
   ASSERT_TRUE(c_dev_res.ok()) << c_dev_res.err();
   c = c_dev_res.value();
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const ginfer::core::tensor::Tensor*> inputs = {a.get(), b.get()};
   std::vector<ginfer::core::tensor::Tensor*> outputs = {c.get()};
-  auto status = add_op.run(ginfer::core::InferContext{}, inputs, outputs);
+  auto status = add_op.run(ginfer::core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   ASSERT_TRUE(status.ok()) << status.err();
 
   auto c_cpu_res = c->toDevice(DeviceType::kDeviceCPU);

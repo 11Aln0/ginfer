@@ -21,8 +21,8 @@ Result<void, std::string> RotaryEmbeddingOp::run(const core::InferContext& ctx,
   Tensor* cos_cache = outputs[1];
 
   auto kernel = getKernel(dev_type, sin_cache->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_);
 
   return Ok<void>();
 }
@@ -53,8 +53,8 @@ Result<void, std::string> Llama3RotaryEmbeddingOp::run(const core::InferContext&
   Tensor* cos_cache = outputs[1];
 
   auto kernel = getKernel(dev_type, sin_cache->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_, factor_,
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *sin_cache, *cos_cache, pos_ids_range[0], pos_ids_range[1], rope_theta_, factor_,
          high_freq_factor_, low_freq_factor_, old_ctx_len_);
 
   return Ok<void>();
@@ -78,8 +78,8 @@ Result<void, std::string> ROPEOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, input->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *positions, *sin_cache, *cos_cache, *outputs[0]);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *input, *positions, *sin_cache, *cos_cache, *outputs[0]);
 
   return Ok<void>();
 }

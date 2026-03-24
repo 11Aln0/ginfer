@@ -48,6 +48,7 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
   ASSIGN_OR_THROW(block_tables_tensor, block_tables_tensor->toDevice(DeviceType::kDeviceCUDA));
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {q_tensor.get(),
                                        k_tensor.get(),
                                        v_tensor.get(),
@@ -55,7 +56,8 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
                                        cu_seqlens_kv_tensor.get(),
                                        block_tables_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = op.run(core::InferContext{}.setMaxSeqlenQ(max_seqlen_q), inputs, outputs);
+  auto status = op.run(core::InferContext{}.setMaxSeqlenQ(max_seqlen_q).setDeviceContext(dev_ctx),
+                       inputs, outputs);
   CHECK(status.ok()) << "GQAVarlenOp run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
@@ -94,10 +96,11 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
   CHECK(v_cache_gpu_res.ok()) << v_cache_gpu_res.err();
   auto v_cache_gpu = v_cache_gpu_res.value();
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {k_tensor.get(), v_tensor.get(), k_cache_gpu.get(),
                                        v_cache_gpu.get(), slot_mapping_tensor.get()};
   std::vector<Tensor*> outputs = {};
-  auto status = op.run(core::InferContext{}, inputs, outputs);
+  auto status = op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "StoreKVCacheOp run failed: " << status.err();
 
   // Copy GPU results back into the original CPU tensors (numpy buffers)

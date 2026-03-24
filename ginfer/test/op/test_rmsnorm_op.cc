@@ -34,9 +34,10 @@ TensorRef test_rmsnorm_op_cuda(TensorRef input_tensor, TensorRef gamma_tensor, f
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(cu_allocator));
 
   // Run computation
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {input_tensor.get(), gamma_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = rmsnorm_op.run(core::InferContext{}, inputs, outputs);
+  auto status = rmsnorm_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "RMSNormOp run failed: " << status.err();
 
   // Copy result back to CPU

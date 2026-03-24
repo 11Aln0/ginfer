@@ -47,6 +47,9 @@ class BaseOp {
                                         std::vector<Tensor*> outputs) = 0;
   virtual Result<void, std::string> toDevice(DeviceType dev_type);
 
+ protected:
+  const common::DeviceContext& getDeviceContext(const core::InferContext& ctx) const;
+
  private:
   DeviceType dev_type_ = DeviceType::kDeviceUnknown;
   OpType op_type_ = OpType::kOpUnknown;

@@ -27,8 +27,8 @@ Result<void, std::string> RMSNormOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, input->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *gamma, *outputs[0], epsilon_);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *input, *gamma, *outputs[0], epsilon_);
 
   return Ok<void>();
 }

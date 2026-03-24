@@ -31,9 +31,10 @@ TensorRef test_argmax_op_cuda(TensorRef input_tensor) {
   ASSIGN_OR_THROW(input_tensor, input_tensor->toDevice(DeviceType::kDeviceCUDA));
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {input_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = argmax_op.run(core::InferContext{}, inputs, outputs);
+  auto status = argmax_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "ArgmaxOp run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));

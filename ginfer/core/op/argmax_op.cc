@@ -20,8 +20,8 @@ Result<void, std::string> ArgmaxOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, input->dtype(), output->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *input, *output);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *input, *output);
 
   return Ok<void>();
 }

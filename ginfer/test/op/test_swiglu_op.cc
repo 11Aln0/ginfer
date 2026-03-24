@@ -27,9 +27,10 @@ TensorRef test_swiglu_op_cuda(TensorRef gate_tensor, TensorRef up_tensor) {
   ASSIGN_OR_THROW(up_tensor, up_tensor->toDevice(DeviceType::kDeviceCUDA));
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {gate_tensor.get(), up_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = swiglu_op.run(core::InferContext{}, inputs, outputs);
+  auto status = swiglu_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "SwiGLUOp run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));

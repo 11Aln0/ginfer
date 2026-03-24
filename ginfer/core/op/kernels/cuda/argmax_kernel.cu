@@ -141,7 +141,8 @@ REGISTER_KERNEL_DIFF_IO(argmax,
                         (Float16, Int32),
                         (BFloat16, Int32),
                         (Float16, Int64),
-                        (BFloat16, Int64));
+                        (BFloat16, Int64),
+                        (Float32, Int64));
 ;
 
 }  // namespace ginfer::core::op::kernel

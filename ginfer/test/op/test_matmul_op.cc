@@ -34,9 +34,10 @@ TensorRef test_matmul_op_cuda(TensorRef a_tensor, TensorRef b_tensor) {
   ASSIGN_OR_THROW(c_tensor, c_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // Run computation
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get()};
   std::vector<Tensor*> outputs = {c_tensor.get()};
-  auto status = matmul_op.run(core::InferContext{}, inputs, outputs);
+  auto status = matmul_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "MatmulOp run failed: " << status.err();
 
   // Copy result back to CPU
@@ -67,9 +68,10 @@ TensorRef test_matmul_op_with_bias_cuda(TensorRef a_tensor,
   ASSIGN_OR_THROW(c_tensor, c_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   // Run computation
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {a_tensor.get(), b_tensor.get(), bias_tensor.get()};
   std::vector<Tensor*> outputs = {c_tensor.get()};
-  auto status = matmul_op.run(core::InferContext{}, inputs, outputs);
+  auto status = matmul_op.run(core::InferContext{}.setDeviceContext(dev_ctx), inputs, outputs);
   CHECK(status.ok()) << "MatmulOp run failed: " << status.err();
 
   // Copy result back to CPU

@@ -76,6 +76,8 @@ void setMaxSeqLenQ(core::InferContext& ctx, int seqlen_q) { ctx.max_seqlen_q = s
 
 void setInferCtx(
     core::InferContext& ctx, bool is_prefill, int seqlen_q, int seqlen_kv, int block_size) {
+  auto dev_ctx = common::DeviceContext::create(DeviceType::kDeviceCUDA);
+  ctx.setDeviceContext(dev_ctx);
   setCuSeqlen(ctx, seqlen_q, seqlen_kv);
   setSlotMapping(ctx, seqlen_kv, is_prefill);
   setBlockTable(ctx, seqlen_kv, block_size);

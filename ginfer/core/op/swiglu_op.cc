@@ -20,8 +20,8 @@ Result<void, std::string> SwiGLUOp::run(const core::InferContext& ctx,
   common::DeviceType dev_type = getDeviceType();
 
   auto kernel = getKernel(dev_type, gate->dtype());
-  auto dev_ctx = common::DeviceContext::create(dev_type);
-  kernel(*dev_ctx, *outputs[0], *gate, *up);
+  const auto& dev_ctx = getDeviceContext(ctx);
+  kernel(dev_ctx, *outputs[0], *gate, *up);
 
   return Ok<void>();
 }

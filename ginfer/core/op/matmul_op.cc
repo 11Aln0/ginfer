@@ -23,21 +23,21 @@ Result<void, std::string> MatmulOp::run(const core::InferContext& ctx,
   CHECK(A->dtype() == B->dtype()) << "Input tensors must have the same data type.";
 
   common::DeviceType dev_type = getDeviceType();
-  auto dev_ctx = common::DeviceContext::create(dev_type);
+  const auto& dev_ctx = getDeviceContext(ctx);
 
   if (isGemvMode(A)) {
     auto gemv_kernel = gemv_dispatcher_.getKernel(dev_type, A->dtype());
     if (bias != nullptr) {
-      gemv_kernel(*dev_ctx, *A, *B, *bias, *outputs[0]);
+      gemv_kernel(dev_ctx, *A, *B, *bias, *outputs[0]);
     } else {
-      gemv_kernel(*dev_ctx, *A, *B, std::nullopt, *outputs[0]);
+      gemv_kernel(dev_ctx, *A, *B, std::nullopt, *outputs[0]);
     }
   } else {
     auto gemm_kernel = gemm_dispatcher_.getKernel(dev_type, A->dtype());
     if (bias != nullptr) {
-      gemm_kernel(*dev_ctx, *A, *B, *bias, *outputs[0]);
+      gemm_kernel(dev_ctx, *A, *B, *bias, *outputs[0]);
     } else {
-      gemm_kernel(*dev_ctx, *A, *B, std::nullopt, *outputs[0]);
+      gemm_kernel(dev_ctx, *A, *B, std::nullopt, *outputs[0]);
     }
   }
 

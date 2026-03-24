@@ -98,7 +98,7 @@ class LlamaArchModel : public Model {
   Result<void, std::string> lazyAllocIntermediates();
   // Result<void, std::string> lazyAllocKVCache();
 
-  Result<void, std::string> lazyInitPosEmbedding();
+  Result<void, std::string> lazyInitPosEmbedding(const core::InferContext& ctx);
 
   // forward
   Result<void, std::string> forward(const core::InferContext& ctx,

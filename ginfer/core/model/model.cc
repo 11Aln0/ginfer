@@ -127,7 +127,7 @@ void LlamaArchModel::setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_c
   encoder_layers[layer_id].getAttentionLayer().setKVCache(k_cache, v_cache);
 }
 
-Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding() {
+Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding(const core::InferContext& ctx) {
   if (pos_embedding_initialized_) return Ok<void>();
   ASSIGN_OR_RETURN(
       sin, Tensor::create(tensor::DataType::kDataTypeFloat32,
@@ -143,7 +143,7 @@ Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding() {
                     Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, allocator));
   pos_ids->data<int64_t>()[0] = 0;
   pos_ids->data<int64_t>()[1] = config_.max_position_embeddings - 1;
-  getRotaryEmbeddingOp().run(core::InferContext{}, {pos_ids.get()}, {sin.get(), cos.get()});
+  RETURN_ON_ERR(getRotaryEmbeddingOp().run(ctx, {pos_ids.get()}, {sin.get(), cos.get()}));
   pos_embedding_initialized_ = true;
   return Ok<void>();
 }
@@ -181,7 +181,7 @@ Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
     const tensor::TensorRef token_ids,
     const tensor::TensorRef positions) {
   RETURN_ON_ERR(lazyAllocIntermediates());
-  RETURN_ON_ERR(lazyInitPosEmbedding());
+  RETURN_ON_ERR(lazyInitPosEmbedding(ctx));
 
   int64_t seq_len = token_ids->shape()[0];
 
