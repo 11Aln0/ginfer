@@ -76,12 +76,23 @@ void setMaxSeqLenQ(core::InferContext& ctx, int seqlen_q) { ctx.max_seqlen_q = s
 
 void setInferCtx(
     core::InferContext& ctx, bool is_prefill, int seqlen_q, int seqlen_kv, int block_size) {
-  auto dev_ctx = common::DeviceContext::create(DeviceType::kDeviceCUDA);
-  ctx.setDeviceContext(dev_ctx);
   setCuSeqlen(ctx, seqlen_q, seqlen_kv);
   setSlotMapping(ctx, seqlen_kv, is_prefill);
   setBlockTable(ctx, seqlen_kv, block_size);
   setMaxSeqLenQ(ctx, seqlen_q);
+}
+
+void printAllocatorStats(DeviceType dev_type) {
+  auto pool_stats = getDeviceAllocator<PooledAllocStrategy>(dev_type)->getStats();
+  LOG(INFO) << "Pooled Allocator Stats - Live bytes: " << pool_stats.live_bytes
+            << ", Peak live bytes: " << pool_stats.peak_live_bytes
+            << ", Reserved bytes: " << pool_stats.reserved_bytes
+            << ", Peak reserved bytes: " << pool_stats.peak_reserved_bytes;
+  auto stats = getDeviceAllocator(dev_type)->getStats();
+  LOG(INFO) << "Default Allocator Stats - Live bytes: " << stats.live_bytes
+            << ", Peak live bytes: " << stats.peak_live_bytes
+            << ", Reserved bytes: " << stats.reserved_bytes
+            << ", Peak reserved bytes: " << stats.peak_reserved_bytes;
 }
 
 void allocKVCache(std::shared_ptr<core::model::Model>& model,
@@ -114,6 +125,7 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
 
   std::vector<int32_t> new_token_ids;
   core::InferContext infer_ctx;
+  infer_ctx.setDeviceContext(common::DeviceContext::create(DeviceType::kDeviceCUDA));
 
   auto next_positions = [&](TensorRef positions) -> TensorRef {
     ASSIGN_OR_THROW(positions, positions->toDevice(host_allocator));
@@ -132,10 +144,14 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
     positions->data<int32_t>()[i] = i;
   }
   ASSIGN_OR_THROW(positions, positions->toDevice(dev_allocator));
+  ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
+
+  DLOG(INFO) << "Warmup run...";
+  THROW_ON_ERR(model->predict(infer_ctx, input_ids, positions));
+  printAllocatorStats(DeviceType::kDeviceCUDA);
 
   // prefill
   setInferCtx(infer_ctx, /* is_prefill */ true, input_seqlen, input_seqlen, block_size);
-  ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_allocator));
   DECLARE_OR_THROW(next_token_ids, model->predict(infer_ctx, input_ids, positions));
   ASSIGN_OR_THROW(input_ids, input_ids->toDevice(host_allocator));
   input_ids = input_ids->slice(0, 0, 1);

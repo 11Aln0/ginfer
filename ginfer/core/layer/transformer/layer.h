@@ -44,9 +44,23 @@ class AttentionLayer : public Layer {
   void setKVCache(TensorRef& k_cache, TensorRef& v_cache);
 
  private:
+  Result<void, std::string> forwardWithKVCache(const core::InferContext& ctx,
+                                               const TensorRef& q,
+                                               const TensorRef& k,
+                                               const TensorRef& v,
+                                               TensorRef output);
+
+  Result<void, std::string> forwardWithoutKVCache(const core::InferContext& ctx,
+                                                  const TensorRef& q,
+                                                  const TensorRef& k,
+                                                  const TensorRef& v,
+                                                  TensorRef output);
+
+ private:
   Intermediates intermediates_;
 
   op::ROPEOp rope_op;
+  op::GQAOp gqa_op;
   op::GQAVarlenOp gqa_varlen_op;
   op::StoreKVCacheOp store_kv_op;
 
@@ -172,6 +186,15 @@ class LMHeadLayer : public Layer {
   void setWeight(const TensorRef& weight);
 
   void setIntermediates(const Intermediates& intermediates);
+
+ private:
+  Result<void, std::string> forwardWithKVCache(const core::InferContext& ctx,
+                                               const TensorRef& hidden_state,
+                                               TensorRef output);
+
+  Result<void, std::string> forwardWithoutKVCache(const core::InferContext& ctx,
+                                                  const TensorRef& hidden_state,
+                                                  TensorRef output);
 
  private:
   Intermediates intermediates_;

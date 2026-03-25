@@ -190,10 +190,13 @@ Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
   CHECK(positions != nullptr) << "positions must not be null";
   CHECK_EQ(positions->shape()[0], seq_len) << "positions length must equal input token_ids length.";
   CHECK(token_ids->dtype() == tensor::DataType::kDataTypeInt32) << "token_ids dtype must be int32";
-  CHECK(ctx.cu_seqlens_q.has_value() && ctx.cu_seqlens_kv.has_value())
-      << "cu_seqlens_q, cu_seqlens_kv are required in InferContext for predict.";
 
-  int64_t batch_size = ctx.cu_seqlens_q.value()->shape()[0] - 1;
+  int64_t batch_size = 1;
+  if (ctx.block_tables.has_value()) {
+    CHECK(ctx.cu_seqlens_q.has_value() && ctx.cu_seqlens_kv.has_value())
+        << "cu_seqlens_q, cu_seqlens_kv are required in InferContext for predict.";
+    batch_size = ctx.cu_seqlens_q.value()->shape()[0] - 1;
+  }
   CHECK_LE(batch_size, static_cast<int64_t>(config_.max_batch_size))
       << "Batch size exceeds max_batch_size.";
 
