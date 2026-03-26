@@ -36,6 +36,8 @@ struct Sequence {
 
   int numBlocks() const { return (num_tokens + block_size - 1) / block_size; }
 
+  int numCachedBlocks() const { return num_cached_tokens / block_size; }
+
   std::span<int32_t> getBlock(int block_id) {
     int start = block_id * block_size;
     int end = std::min(start + block_size, num_tokens);

@@ -5,10 +5,11 @@
 
 namespace ginfer::engine {
 
-BlockManager::BlockManager(int block_size) {
+BlockManager::BlockManager(int num_blocks, int block_size) {
+  num_blocks_ = num_blocks;
   block_size_ = block_size;
-  blocks_.reserve(block_size);
-  for (int i = 0; i < block_size_; i++) {
+  blocks_.reserve(num_blocks);
+  for (int i = 0; i < num_blocks_; i++) {
     blocks_.emplace_back(i);
     free_block_ids_.push_back(i);
   }

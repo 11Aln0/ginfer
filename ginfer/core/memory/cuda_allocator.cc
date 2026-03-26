@@ -67,4 +67,11 @@ void CUDADeviceAllocator::memcpy(
   }
 }
 
+DeviceMemInfo CUDADeviceAllocator::getMemInfo() const {
+  size_t free_bytes = 0, total_bytes = 0;
+  cudaError_t err = cudaMemGetInfo(&free_bytes, &total_bytes);
+  CHECK_EQ(err, cudaSuccess) << "cudaMemGetInfo failed: " << cudaGetErrorString(err);
+  return {total_bytes, free_bytes};
+}
+
 }  // namespace ginfer::core::memory

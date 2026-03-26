@@ -25,7 +25,7 @@ Qwen2Config Qwen2ModelLoader::loadConfig() {
   config.intermediate_size = json.at("intermediate_size").get<int>();
   config.vocab_size = json.at("vocab_size").get<int>();
   config.max_position_embeddings = json.at("max_position_embeddings").get<int>();
-  config.max_seq_len = 4096;  // TODO temporary fix for qwen2 models with longer context
+  config.max_seq_len = 4096;
   config.rms_norm_eps = json.value("rms_norm_eps", 1e-6f);
   config.rope_theta = json.value("rope_theta", 10000.0f);
   if (auto it = json.find("eos_token_id"); it != json.end() && it->is_array()) {
@@ -38,9 +38,9 @@ Qwen2Config Qwen2ModelLoader::loadConfig() {
   return config;
 }
 
-std::shared_ptr<Model> Qwen2ModelLoader::load() {
+std::unique_ptr<Model> Qwen2ModelLoader::load() {
   Qwen2Config config = loadConfig();
-  auto m = std::make_shared<Qwen2Model>(config);
+  auto m = std::make_unique<Qwen2Model>(config);
 
   weight_loader.load(model_path_ + "/model.safetensors");  // TODO multi-part safetensors
 

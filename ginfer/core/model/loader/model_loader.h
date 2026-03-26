@@ -17,7 +17,7 @@ class ModelLoader {
  public:
   explicit ModelLoader(std::string model_path);
 
-  virtual std::shared_ptr<Model> load() = 0;
+  virtual std::unique_ptr<Model> load() = 0;
 
  protected:
   using AttentionWeight = layer::transformer::AttentionLayer::Weight;

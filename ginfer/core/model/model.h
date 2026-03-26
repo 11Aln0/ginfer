@@ -23,7 +23,7 @@ struct ModelConfig {
   int nlayer;
   int vocab_size;
   int max_position_embeddings;
-  int max_seq_len;
+  int max_seq_len = 4096;
   int max_batch_size = 1;
 
   int num_heads;
@@ -45,6 +45,8 @@ class Model {
 
   virtual Result<void, std::string> toDevice(common::DeviceType dev_type);
 
+  common::DeviceType getDeviceType() const;
+
   int getVocabSize() const;
 
   int getNumLayers() const;
@@ -54,6 +56,8 @@ class Model {
   std::tuple<int, int, int> getAttentionConfig() const;
 
   bool isEosToken(int32_t token_id) const;
+
+  void setMaxSeqLen(int max_seq_len);
 
   // K/V Cache Tensor: [num_kvcache_blocks, block_size, num_kv_heads * head_dim]
   virtual void setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) = 0;

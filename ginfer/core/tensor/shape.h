@@ -13,7 +13,7 @@ class Shape {
 
   explicit Shape(int ndim) : dims_(ndim, 0) {}
 
-  explicit Shape(const std::initializer_list<int64_t> dims) : dims_(dims) {}
+  Shape(const std::initializer_list<int64_t> dims) : dims_(dims) {}
 
   explicit Shape(const std::vector<int64_t>& dims) : dims_(dims) {}
 

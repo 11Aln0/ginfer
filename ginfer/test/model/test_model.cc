@@ -95,7 +95,7 @@ void printAllocatorStats(DeviceType dev_type) {
             << ", Peak reserved bytes: " << stats.peak_reserved_bytes;
 }
 
-void allocKVCache(std::shared_ptr<core::model::Model>& model,
+void allocKVCache(std::unique_ptr<core::model::Model>& model,
                   int num_blocks,
                   int block_size,
                   int num_kv_heads,

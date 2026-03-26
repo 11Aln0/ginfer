@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include <sys/sysinfo.h>
 #include <cstring>
 #include "allocator.h"
 #include "ginfer/common/errors.h"
@@ -28,6 +29,14 @@ void CPUDeviceAllocator::memcpy(
   (void)stream;
   (void)sync;
   std::memcpy(dst, src, size);
+}
+
+DeviceMemInfo CPUDeviceAllocator::getMemInfo() const {
+  struct sysinfo info;
+  if (sysinfo(&info) == 0) {
+    return {info.totalram * info.mem_unit, info.freeram * info.mem_unit};
+  }
+  return {0, 0};
 }
 
 }  // namespace ginfer::core::memory

@@ -13,6 +13,8 @@ Result<void, std::string> Model::toDevice(common::DeviceType dev_type) {
   return Ok<void>();
 }
 
+common::DeviceType Model::getDeviceType() const { return dev_type_; }
+
 int Model::getVocabSize() const { return config_.vocab_size; }
 
 int Model::getNumLayers() const { return config_.nlayer; }
@@ -29,6 +31,8 @@ bool Model::isEosToken(int32_t token_id) const {
   }
   return false;
 }
+
+void Model::setMaxSeqLen(int max_seq_len) { config_.max_seq_len = max_seq_len; }
 
 // end Model
 

@@ -36,7 +36,7 @@ struct Block {
 
 class BlockManager {
  public:
-  BlockManager(int block_size);
+  BlockManager(int num_blocks, int block_size);
 
   bool canAllocate(Sequence::Ptr& seq) const;
   void allocate(Sequence::Ptr& seq);
@@ -55,6 +55,7 @@ class BlockManager {
 
  private:
   int block_size_;
+  int num_blocks_;
   std::vector<Block> blocks_;
   std::deque<int> free_block_ids_;
   std::unordered_set<int> used_block_ids_;

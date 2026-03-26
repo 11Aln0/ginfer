@@ -22,7 +22,7 @@ class Qwen2ModelLoader : public ModelLoader {
  public:
   explicit Qwen2ModelLoader(std::string model_path);
 
-  std::shared_ptr<Model> load() override;
+  std::unique_ptr<Model> load() override;
 
  protected:
   ModelLoader::EncoderWeight loadEncoderLayerWeight(int layer_idx);

@@ -22,6 +22,11 @@ enum class MemcpyKind {
   kMemcpyDeviceToDevice,
 };
 
+struct DeviceMemInfo {
+  size_t total;  // bytes
+  size_t free;
+};
+
 class DeviceAllocator : protected AllocatorStatsTracker {
  public:
   explicit DeviceAllocator(DeviceType dev_type) : dev_type_(dev_type){};
@@ -41,6 +46,8 @@ class DeviceAllocator : protected AllocatorStatsTracker {
                       MemcpyKind kind,
                       void* stream = nullptr,
                       bool sync = false) const = 0;
+
+  virtual DeviceMemInfo getMemInfo() const = 0;
 
   virtual ~DeviceAllocator() = default;
 
@@ -67,6 +74,8 @@ class CPUDeviceAllocator : public DeviceAllocator {
               void* stream = nullptr,
               bool sync = false) const override;
 
+  DeviceMemInfo getMemInfo() const override;
+
  protected:
   Result<void*, std::string> doAlloc(size_t size) override;
 
@@ -83,6 +92,8 @@ class CUDADeviceAllocator : public DeviceAllocator {
               MemcpyKind kind,
               void* stream = nullptr,
               bool sync = false) const override;
+
+  DeviceMemInfo getMemInfo() const override;
 
  protected:
   Result<void*, std::string> doAlloc(size_t size) override;

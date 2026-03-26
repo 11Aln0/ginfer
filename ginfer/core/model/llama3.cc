@@ -53,9 +53,9 @@ ModelLoader::EncoderWeight Llama3ModelLoader::loadEncoderLayerWeight(int layer_i
   return w;
 }
 
-std::shared_ptr<Model> Llama3ModelLoader::load() {
+std::unique_ptr<Model> Llama3ModelLoader::load() {
   Llama3Config config = loadConfig();
-  auto m = std::make_shared<Llama3Model>(config);
+  auto m = std::make_unique<Llama3Model>(config);
 
   weight_loader.load(model_path_ + "/model.safetensors");  // TODO multi-part safetensors
 
