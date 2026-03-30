@@ -28,7 +28,8 @@ Buffer::Buffer(size_t size, std::byte* ptr, DeviceAllocator* allocator, bool ext
       dev_type_(allocator->devType()),
       allocator_(allocator) {}
 
-void Buffer::copyFrom(const Buffer& src, int64_t src_off, int64_t dst_off, size_t size) {
+void Buffer::copyFrom(
+    const Buffer& src, int64_t src_off, int64_t dst_off, size_t size, bool async) {
   CHECK(src_off >= 0 && dst_off >= 0) << "Copy failed: src/dst offset cannot be negative.";
   CHECK(src.size() >= src_off + size)
       << "Copy failed: source buffer size is smaller than copy size.";
@@ -36,30 +37,32 @@ void Buffer::copyFrom(const Buffer& src, int64_t src_off, int64_t dst_off, size_
       << "Copy failed: destination buffer size is smaller than copy size.";
 
   if (src.devType() == dev_type_) {
-    allocator_->memcpy(src.ptr() + src_off, ptr_ + dst_off, size,
-                       MemcpyKind::kMemcpyDeviceToDevice);
+    auto kind = common::isHostDevice(dev_type_) ? MemcpyKind::kMemcpyHostToHost
+                                                : MemcpyKind::kMemcpyDeviceToDevice;
+    allocator_->memcpy(src.ptr() + src_off, ptr_ + dst_off, size, kind, async);
   } else {
     if (common::isHostDevice(src.devType())) {
-      allocator_->memcpy(src.ptr() + src_off, ptr_ + dst_off, size,
-                         MemcpyKind::kMemcpyHostToDevice);  // src is host
+      allocator_->memcpy(src.ptr() + src_off, ptr_ + dst_off, size, MemcpyKind::kMemcpyHostToDevice,
+                         async);  // src is host
     } else {
       src.allocator_->memcpy(src.ptr() + src_off, ptr_ + dst_off, size,
-                             MemcpyKind::kMemcpyDeviceToHost);  // src is device
+                             MemcpyKind::kMemcpyDeviceToHost,
+                             async);  // src is device
     }
   }
 }
 
-void Buffer::copyFrom(const std::shared_ptr<Buffer>& src,
-                      int64_t src_off,
-                      int64_t dst_off,
-                      size_t size) {
+void Buffer::copyFrom(
+    const std::shared_ptr<Buffer>& src, int64_t src_off, int64_t dst_off, size_t size, bool async) {
   CHECK(src != nullptr) << "Source buffer is nullptr.";
-  copyFrom(*src, src_off, dst_off, size);
+  copyFrom(*src, src_off, dst_off, size, async);
 }
 
-void Buffer::copyFrom(const std::shared_ptr<Buffer>& src) { copyFrom(src, 0, 0, size_); }
+void Buffer::copyFrom(const std::shared_ptr<Buffer>& src, bool async) {
+  copyFrom(src, 0, 0, size_, async);
+}
 
-void Buffer::copyFrom(const Buffer& src) { copyFrom(src, 0, 0, size_); }
+void Buffer::copyFrom(const Buffer& src, bool async) { copyFrom(src, 0, 0, size_, async); }
 
 Buffer::~Buffer() {
   if (!external_) {

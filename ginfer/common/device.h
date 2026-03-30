@@ -6,7 +6,13 @@
 
 namespace ginfer::common {
 
-enum class DeviceType { kDeviceUnknown = 0, kDeviceCPU = 1, kDeviceCUDA = 2, kDeviceROCM = 3 };
+enum class DeviceType {
+  kDeviceUnknown = 0,
+  kDeviceCPU = 1,
+  kDeviceCUDA = 2,
+  kDeviceROCM = 3,
+  kDeviceMax = 4
+};
 
 static const char* device_type_names[4] = {"DeviceUnknown", "DeviceCPU", "DeviceCUDA",
                                            "DeviceROCM"};

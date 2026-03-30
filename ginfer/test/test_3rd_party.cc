@@ -29,7 +29,8 @@ void testTokenizer(std::unique_ptr<tokenizers::Tokenizer> tok, bool print_vocab 
   std::string prompt = "What is the  capital of Canada?";
   std::vector<int> ids = tok->Encode(prompt);
   std::string decoded_prompt = tok->Decode(ids);
-  EXPECT_EQ(prompt, decoded_prompt) << "prompt=\"" << prompt << "\", decoded_prompt=\"" << decoded_prompt << "\"";
+  EXPECT_EQ(prompt, decoded_prompt)
+      << "prompt=\"" << prompt << "\", decoded_prompt=\"" << decoded_prompt << "\"";
 
   // Check #2. IdToToken and TokenToId
   std::vector<int32_t> ids_to_test = {0, 1, 2, 3, 32, 33, 34, 130, 131, 1000};

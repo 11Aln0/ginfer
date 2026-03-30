@@ -17,6 +17,8 @@ void DeviceAllocator::free(void* ptr, size_t size) {
   onFree(size);
 }
 
+void DeviceAllocator::setStream(void* stream) { stream_ = stream; }
+
 void AllocatorStatsTracker::onAlloc(size_t size) {
   stats_.live_bytes += size;
   if (stats_.live_bytes > stats_.peak_live_bytes) {

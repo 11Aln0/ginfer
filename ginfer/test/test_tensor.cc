@@ -4,6 +4,7 @@
 
 #include "ginfer/core/memory/allocator_factory.h"
 #include "ginfer/core/tensor/tensor.h"
+#include "ginfer/core/tensor/tensor_writer.h"
 
 namespace ginfer::test::tensor {
 
@@ -12,7 +13,7 @@ using std::byte;
 TEST(TensorTest, fromBuffer) {
   // cpu test
 
-  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(cpu_allocator, nullptr);
   float* ptr1 = new float[128];
   auto cpu_buffer_res = ginfer::core::memory::Buffer::create(
@@ -37,7 +38,7 @@ TEST(TensorTest, fromBuffer) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto cuda_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCUDA);
   ASSERT_NE(cuda_allocator, nullptr);
   float* ptr2 = nullptr;
   cudaError_t err = cudaMallocManaged(reinterpret_cast<void**>(&ptr2), 128 * sizeof(float));
@@ -65,7 +66,7 @@ TEST(TensorTest, fromBuffer) {
 TEST(TensorTest, fromAllocator) {
   // cpu test
 
-  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::core::tensor::Shape shape{32, 4};
   auto cpu_tensor_res =
@@ -86,7 +87,7 @@ TEST(TensorTest, fromAllocator) {
 
   // cuda test
 
-  auto cuda_allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto cuda_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCUDA);
   ASSERT_NE(cuda_allocator, nullptr);
   auto cuda_tensor_res =
       ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeFloat32, shape,
@@ -106,7 +107,7 @@ TEST(TensorTest, fromAllocator) {
 }
 
 TEST(TensorTest, toDev) {
-  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::core::tensor::Shape shape{16, 8};
   auto tensor_res =
@@ -134,7 +135,7 @@ TEST(TensorTest, toDev) {
 }
 
 TEST(TensorTest, strides) {
-  auto cpu_allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto cpu_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(cpu_allocator, nullptr);
   ginfer::core::tensor::Shape shape{4, 3, 2};
   auto rmt_res =
@@ -270,6 +271,58 @@ TEST(TensorTest, reshape) {
 
   // Reshape with mismatched numel should fail
   // ASSERT_THROW(tensor.reshape(ginfer::core::tensor::Shape{5, 5}), std::exception);
+}
+
+TEST(TensorTest, tensorWriter) {
+  auto tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeInt32, ginfer::core::tensor::Shape{6},
+      ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto writer = ginfer::core::tensor::bindTensor<int32_t>(tensor);
+  std::vector<int32_t> prefix{1, 2, 3};
+  writer.extend(prefix.begin(), prefix.end());
+  writer.append(4);
+  writer.append(5);
+
+  ASSERT_EQ(writer.size(), 5);
+  ASSERT_EQ(writer.capacity(), 6);
+  auto* ptr = tensor->data<int32_t>();
+  ASSERT_EQ(ptr[0], 1);
+  ASSERT_EQ(ptr[1], 2);
+  ASSERT_EQ(ptr[2], 3);
+  ASSERT_EQ(ptr[3], 4);
+  ASSERT_EQ(ptr[4], 5);
+
+  EXPECT_THROW(writer.append(6), std::runtime_error);
+}
+
+TEST(TensorTest, tensorWriter2D) {
+  auto tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeInt32, ginfer::core::tensor::Shape{2, 4},
+      ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto writer = ginfer::core::tensor::bindTensor2D<int32_t>(tensor);
+  std::vector<int32_t> row0{10, 11};
+  std::vector<int32_t> row1{20, 21, 22};
+  writer.appendRow(row0.begin(), row0.end(), 4);
+  writer.appendRow(row1.begin(), row1.end(), 4, -9);
+
+  ASSERT_EQ(writer.size(), 2);
+  auto* ptr = tensor->data<int32_t>();
+  ASSERT_EQ(ptr[0], 10);
+  ASSERT_EQ(ptr[1], 11);
+  ASSERT_EQ(ptr[2], -1);
+  ASSERT_EQ(ptr[3], -1);
+  ASSERT_EQ(ptr[4], 20);
+  ASSERT_EQ(ptr[5], 21);
+  ASSERT_EQ(ptr[6], 22);
+  ASSERT_EQ(ptr[7], -9);
+
+  EXPECT_THROW(writer.appendRow(row0.begin(), row0.end(), 4), std::runtime_error);
 }
 
 }  // namespace ginfer::test::tensor

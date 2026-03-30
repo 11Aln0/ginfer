@@ -38,10 +38,7 @@ Result<void, std::string> AttentionLayer::forwardWithKVCache(const core::InferCo
 
   RETURN_ON_ERR(store_kv_op.run(
       ctx, {k.get(), v.get(), k_cache_.get(), v_cache_.get(), ctx.slot_mapping.value().get()}, {}));
-  return gqa_varlen_op.run(ctx,
-                           {q.get(), k_cache_.get(), v_cache_.get(), ctx.cu_seqlens_q.value().get(),
-                            ctx.cu_seqlens_kv.value().get(), ctx.block_tables.value().get()},
-                           {output.get()});
+  return gqa_varlen_op.run(ctx, {q.get(), k_cache_.get(), v_cache_.get()}, {output.get()});
 }
 
 Result<void, std::string> AttentionLayer::forwardWithoutKVCache(const core::InferContext& ctx,

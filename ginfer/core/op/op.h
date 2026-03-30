@@ -145,7 +145,7 @@ class GQAOp : public AutoKernelDispatchOp<kernel::GQAKernelFuncType> {
   // int seq_len_;
 };
 
-class GQAVarlenOp : public AutoKernelDispatchOp<kernel::GQAVarlenKernelFuncType> {
+class GQAVarlenOp : public Op {
  public:
   GQAVarlenOp(DeviceType dev_type, int paged_block_size);
 
@@ -153,8 +153,13 @@ class GQAVarlenOp : public AutoKernelDispatchOp<kernel::GQAVarlenKernelFuncType>
                                         const std::vector<const Tensor*>& inputs,
                                         std::vector<Tensor*> outputs) override;
 
+  virtual Result<void, std::string> toDevice(DeviceType dev_type) override;
+
  private:
   int paged_block_size_;
+  kernel::KernelDispatcher<kernel::GQAVarlenKernelFuncType> prefill_dispatcher_{"GQAVarlen"};
+  kernel::KernelDispatcher<kernel::GQAVarlenDecodeKernelFuncType> decode_dispatcher_{
+      "GQAVarlenDecode"};
 };
 
 class StoreKVCacheOp : public AutoKernelDispatchOp<kernel::StoreKVCacheKernelFuncType> {

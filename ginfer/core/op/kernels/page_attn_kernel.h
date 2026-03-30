@@ -20,6 +20,19 @@ void GQAVarlenKernel(const Context& ctx,
 using GQAVarlenKernelFuncType = decltype(&GQAVarlenKernel<float, common::DeviceContext>);
 
 template <typename T, typename Context>
+void GQAVarlenDecodeKernel(const Context& ctx,
+                           const tensor::Tensor& q,
+                           const tensor::Tensor& k,
+                           const tensor::Tensor& v,
+                           const tensor::Tensor& cu_seqlens_kv,
+                           const tensor::Tensor& block_tables,
+                           const int paged_block_size,
+                           tensor::Tensor& output);
+
+using GQAVarlenDecodeKernelFuncType =
+    decltype(&GQAVarlenDecodeKernel<float, common::DeviceContext>);
+
+template <typename T, typename Context>
 void storeKVCacheKernel(const Context& ctx,
                         const tensor::Tensor& k,
                         const tensor::Tensor& v,

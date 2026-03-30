@@ -6,6 +6,7 @@
 
 #include "ginfer/common/errors.h"
 #include "ginfer/core/memory/allocator.h"
+#include "ginfer/core/memory/allocator_factory.h"
 #include "ginfer/core/memory/buffer.h"
 #include "ginfer/core/tensor/dtype.h"
 #include "ginfer/core/tensor/layout.h"
@@ -25,7 +26,10 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
                                                Shape shape,
                                                std::shared_ptr<memory::Buffer> buffer);
 
-  static Result<TensorRef, std::string> create(DataType dtype, Shape shape, DeviceType dev_type);
+  static Result<TensorRef, std::string> create(DataType dtype,
+                                               Shape shape,
+                                               DeviceType dev_type,
+                                               uint8_t alloc_flags = memory::kDefault);
 
   static Result<TensorRef, std::string> create(DataType dtype,
                                                Shape shape,
@@ -37,6 +41,8 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   DataType dtype() const;
 
+  DeviceType devType() const;
+
   size_t size() const;
 
   size_t nbytes() const;
@@ -45,12 +51,16 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   bool isContiguous() const;
 
-  Result<TensorRef, std::string> toDevice(DeviceType dev_type, bool preserveLayout = true);
+  Result<TensorRef, std::string> toDevice(DeviceType dev_type,
+                                          uint8_t alloc_flags = memory::kDefault,
+                                          bool preserveLayout = true,
+                                          bool async = false);
 
   Result<TensorRef, std::string> toDevice(memory::DeviceAllocator* allocator,
-                                          bool preserveLayout = true);
+                                          bool preserveLayout = true,
+                                          bool async = false);
 
-  void copyFrom(const TensorRef& src);
+  void copyFrom(const TensorRef& src, bool async = false);
 
   template <typename T = void>
   T* data() {
@@ -76,8 +86,10 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   void calcStrides();
 
-  Result<TensorRef, std::string> toDeviceDense(memory::DeviceAllocator* allocator);
-  Result<TensorRef, std::string> toDevicePreserveLayout(memory::DeviceAllocator* allocator);
+  Result<TensorRef, std::string> toDeviceDense(memory::DeviceAllocator* allocator,
+                                               bool async = false);
+  Result<TensorRef, std::string> toDevicePreserveLayout(memory::DeviceAllocator* allocator,
+                                                        bool async = false);
 
  private:
   DataType dtype_ = DataType::kDataTypeVoid;

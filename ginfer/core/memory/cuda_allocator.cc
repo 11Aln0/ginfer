@@ -1,3 +1,4 @@
+#include <cuda_runtime.h>
 #include <glog/logging.h>
 #include "ginfer/core/memory/allocator.h"
 
@@ -29,7 +30,7 @@ void CUDADeviceAllocator::doFree(void* ptr, size_t size) {
 }
 
 void CUDADeviceAllocator::memcpy(
-    const void* src, void* dst, size_t size, MemcpyKind kind, void* stream, bool sync) const {
+    const void* src, void* dst, size_t size, MemcpyKind kind, bool async) const {
   CHECK_NE(src, nullptr);
   CHECK_NE(dst, nullptr);
   if (size == 0) {
@@ -37,10 +38,7 @@ void CUDADeviceAllocator::memcpy(
     return;
   }
 
-  cudaStream_t cu_stream = nullptr;
-  if (stream) cu_stream = static_cast<cudaStream_t>(stream);
-
-  cudaMemcpyKind cu_kind = cudaMemcpyDefault;
+  cudaMemcpyKind cu_kind;
 
   switch (kind) {
     case MemcpyKind::kMemcpyHostToDevice:
@@ -56,14 +54,11 @@ void CUDADeviceAllocator::memcpy(
       LOG(FATAL) << "Unsupported MemcpyKind.";
   }
 
-  if (cu_stream) {
-    cudaMemcpyAsync(dst, src, size, cu_kind, cu_stream);
+  if (async) {
+    cudaStream_t stream = stream_ ? static_cast<cudaStream_t>(stream_) : cudaStreamDefault;
+    cudaMemcpyAsync(dst, src, size, cu_kind, stream);
   } else {
     cudaMemcpy(dst, src, size, cu_kind);
-  }
-
-  if (sync) {
-    cudaDeviceSynchronize();
   }
 }
 

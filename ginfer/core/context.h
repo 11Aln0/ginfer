@@ -14,6 +14,7 @@ struct InferContext {
   std::optional<tensor::TensorRef> cu_seqlens_kv;
   std::optional<tensor::TensorRef> block_tables;
   std::optional<tensor::TensorRef> slot_mapping;
+  bool is_prefill = false;
 
   InferContext() = default;
 
@@ -44,6 +45,11 @@ struct InferContext {
 
   InferContext& setDeviceContext(const std::shared_ptr<common::DeviceContext>& dev_ctx) {
     this->dev_ctx = dev_ctx;
+    return *this;
+  }
+
+  InferContext& setIsPrefill(bool is_prefill) {
+    this->is_prefill = is_prefill;
     return *this;
   }
 };

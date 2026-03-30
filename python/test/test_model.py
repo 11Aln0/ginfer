@@ -5,7 +5,7 @@ import ml_dtypes
 import os
 from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
-from huggingface_hub import snapshot_download
+import time
 
 
 MODEL_PATH = os.environ.get("MODEL_PATH", "")
@@ -25,14 +25,31 @@ def load_hf_model(model_path=None, device_name="cpu"):
 def hf_generate(
     inputs, model, max_new_tokens=128, top_p=0.8, top_k=50, temperature=0.8
 ):
+    compiled_model = torch.compile(model, mode="reduce-overhead")
+    
     with torch.no_grad():
-        outputs = model.generate(
+        # warmup
+        compiled_model.generate(
             inputs,
             max_new_tokens=max_new_tokens,
             top_k=top_k,
             top_p=top_p,
             temperature=temperature,
         )
+        
+        torch.cuda.synchronize()
+        start = time.perf_counter()
+        
+        outputs = compiled_model.generate(
+            inputs,
+            max_new_tokens=max_new_tokens,
+            top_k=top_k,
+            top_p=top_p,
+            temperature=temperature,
+        )
+        
+        torch.cuda.synchronize()
+        print(f"torch compiled generate time: {time.perf_counter() - start:.3f}s")
 
     return outputs[0]
 
@@ -59,12 +76,11 @@ def test_model_generate_cuda():
     next_token_ids = ginfer_test.test_model_generate_cuda(MODEL_PATH, input_ids)
     token_ids = np.concatenate([input_ids, next_token_ids])
     
-
     np.testing.assert_array_equal(token_ids, ref_token_ids)
 
 def test_model_infer_cuda():
     prompt = "Who are you?"
-    hf_model, hf_tokenizer = load_hf_model(MODEL_PATH, device_name="cuda:1")
+    hf_model, hf_tokenizer = load_hf_model(MODEL_PATH, device_name="cuda:0")
     ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0)
     
     result = ginfer_test.test_model_infer_cuda(MODEL_PATH, prompt)

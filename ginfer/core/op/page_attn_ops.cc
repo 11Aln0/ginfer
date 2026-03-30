@@ -8,33 +8,44 @@
 namespace ginfer::core::op {
 
 GQAVarlenOp::GQAVarlenOp(DeviceType dev_type, int paged_block_size)
-    : AutoKernelDispatchOp<kernel::GQAVarlenKernelFuncType>(dev_type, OpType::kOpGQA, "GQAVarlen"),
-      paged_block_size_(paged_block_size) {}
+    : Op(dev_type, OpType::kOpGQA, "GQAVarlen"), paged_block_size_(paged_block_size) {}
 
 Result<void, std::string> GQAVarlenOp::run(const core::InferContext& ctx,
                                            const std::vector<const Tensor*>& inputs,
                                            std::vector<Tensor*> outputs) {
-  CHECK(inputs.size() == 6) << "GQAVarlenOp requires exactly 6 input tensors.";
+  CHECK(inputs.size() == 3) << "GQAVarlenOp requires exactly 3 input tensors.";
   CHECK(outputs.size() == 1) << "GQAVarlenOp requires exactly 1 output tensor.";
   const Tensor* q = inputs[0];
   const Tensor* k = inputs[1];
   const Tensor* v = inputs[2];
-  const Tensor* cu_seqlens_q = inputs[3];
-  const Tensor* cu_seqlens_kv = inputs[4];
-  const Tensor* block_tables = inputs[5];
   CHECK(q->dtype() == k->dtype() && k->dtype() == v->dtype())
       << "Input tensors must have the same data type.";
-  CHECK(ctx.max_seqlen_q.has_value()) << "GQAVarlenOp requires max_seqlen_q in InferContext.";
-  int max_seqlen_q = ctx.max_seqlen_q.value();
+  CHECK(ctx.cu_seqlens_kv.has_value()) << "GQAVarlenOp requires cu_seqlens_kv in InferContext.";
+  CHECK(ctx.block_tables.has_value()) << "GQAVarlenOp requires block_tables in InferContext.";
 
   common::DeviceType dev_type = getDeviceType();
   const auto& dev_ctx = getDeviceContext(ctx);
+  const Tensor& cu_seqlens_kv = *ctx.cu_seqlens_kv.value();
+  const Tensor& block_tables = *ctx.block_tables.value();
 
-  auto gqa_varlen_kernel = getKernel(dev_type, q->dtype());
-  gqa_varlen_kernel(dev_ctx, *q, *k, *v, *cu_seqlens_q, *cu_seqlens_kv, *block_tables,
-                    max_seqlen_q, paged_block_size_, *outputs[0]);
+  if (ctx.is_prefill) {
+    CHECK(ctx.cu_seqlens_q.has_value()) << "GQAVarlenOp requires cu_seqlens_q in InferContext.";
+    CHECK(ctx.max_seqlen_q.has_value()) << "GQAVarlenOp requires max_seqlen_q in InferContext.";
+    const Tensor& cu_seqlens_q = *ctx.cu_seqlens_q.value();
+    int max_seqlen_q = ctx.max_seqlen_q.value();
+    auto kernel = prefill_dispatcher_.getKernel(dev_type, q->dtype());
+    kernel(dev_ctx, *q, *k, *v, cu_seqlens_q, cu_seqlens_kv, block_tables, max_seqlen_q,
+           paged_block_size_, *outputs[0]);
+  } else {
+    auto kernel = decode_dispatcher_.getKernel(dev_type, q->dtype());
+    kernel(dev_ctx, *q, *k, *v, cu_seqlens_kv, block_tables, paged_block_size_, *outputs[0]);
+  }
 
   return Ok<void>();
+}
+
+Result<void, std::string> GQAVarlenOp::toDevice(DeviceType dev_type) {
+  return BaseOp::toDevice(dev_type);
 }
 
 StoreKVCacheOp::StoreKVCacheOp(DeviceType dev_type)

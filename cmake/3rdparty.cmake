@@ -9,7 +9,6 @@ if(NOT EXISTS ${CPM_CACHE_FILE})
 endif()
 
 include(${CPM_CACHE_FILE})
-set(CPM_USE_LOCAL_PACKAGES ON)
 set(CPM_SOURCE_CACHE "$ENV{HOME}/.cache/CPM")
 
 CPMAddPackage("gh:nlohmann/json@3.12.0")

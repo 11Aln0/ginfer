@@ -3,7 +3,7 @@ import numpy as np
 import ml_dtypes
 import pytest
 import torch
-from flash_attn import flash_attn_varlen_func
+from flash_attn import flash_attn_varlen_func, flash_attn_with_kvcache
 
 # ==================== GQA Varlen ====================
 
@@ -32,6 +32,33 @@ def flash_attn_varlen_reference(q_cat, k_cache, v_cache, block_tables,
     return out.cpu().to(dtype=torch.float32).numpy()
 
 
+def flash_attn_decode_reference(q_decode, k_cache, v_cache, cache_seqlens, block_tables, dtype):
+    """
+    用 flash_attn_with_kvcache 计算 decode 阶段参考输出。
+    q_decode: [batch, 1, nheads, head_dim]
+    返回: [batch, nheads, head_dim] numpy array
+    """
+    device = "cuda"
+    torch_dtype = torch.float16 if dtype == np.float16 else torch.bfloat16
+
+    q = torch.from_numpy(q_decode.astype(np.float32)).to(device=device, dtype=torch_dtype)
+    k = torch.from_numpy(k_cache.astype(np.float32)).to(device=device, dtype=torch_dtype)
+    v = torch.from_numpy(v_cache.astype(np.float32)).to(device=device, dtype=torch_dtype)
+    cache_seqlens_t = torch.tensor(cache_seqlens, dtype=torch.int32, device=device)
+    block_table_t = torch.from_numpy(block_tables).to(device=device, dtype=torch.int32)
+
+    out = flash_attn_with_kvcache(
+        q=q,
+        k_cache=k,
+        v_cache=v,
+        cache_seqlens=cache_seqlens_t,
+        causal=True,
+        block_table=block_table_t,
+    )
+
+    return out[:, 0].cpu().to(dtype=torch.float32).numpy()
+
+
 VARLEN_CONFIGS = [
     # (name, num_heads, kv_heads, head_dim)
     ("Llama3-8B",  32,  8, 128),
@@ -47,14 +74,20 @@ VARLEN_SEQ_CONFIGS = [
     [(125, 260), (63, 63)],
 ]
 
+DECODE_SEQ_CONFIGS = [
+    [1280, 2561],
+    [5000, 2000],
+    [2600, 22000],
+]
 
-@pytest.mark.parametrize("name, num_heads, kv_heads, head_dim", VARLEN_CONFIGS)
+
+@pytest.mark.parametrize("_name, num_heads, kv_heads, head_dim", VARLEN_CONFIGS)
 @pytest.mark.parametrize("seq_config", VARLEN_SEQ_CONFIGS)
 @pytest.mark.parametrize("dtype, atol, rtol", [
     (np.float16,      2e-3, 2e-3),
     (ml_dtypes.bfloat16, 2e-2, 2e-2),
 ])
-def test_gqa_varlen_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, seq_config):
+def test_gqa_varlen_op(dtype, atol, rtol, _name, num_heads, kv_heads, head_dim, seq_config):
     import math
     paged_block_size = 256  # 与 kernel 中 bc=64 对齐
 
@@ -105,6 +138,49 @@ def test_gqa_varlen_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, s
     np.testing.assert_allclose(out_cuda, ref_out, rtol=rtol, atol=atol)
 
 
+@pytest.mark.parametrize("name, num_heads, kv_heads, head_dim", VARLEN_CONFIGS)
+@pytest.mark.parametrize("kv_lens", DECODE_SEQ_CONFIGS)
+@pytest.mark.parametrize("dtype, atol, rtol", [
+    (np.float16, 2e-3, 2e-3),
+    (ml_dtypes.bfloat16, 2e-2, 2e-2),
+])
+def test_gqa_varlen_decode_op(dtype, atol, rtol, name, num_heads, kv_heads, head_dim, kv_lens):
+    import math
+    paged_block_size = 256
+
+    batch_size = len(kv_lens)
+    blocks_per_seq = [math.ceil(l / paged_block_size) for l in kv_lens]
+    total_blocks = sum(blocks_per_seq)
+    max_blocks = max(blocks_per_seq)
+
+    k_cache = np.random.randn(total_blocks, paged_block_size, kv_heads, head_dim).astype(dtype)
+    v_cache = np.random.randn(total_blocks, paged_block_size, kv_heads, head_dim).astype(dtype)
+
+    block_tables = np.zeros((batch_size, max_blocks), dtype=np.int32)
+    blk_offset = 0
+    for i, n in enumerate(blocks_per_seq):
+        block_tables[i, :n] = np.arange(blk_offset, blk_offset + n)
+        blk_offset += n
+
+    cu_seqlens_kv = np.array([0] + list(np.cumsum(kv_lens)), dtype=np.int32)
+    q_decode = np.random.randn(batch_size, 1, num_heads, head_dim).astype(dtype)
+
+    out_cuda = ginfer_test.test_gqa_varlen_decode_op_cuda(
+        q_decode, k_cache, v_cache,
+        cu_seqlens_kv, block_tables,
+        paged_block_size,
+    ).astype(np.float32).reshape(batch_size, num_heads, head_dim)
+
+    ref_out = flash_attn_decode_reference(
+        q_decode, k_cache, v_cache, kv_lens, block_tables, dtype,
+    )
+
+    if not np.allclose(out_cuda, ref_out, rtol=rtol, atol=atol):
+        print("Max absolute error:", np.max(np.abs(out_cuda - ref_out)))
+        print("Max relative error:", np.max(np.abs(out_cuda - ref_out) / (np.abs(ref_out) + 1e-6)))
+    np.testing.assert_allclose(out_cuda, ref_out, rtol=rtol, atol=atol)
+
+
 # ==================== Store KV Cache ====================
 
 STORE_KVCACHE_CONFIGS = [
@@ -128,9 +204,9 @@ def test_store_kvcache_op(dtype, atol, kv_heads, head_dim):
     k = np.random.randn(num_tokens, kv_heads, head_dim).astype(dtype)
     v = np.random.randn(num_tokens, kv_heads, head_dim).astype(dtype)
 
-    # Pre-fill cache with sentinel so untouched slots can be verified
-    k_cache = np.full((total_slots, kv_heads, head_dim), fill_value=99.0, dtype=dtype)
-    v_cache = np.full((total_slots, kv_heads, head_dim), fill_value=99.0, dtype=dtype)
+    # Pre-fill cache with random values so untouched slots can be verified
+    k_cache = np.random.randn(total_slots, kv_heads, head_dim).astype(dtype)
+    v_cache = np.random.randn(total_slots, kv_heads, head_dim).astype(dtype)
 
     # Reference: manual scatter
     ref_k_cache = k_cache.copy()

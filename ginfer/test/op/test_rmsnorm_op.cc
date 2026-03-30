@@ -27,8 +27,8 @@ TensorRef test_rmsnorm_op_cuda(TensorRef input_tensor, TensorRef gamma_tensor, f
 
   // Move tensors to GPU
   auto cu_allocator =
-      ginfer::core::memory::getDeviceAllocator<ginfer::core::memory::PooledAllocStrategy>(
-          DeviceType::kDeviceCUDA);
+      ginfer::core::memory::getDeviceAllocator(DeviceType::kDeviceCUDA,
+                                                 ginfer::core::memory::kPooled);
   ASSIGN_OR_THROW(input_tensor, input_tensor->toDevice(cu_allocator));
   ASSIGN_OR_THROW(gamma_tensor, gamma_tensor->toDevice(cu_allocator));
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(cu_allocator));

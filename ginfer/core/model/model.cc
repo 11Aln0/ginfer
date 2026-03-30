@@ -142,7 +142,7 @@ Result<void, std::string> LlamaArchModel::lazyInitPosEmbedding(const core::Infer
                           tensor::Shape{config_.max_position_embeddings, config_.head_dim / 2},
                           dev_type_));
   auto allocator =
-      memory::getDeviceAllocator<memory::PooledAllocStrategy>(memory::DeviceType::kDeviceCPU);
+      memory::getDeviceAllocator(memory::DeviceType::kDeviceCPU, memory::kPooled);
   DECLARE_OR_RETURN(pos_ids,
                     Tensor::create(tensor::DataType::kDataTypeInt64, tensor::Shape{2}, allocator));
   pos_ids->data<int64_t>()[0] = 0;
@@ -216,8 +216,7 @@ Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
   auto argmax_out = intermediates_.argmax_out->slice(0, 0, batch_size);
   RETURN_ON_ERR(argmax_op.run(ctx, {lm_head_out.get()}, {argmax_out.get()}));
   ASSIGN_OR_RETURN(argmax_out,
-                   argmax_out->toDevice(memory::getDeviceAllocator<memory::PooledAllocStrategy>(
-                       memory::DeviceType::kDeviceCPU)));
+                   argmax_out->toDevice(memory::DeviceType::kDeviceCPU, memory::kPooled));
 
   std::vector<int32_t> tokens(batch_size);
   std::memcpy(tokens.data(), argmax_out->data(), batch_size * sizeof(int32_t));

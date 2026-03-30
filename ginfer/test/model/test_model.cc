@@ -1,5 +1,6 @@
 #include <glog/logging.h>
 #include <tokenizers_cpp.h>
+#include <chrono>
 #include <ranges>
 #include <vector>
 #include "ginfer/common/errors.h"
@@ -19,14 +20,13 @@ namespace ginfer::test::pybind {
 using common::DeviceType;
 using core::memory::Buffer;
 using core::memory::getDeviceAllocator;
-using core::memory::PooledAllocStrategy;
 using core::tensor::DataType;
 using core::tensor::Shape;
 using core::tensor::Tensor;
 using core::tensor::TensorRef;
 
-auto host_allocator = getDeviceAllocator<PooledAllocStrategy>(DeviceType::kDeviceCPU);
-auto dev_allocator = getDeviceAllocator<PooledAllocStrategy>(DeviceType::kDeviceCUDA);
+auto host_allocator = getDeviceAllocator(DeviceType::kDeviceCPU, core::memory::kPooled);
+auto dev_allocator = getDeviceAllocator(DeviceType::kDeviceCUDA, core::memory::kPooled);
 
 void setCuSeqlen(core::InferContext& ctx, int seqlen_q, int seqlen_kv) {
   DECLARE_OR_THROW(cu_seqlens_q,
@@ -80,15 +80,16 @@ void setInferCtx(
   setSlotMapping(ctx, seqlen_kv, is_prefill);
   setBlockTable(ctx, seqlen_kv, block_size);
   setMaxSeqLenQ(ctx, seqlen_q);
+  ctx.setIsPrefill(is_prefill);
 }
 
 void printAllocatorStats(DeviceType dev_type) {
-  auto pool_stats = getDeviceAllocator<PooledAllocStrategy>(dev_type)->getStats();
+  auto pool_stats = getDeviceAllocator(dev_type, core::memory::kPooled)->getStats();
   LOG(INFO) << "Pooled Allocator Stats - Live bytes: " << pool_stats.live_bytes
             << ", Peak live bytes: " << pool_stats.peak_live_bytes
             << ", Reserved bytes: " << pool_stats.reserved_bytes
             << ", Peak reserved bytes: " << pool_stats.peak_reserved_bytes;
-  auto stats = getDeviceAllocator(dev_type)->getStats();
+  auto stats = getDeviceAllocator(dev_type, core::memory::kDefault)->getStats();
   LOG(INFO) << "Default Allocator Stats - Live bytes: " << stats.live_bytes
             << ", Peak live bytes: " << stats.peak_live_bytes
             << ", Reserved bytes: " << stats.reserved_bytes
@@ -150,6 +151,8 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   THROW_ON_ERR(model->predict(infer_ctx, input_ids, positions));
   printAllocatorStats(DeviceType::kDeviceCUDA);
 
+  auto start = std::chrono::high_resolution_clock::now();
+
   // prefill
   setInferCtx(infer_ctx, /* is_prefill */ true, input_seqlen, input_seqlen, block_size);
   DECLARE_OR_THROW(next_token_ids, model->predict(infer_ctx, input_ids, positions));
@@ -173,6 +176,10 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
     input_ids->data<int32_t>()[0] = next_token_id;
   }
   new_token_ids.push_back(next_token_id);
+
+  auto end = std::chrono::high_resolution_clock::now();
+  auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+  LOG(INFO) << "ginfer generate time: " << duration.count() << " ms";
 
   return new_token_ids;
 }

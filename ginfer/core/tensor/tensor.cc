@@ -16,9 +16,11 @@ Result<TensorRef, std::string> Tensor::create(DataType dtype,
   return Ok(std::shared_ptr<Tensor>(new Tensor(dtype, shape, buffer)));
 }
 
-Result<TensorRef, std::string> Tensor::create(DataType dtype, Shape shape, DeviceType dev_type) {
-  DECLARE_OR_RETURN(buffer, memory::Buffer::create(shape.numel() * dTypeSize(dtype), dev_type));
-  return create(dtype, std::move(shape), buffer);
+Result<TensorRef, std::string> Tensor::create(DataType dtype,
+                                              Shape shape,
+                                              DeviceType dev_type,
+                                              uint8_t alloc_flags) {
+  return create(dtype, std::move(shape), memory::getDeviceAllocator(dev_type, alloc_flags));
 }
 
 Result<TensorRef, std::string> Tensor::create(DataType dtype,
@@ -43,6 +45,8 @@ const Shape& Tensor::shape() const { return shape_; }
 
 DataType Tensor::dtype() const { return dtype_; }
 
+DeviceType Tensor::devType() const { return buffer_->devType(); }
+
 size_t Tensor::size() const { return size_; }
 
 size_t Tensor::nbytes() const { return buffer_->size(); }
@@ -60,21 +64,23 @@ bool Tensor::isContiguous() const {
   return true;
 }
 
-Result<TensorRef, std::string> Tensor::toDeviceDense(memory::DeviceAllocator* allocator) {
+Result<TensorRef, std::string> Tensor::toDeviceDense(memory::DeviceAllocator* allocator,
+                                                     bool async) {
   auto dtype_size = dTypeSize(dtype_);
   DECLARE_OR_RETURN(new_buffer, memory::Buffer::create(size_ * dtype_size, allocator));
-  new_buffer->copyFrom(buffer_, 0, offset_ * dtype_size, size_ * dtype_size);
+  new_buffer->copyFrom(buffer_, 0, offset_ * dtype_size, size_ * dtype_size, async);
   auto new_tensor = std::shared_ptr<Tensor>(new Tensor(dtype_, shape_, new_buffer));
   return Ok(new_tensor);
 }
 
-Result<TensorRef, std::string> Tensor::toDevicePreserveLayout(memory::DeviceAllocator* allocator) {
-  if (buffer_->devType() == allocator->devType()) {
+Result<TensorRef, std::string> Tensor::toDevicePreserveLayout(memory::DeviceAllocator* allocator,
+                                                              bool async) {
+  if (buffer_->allocator() == allocator) {
     return Ok(shared_from_this());
   }
   auto dtype_size = dTypeSize(dtype_);
   DECLARE_OR_RETURN(new_buffer, memory::Buffer::create(buffer_->size(), allocator));
-  new_buffer->copyFrom(buffer_);
+  new_buffer->copyFrom(buffer_, async);
   auto new_tensor = std::shared_ptr<Tensor>(new Tensor(dtype_, shape_, new_buffer));
   new_tensor->offset_ = offset_;
   new_tensor->strides_ = strides_;
@@ -84,7 +90,8 @@ Result<TensorRef, std::string> Tensor::toDevicePreserveLayout(memory::DeviceAllo
 }
 
 Result<TensorRef, std::string> Tensor::toDevice(memory::DeviceAllocator* allocator,
-                                                bool preserveLayout) {
+                                                bool preserveLayout,
+                                                bool async) {
   CHECK_NE(buffer_, nullptr);
   CHECK_NE(allocator, nullptr);
   CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
@@ -93,17 +100,20 @@ Result<TensorRef, std::string> Tensor::toDevice(memory::DeviceAllocator* allocat
       << "Only contiguous tensors are supported for now.";
 
   if (preserveLayout) {
-    return toDevicePreserveLayout(allocator);
+    return toDevicePreserveLayout(allocator, async);
   } else {
-    return toDeviceDense(allocator);
+    return toDeviceDense(allocator, async);
   }
 }
 
-Result<TensorRef, std::string> Tensor::toDevice(DeviceType dev_type, bool preserveLayout) {
-  return toDevice(memory::getDefaultDeviceAllocator(dev_type), preserveLayout);
+Result<TensorRef, std::string> Tensor::toDevice(DeviceType dev_type,
+                                                uint8_t alloc_flags,
+                                                bool preserveLayout,
+                                                bool async) {
+  return toDevice(memory::getDeviceAllocator(dev_type, alloc_flags), preserveLayout, async);
 }
 
-void Tensor::copyFrom(const TensorRef& src) {
+void Tensor::copyFrom(const TensorRef& src, bool async) {
   CHECK(shape_ == src->shape()) << "Copy failed: tensor shapes do not match.";
   CHECK(dtype_ == src->dtype()) << "Copy failed: tensor data types do not match.";
   CHECK(strides_ == src->strides()) << "Copy failed: tensor strides do not match.";
@@ -111,7 +121,7 @@ void Tensor::copyFrom(const TensorRef& src) {
       << "Copy failed: src or dst tensor is not contiguous.";
   auto dtype_size = dTypeSize(dtype_);
   buffer_->copyFrom(src->buffer_, src->offset_ * dtype_size, offset_ * dtype_size,
-                    size_ * dtype_size);
+                    size_ * dtype_size, async);
 }
 
 TensorRef Tensor::slice(int dim, int64_t start, int64_t end) const {

@@ -10,7 +10,8 @@ namespace ginfer::test::memory {
 using std::byte;
 
 TEST(MemoryTest, DefaultCUDAAllocator) {
-  auto allocator = ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance();
+  auto allocator = ginfer::core::memory::getDefaultDeviceAllocator(
+      ginfer::core::memory::DeviceType::kDeviceCUDA);
   ASSERT_NE(allocator, nullptr);
   auto res = allocator->alloc(1024);
   ASSERT_TRUE(res.ok()) << "Allocation failed with error: " << res.err();
@@ -21,9 +22,7 @@ TEST(MemoryTest, DefaultCUDAAllocator) {
 
 TEST(MemoryTest, PooledCUDAAllocator) {
   using namespace ginfer::core::memory;
-  using PooledCUDADAllocator = PooledAllocStrategy<CUDADeviceAllocator>;
-  using PooledGlobalCUDAAllocator = GlobalDeviceAllocator<PooledCUDADAllocator>;
-  auto allocator = PooledGlobalCUDAAllocator::getInstance();
+  auto allocator = getDeviceAllocator(DeviceType::kDeviceCUDA, kPooled);
   ASSERT_NE(allocator, nullptr);
 
   auto res1 = allocator->alloc(1024);
@@ -61,7 +60,19 @@ TEST(MemoryTest, PooledCUDAAllocator) {
 }
 
 TEST(MemoryTest, CPUAllocator) {
-  auto allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto allocator = ginfer::core::memory::getDefaultDeviceAllocator(
+      ginfer::core::memory::DeviceType::kDeviceCPU);
+  ASSERT_NE(allocator, nullptr);
+  auto res = allocator->alloc(1024);
+  ASSERT_TRUE(res.ok()) << "Allocation failed with error: " << res.err();
+  void* ptr = res.value();
+  ASSERT_NE((byte*)ptr, nullptr);
+  allocator->free(ptr, 1024);
+}
+
+TEST(MemoryTest, PinnedCPUAllocator) {
+  auto allocator = ginfer::core::memory::getDeviceAllocator(
+      ginfer::core::memory::DeviceType::kDeviceCPU, ginfer::core::memory::kPinned);
   ASSERT_NE(allocator, nullptr);
   auto res = allocator->alloc(1024);
   ASSERT_TRUE(res.ok()) << "Allocation failed with error: " << res.err();
@@ -80,16 +91,16 @@ TEST(MemoryTest, CUDABuffer) {
   ASSERT_EQ(buf->size(), 1024);
   ASSERT_NE(buf->ptr(), nullptr);
 
-  using PooledGlobalCUDAAllocator = ginfer::core::memory::GlobalDeviceAllocator<
-      ginfer::core::memory::PooledAllocStrategy<ginfer::core::memory::CUDADeviceAllocator>>;
-  auto res1 = Buffer::create(1024, PooledGlobalCUDAAllocator::getInstance());
+  auto res1 = Buffer::create(
+      1024, ginfer::core::memory::getDeviceAllocator(DeviceType::kDeviceCUDA,
+                                                     ginfer::core::memory::kPooled));
   ASSERT_TRUE(res1.ok()) << res1.err();
   std::shared_ptr<Buffer> buf1 = res1.value();
   ASSERT_EQ(buf1->devType(), DeviceType::kDeviceCUDA);
   ASSERT_EQ(buf1->size(), 1024);
   ASSERT_NE(buf1->ptr(), nullptr);
 
-  auto res2 = Buffer::create(2048, ginfer::core::memory::DefaultGlobalCUDAAllocator::getInstance());
+  auto res2 = Buffer::create(2048, ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCUDA));
   ASSERT_TRUE(res2.ok()) << res2.err();
   std::shared_ptr<Buffer> buf2 = res2.value();
   ASSERT_EQ(buf2->devType(), DeviceType::kDeviceCUDA);
@@ -98,7 +109,7 @@ TEST(MemoryTest, CUDABuffer) {
 }
 
 TEST(MemoryTest, CPUBuffer) {
-  auto allocator = ginfer::core::memory::GlobalCPUAllocator::getInstance();
+  auto allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(allocator, nullptr);
   {
     auto res = ginfer::core::memory::Buffer::create(1024, allocator);

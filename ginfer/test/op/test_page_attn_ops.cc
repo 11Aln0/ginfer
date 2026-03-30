@@ -49,16 +49,60 @@ TensorRef test_gqa_varlen_op_cuda(TensorRef q_tensor,
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
 
   auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
-  std::vector<const Tensor*> inputs = {q_tensor.get(),
-                                       k_tensor.get(),
-                                       v_tensor.get(),
-                                       cu_seqlens_q_tensor.get(),
-                                       cu_seqlens_kv_tensor.get(),
-                                       block_tables_tensor.get()};
+  std::vector<const Tensor*> inputs = {q_tensor.get(), k_tensor.get(), v_tensor.get()};
   std::vector<Tensor*> outputs = {output_tensor.get()};
-  auto status = op.run(core::InferContext{}.setMaxSeqlenQ(max_seqlen_q).setDeviceContext(dev_ctx),
+  auto status = op.run(core::InferContext{}
+                           .setIsPrefill(true)
+                           .setMaxSeqlenQ(max_seqlen_q)
+                           .setCuSeqlensQ(cu_seqlens_q_tensor)
+                           .setCuSeqlensKV(cu_seqlens_kv_tensor)
+                           .setBlockTables(block_tables_tensor)
+                           .setDeviceContext(dev_ctx),
                        inputs, outputs);
   CHECK(status.ok()) << "GQAVarlenOp run failed: " << status.err();
+
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
+  return output_tensor;
+}
+
+// ─────────────────────────────────────────────
+//  test_gqa_varlen_decode_op_cuda
+//
+//  q:            [batch, 1, num_heads, head_dim]
+//  k / v:        [total_blocks * block_size, kv_heads, head_dim]  (paged layout)
+//  cu_seqlens_kv:[batch + 1] int32
+//  block_tables: [batch, max_blocks_per_seq] int32
+// ─────────────────────────────────────────────
+TensorRef test_gqa_varlen_decode_op_cuda(TensorRef q_tensor,
+                                         TensorRef k_tensor,
+                                         TensorRef v_tensor,
+                                         TensorRef cu_seqlens_kv_tensor,
+                                         TensorRef block_tables_tensor,
+                                         int paged_block_size) {
+  auto out_res =
+      Tensor::create(q_tensor->dtype(), Shape(q_tensor->shape()), DeviceType::kDeviceCPU);
+  CHECK(out_res.ok()) << out_res.err();
+  auto output_tensor = out_res.value();
+
+  ::ginfer::core::op::GQAVarlenOp op(DeviceType::kDeviceCUDA, paged_block_size);
+
+  ASSIGN_OR_THROW(q_tensor, q_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(k_tensor, k_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(v_tensor, v_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(cu_seqlens_kv_tensor, cu_seqlens_kv_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(block_tables_tensor, block_tables_tensor->toDevice(DeviceType::kDeviceCUDA));
+  ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCUDA));
+
+  auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
+  std::vector<const Tensor*> inputs = {q_tensor.get(), k_tensor.get(), v_tensor.get()};
+  std::vector<Tensor*> outputs = {output_tensor.get()};
+  auto status = op.run(core::InferContext{}
+                           .setIsPrefill(false)
+                           .setCuSeqlensKV(cu_seqlens_kv_tensor)
+                           .setBlockTables(block_tables_tensor)
+                           .setDeviceContext(dev_ctx),
+                       inputs, outputs);
+  CHECK(status.ok()) << "GQAVarlen decode run failed: " << status.err();
 
   ASSIGN_OR_THROW(output_tensor, output_tensor->toDevice(DeviceType::kDeviceCPU));
   return output_tensor;
@@ -96,6 +140,10 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
   CHECK(v_cache_gpu_res.ok()) << v_cache_gpu_res.err();
   auto v_cache_gpu = v_cache_gpu_res.value();
 
+  // Preserve the initial sentinel contents before running the in-place update.
+  k_cache_gpu->copyFrom(k_cache_tensor);  // CPU → GPU
+  v_cache_gpu->copyFrom(v_cache_tensor);  // CPU → GPU
+
   auto dev_ctx = ginfer::common::DeviceContext::create(DeviceType::kDeviceCUDA);
   std::vector<const Tensor*> inputs = {k_tensor.get(), v_tensor.get(), k_cache_gpu.get(),
                                        v_cache_gpu.get(), slot_mapping_tensor.get()};
@@ -109,6 +157,7 @@ void test_store_kvcache_op_cuda(TensorRef k_tensor,
 }
 
 REGISTER_PYBIND_TEST(test_gqa_varlen_op_cuda);
+REGISTER_PYBIND_TEST(test_gqa_varlen_decode_op_cuda);
 REGISTER_PYBIND_TEST(test_store_kvcache_op_cuda);
 
 }  // namespace ginfer::test::pybind

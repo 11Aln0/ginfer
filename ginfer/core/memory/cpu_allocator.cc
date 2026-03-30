@@ -24,10 +24,10 @@ void CPUDeviceAllocator::doFree(void* ptr, size_t size) {
 }
 
 void CPUDeviceAllocator::memcpy(
-    const void* src, void* dst, size_t size, MemcpyKind kind, void* stream, bool sync) const {
+    const void* src, void* dst, size_t size, MemcpyKind kind, bool async) const {
+  CHECK(!async) << "Async copy is not supported for CPUDeviceAllocator.";
   (void)kind;
-  (void)stream;
-  (void)sync;
+  (void)async;
   std::memcpy(dst, src, size);
 }
 

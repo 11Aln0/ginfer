@@ -40,12 +40,10 @@ class DeviceAllocator : protected AllocatorStatsTracker {
   // overhead), we add size argument here might have a better way to implement it in future
   void free(void* ptr, size_t size);
 
-  virtual void memcpy(const void* src,
-                      void* dst,
-                      size_t size,
-                      MemcpyKind kind,
-                      void* stream = nullptr,
-                      bool sync = false) const = 0;
+  void setStream(void* stream);
+
+  virtual void memcpy(
+      const void* src, void* dst, size_t size, MemcpyKind kind, bool async = false) const = 0;
 
   virtual DeviceMemInfo getMemInfo() const = 0;
 
@@ -59,6 +57,9 @@ class DeviceAllocator : protected AllocatorStatsTracker {
 
   virtual void doFree(void* ptr, size_t size) = 0;
 
+ protected:
+  void* stream_ = nullptr;  // optional stream for async copy, only used by some devices like CUDA
+
  private:
   DeviceType dev_type_;
 };
@@ -67,12 +68,23 @@ class CPUDeviceAllocator : public DeviceAllocator {
  public:
   explicit CPUDeviceAllocator();
 
-  void memcpy(const void* src,
-              void* dst,
-              size_t size,
-              MemcpyKind kind,
-              void* stream = nullptr,
-              bool sync = false) const override;
+  void memcpy(
+      const void* src, void* dst, size_t size, MemcpyKind kind, bool async = false) const override;
+
+  DeviceMemInfo getMemInfo() const override;
+
+ protected:
+  Result<void*, std::string> doAlloc(size_t size) override;
+
+  void doFree(void* ptr, size_t size) override;
+};
+
+class PinnedCPUAllocator : public DeviceAllocator {
+ public:
+  explicit PinnedCPUAllocator();
+
+  void memcpy(
+      const void* src, void* dst, size_t size, MemcpyKind kind, bool async = false) const override;
 
   DeviceMemInfo getMemInfo() const override;
 
@@ -86,12 +98,8 @@ class CUDADeviceAllocator : public DeviceAllocator {
  public:
   explicit CUDADeviceAllocator();
 
-  void memcpy(const void* src,
-              void* dst,
-              size_t size,
-              MemcpyKind kind,
-              void* stream = nullptr,
-              bool sync = false) const override;
+  void memcpy(
+      const void* src, void* dst, size_t size, MemcpyKind kind, bool async = false) const override;
 
   DeviceMemInfo getMemInfo() const override;
 
