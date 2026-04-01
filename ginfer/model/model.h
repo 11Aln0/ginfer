@@ -7,24 +7,22 @@
 #include "ginfer/core/layer/layer.h"
 #include "ginfer/core/layer/transformer/layer.h"
 #include "ginfer/core/memory/allocator_factory.h"
-#include "ginfer/core/model/loader/safetensor_loader.h"
 #include "ginfer/core/op/op.h"
 #include "ginfer/core/tensor/tensor.h"
+#include "ginfer/model/loader/safetensor_loader.h"
 
-namespace ginfer::core::model {
+namespace ginfer::model {
 
 using ginfer::core::tensor::Tensor;
 using ginfer::core::tensor::TensorRef;
 
 struct ModelConfig {
  public:
-  tensor::DataType dtype;
+  core::tensor::DataType dtype;
 
   int nlayer;
   int vocab_size;
   int max_position_embeddings;
-  int max_seq_len = 4096;
-  int max_batch_size = 1;
 
   int num_heads;
   int num_kv_heads;
@@ -33,37 +31,39 @@ struct ModelConfig {
   std::vector<int32_t> eos_token_ids;
 };
 
+struct ModelRuntimeConfig {
+ public:
+  int max_seq_len = 4096;
+  int max_batch_size = 1;
+};
+
 class Model {
  public:
   Model() = delete;
 
   explicit Model(ModelConfig config, common::DeviceType dev_type);
 
-  virtual Result<std::vector<int32_t>, std::string> predict(const core::InferContext& ctx,
-                                                            const tensor::TensorRef token_ids,
-                                                            const tensor::TensorRef positions) = 0;
+  virtual Result<std::vector<int32_t>, std::string> predict(
+      const core::InferContext& ctx,
+      const core::tensor::TensorRef token_ids,
+      const core::tensor::TensorRef positions) = 0;
 
   virtual Result<void, std::string> toDevice(common::DeviceType dev_type);
 
   common::DeviceType getDeviceType() const;
 
-  int getVocabSize() const;
-
-  int getNumLayers() const;
-
-  tensor::DataType getDtype() const;
-
-  std::tuple<int, int, int> getAttentionConfig() const;
+  const ModelConfig& getConfig() const;
 
   bool isEosToken(int32_t token_id) const;
 
-  void setMaxSeqLen(int max_seq_len);
+  void setRuntimeConfig(ModelRuntimeConfig runtime_config);
 
   // K/V Cache Tensor: [num_kvcache_blocks, block_size, num_kv_heads * head_dim]
   virtual void setKVCache(int layer_id, TensorRef& k_cache, TensorRef& v_cache) = 0;
 
- private:
+ protected:
   ModelConfig config_;
+  ModelRuntimeConfig runtime_config_;
   common::DeviceType dev_type_;
 };
 
@@ -81,9 +81,10 @@ class LlamaArchModel : public Model {
  public:
   LlamaArchModel(LlamaArchModelConfig config, common::DeviceType dev_type);
 
-  Result<std::vector<int32_t>, std::string> predict(const core::InferContext& ctx,
-                                                    const tensor::TensorRef token_ids,
-                                                    const tensor::TensorRef positions) override;
+  Result<std::vector<int32_t>, std::string> predict(
+      const core::InferContext& ctx,
+      const core::tensor::TensorRef token_ids,
+      const core::tensor::TensorRef positions) override;
 
   Result<void, std::string> toDevice(common::DeviceType dev_type) override;
 
@@ -112,7 +113,6 @@ class LlamaArchModel : public Model {
 
  private:
   LlamaArchModelConfig config_;
-  common::DeviceType dev_type_;
   bool intermediates_allocated_ = false;
 
   Intermediates intermediates_;
@@ -122,14 +122,14 @@ class LlamaArchModel : public Model {
   TensorRef cos;
   bool pos_embedding_initialized_ = false;
 
-  virtual op::Op& getRotaryEmbeddingOp() = 0;
+  virtual core::op::Op& getRotaryEmbeddingOp() = 0;
 
  protected:
-  op::ArgmaxOp argmax_op;
-  layer::EmbeddingLayer embed_tokens;
-  std::vector<layer::transformer::EncoderLayer> encoder_layers;
-  layer::RMSNormLayer final_rmsnorm;
-  layer::transformer::LMHeadLayer lm_head;
+  core::op::ArgmaxOp argmax_op;
+  core::layer::EmbeddingLayer embed_tokens;
+  std::vector<core::layer::transformer::EncoderLayer> encoder_layers;
+  core::layer::RMSNormLayer final_rmsnorm;
+  core::layer::transformer::LMHeadLayer lm_head;
 };
 
-}  // namespace ginfer::core::model
+}  // namespace ginfer::model

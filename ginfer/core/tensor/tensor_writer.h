@@ -55,7 +55,8 @@ class TensorWriter {
   }
 
   void ensureCapacity(size_t n) const {
-    CHECK(size_ + n <= capacity_) << "TensorWriter capacity exceeded";
+    CHECK(size_ + n <= capacity_) << "TensorWriter capacity exceeded: size " << size_ << " + n "
+                                  << n << " > capacity " << capacity_;
   }
 
  private:

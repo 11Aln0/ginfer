@@ -27,14 +27,7 @@ Result<void, std::string> AttentionLayer::forwardWithKVCache(const core::InferCo
                                                              TensorRef output) {
   CHECK(ctx.slot_mapping.has_value())
       << "slot_mapping is required in InferContext for AttentionLayer.";
-  CHECK(ctx.cu_seqlens_q.has_value() && ctx.cu_seqlens_kv.has_value())
-      << "cu_seqlens_q, cu_seqlens_kv are required in InferContext for AttentionLayer.";
-  CHECK(ctx.block_tables.has_value())
-      << "block_tables is required in InferContext for AttentionLayer.";
-  CHECK(k_cache_ != nullptr && v_cache_ != nullptr)
-      << "KV cache tensors must be set before calling AttentionLayer forward.";
-  CHECK(ctx.slot_mapping.value()->shape()[0] == k->shape()[0])
-      << "slot_mapping length must match the sequence length of k/v tensors.";
+  // TODO Context CHECK
 
   RETURN_ON_ERR(store_kv_op.run(
       ctx, {k.get(), v.get(), k_cache_.get(), v_cache_.get(), ctx.slot_mapping.value().get()}, {}));

@@ -3,13 +3,13 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include "ginfer/common/errors.h"
-#include "ginfer/core/model/llama3.h"
-#include "ginfer/core/model/loader/model_loader.h"
-#include "ginfer/core/model/model.h"
-#include "ginfer/core/model/qwen2.h"
+#include "ginfer/model/llama3.h"
+#include "ginfer/model/loader/model_loader.h"
+#include "ginfer/model/model.h"
+#include "ginfer/model/qwen2.h"
 #include "ginfer/utils/utils.h"
 
-namespace ginfer::core::model {
+namespace ginfer::model {
 
 class ModelFactory {
  public:
@@ -27,4 +27,4 @@ class ModelFactory {
   }
 };
 
-}  // namespace ginfer::core::model
+}  // namespace ginfer::model

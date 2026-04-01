@@ -30,6 +30,9 @@ if(NOT TARGET concurrentqueue)
   target_include_directories(concurrentqueue INTERFACE ${concurrentqueue_SOURCE_DIR})
 endif()
 
+# 临时关闭警告
+set(CMAKE_CXX_FLAGS_SAVE "${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w")
 
 CPMAddPackage(
   NAME tokenizers_cpp
@@ -38,6 +41,8 @@ CPMAddPackage(
   OPTIONS
     "TOKENIZERS_CPP_EXAMPLE OFF"
 )
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS_SAVE}")
 
 CPMAddPackage(
   NAME jinja

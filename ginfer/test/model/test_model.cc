@@ -4,10 +4,10 @@
 #include <ranges>
 #include <vector>
 #include "ginfer/common/errors.h"
-#include "ginfer/core/model/model_factory.h"
-#include "ginfer/core/model/qwen2.h"
-#include "ginfer/core/model/tokenizer/auto_tokenizer.h"
 #include "ginfer/core/op/op.h"
+#include "ginfer/model/model_factory.h"
+#include "ginfer/model/qwen2.h"
+#include "ginfer/model/tokenizer/auto_tokenizer.h"
 #include "ginfer/test/pybind/func_wrap.h"
 #include "ginfer/test/pybind/test_registry.h"
 #include "ginfer/test/pybind/type.h"
@@ -96,13 +96,15 @@ void printAllocatorStats(DeviceType dev_type) {
             << ", Peak reserved bytes: " << stats.peak_reserved_bytes;
 }
 
-void allocKVCache(std::unique_ptr<core::model::Model>& model,
+void allocKVCache(std::unique_ptr<model::Model>& model,
                   int num_blocks,
                   int block_size,
                   int num_kv_heads,
                   int head_dim) {
-  auto dtype = model->getDtype();
-  for (int i = 0; i < model->getNumLayers(); ++i) {
+  auto& cfg = model->getConfig();
+  auto dtype = cfg.dtype;
+  int n_layer = cfg.nlayer;
+  for (int i = 0; i < n_layer; ++i) {
     DECLARE_OR_THROW(k_cache,
                      Tensor::create(dtype, Shape({num_blocks, block_size, num_kv_heads, head_dim}),
                                     dev_allocator));
@@ -118,11 +120,15 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   const int block_size = 16;
   const int num_blocks = 4096 / block_size;  // support up to 4096 sequence length
 
-  auto loader = core::model::ModelFactory::createLoader(model_path);
+  auto loader = model::ModelFactory::createLoader(model_path);
   auto model = loader->load();
   THROW_ON_ERR(model->toDevice(DeviceType::kDeviceCUDA));
-  auto [num_heads, num_kv_heads, head_dim] = model->getAttentionConfig();
-  allocKVCache(model, num_blocks, block_size, num_kv_heads, head_dim);
+  model->setRuntimeConfig({
+      .max_seq_len = 4096,
+      .max_batch_size = 1,
+  });
+  auto& cfg = model->getConfig();
+  allocKVCache(model, num_blocks, block_size, cfg.num_kv_heads, cfg.head_dim);
 
   std::vector<int32_t> new_token_ids;
   core::InferContext infer_ctx;
@@ -197,7 +203,7 @@ TensorRef test_model_generate_cuda(const std::string& model_path, TensorRef inpu
 
 std::string test_model_infer_cuda(const std::string& model_path, const std::string& prompt) {
   // Tokenize prompt
-  auto tokenizer = std::make_unique<core::model::tokenizer::AutoTokenizer>(model_path);
+  auto tokenizer = std::make_unique<model::tokenizer::AutoTokenizer>(model_path);
   auto conversation = nlohmann::json::array({{{"role", "user"}, {"content", prompt}}});
   auto input_content = tokenizer->applyChatTemplate(conversation);
   auto input_ids_vec = tokenizer->encode(input_content);

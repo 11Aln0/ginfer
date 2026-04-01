@@ -23,7 +23,7 @@ class Shape {
 
   int64_t numel() const {
     if (dims_.empty()) return 0;
-    return std::accumulate(dims_.begin(), dims_.end(), 1, std::multiplies<int64_t>());
+    return std::accumulate(dims_.begin(), dims_.end(), 1LL, std::multiplies<int64_t>());
   }
 
   int64_t operator[](int64_t idx) const { return dims_.at(idx); }

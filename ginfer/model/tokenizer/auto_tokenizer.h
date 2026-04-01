@@ -5,7 +5,7 @@
 #include <tuple>
 #include <unordered_set>
 
-namespace ginfer::core::model::tokenizer {
+namespace ginfer::model::tokenizer {
 
 using json = nlohmann::json;
 
@@ -35,4 +35,4 @@ class AutoTokenizer {
   std::unique_ptr<jinja::Template> chat_template_;
 };
 
-}  // namespace ginfer::core::model::tokenizer
+}  // namespace ginfer::model::tokenizer

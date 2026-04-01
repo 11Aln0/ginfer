@@ -1,11 +1,11 @@
-#include "ginfer/core/model/tokenizer/auto_tokenizer.h"
+#include "ginfer/model/tokenizer/auto_tokenizer.h"
 #include <algorithm>
 #include <iterator>
 #include <utility>
 #include "ginfer/common/errors.h"
 #include "ginfer/utils/utils.h"
 
-namespace ginfer::core::model::tokenizer {
+namespace ginfer::model::tokenizer {
 
 AutoTokenizer::AutoTokenizer(const std::string& model_path) : model_path_(model_path) {
   constructChatTemplate();
@@ -108,4 +108,4 @@ std::string AutoTokenizer::applyChatTemplate(const json& conversation,
   return chat_template_->apply_chat_template(conversation, add_generation_prompt, tools);
 }
 
-}  // namespace ginfer::core::model::tokenizer
+}  // namespace ginfer::model::tokenizer

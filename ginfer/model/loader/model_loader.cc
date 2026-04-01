@@ -1,11 +1,11 @@
 
-#include "ginfer/core/model/loader/model_loader.h"
+#include "ginfer/model/loader/model_loader.h"
 #include <fstream>
 #include "ginfer/common/errors.h"
 #include "ginfer/core/layer/layer.h"
 #include "ginfer/core/layer/transformer/layer.h"
 
-namespace ginfer::core::model {
+namespace ginfer::model {
 
 ModelLoader::ModelLoader(std::string model_path) : model_path_(std::move(model_path)) {}
 
@@ -15,8 +15,15 @@ nlohmann::json ModelLoader::loadConfigJSON() {
   return nlohmann::json::parse(f);
 }
 
-tensor::DataType ModelLoader::parseDataType(const std::string& dtype_str) const {
-  using tensor::DataType;
+ModelConfig ModelLoader::getModelConfig() {
+  ModelConfig config;
+  auto json = loadConfigJSON();
+  loadModelConfig(config, json);
+  return config;
+}
+
+core::tensor::DataType ModelLoader::parseDataType(const std::string& dtype_str) const {
+  using core::tensor::DataType;
   if (dtype_str == "bfloat16") {
     return DataType::kDataTypeBFloat16;
   } else if (dtype_str == "float16") {
@@ -25,6 +32,22 @@ tensor::DataType ModelLoader::parseDataType(const std::string& dtype_str) const 
     return DataType::kDataTypeFloat32;
   } else {
     CHECK_THROW(false, "Unsupported data type: {}", dtype_str);
+  }
+}
+
+void ModelLoader::loadModelConfig(ModelConfig& config, const nlohmann::json& json) {
+  config.dtype = parseDataType(json.value("torch_dtype", "float16"));
+  config.nlayer = json.at("num_hidden_layers").get<int>();
+  config.vocab_size = json.at("vocab_size").get<int>();
+  config.max_position_embeddings = json.at("max_position_embeddings").get<int>();
+  config.num_heads = json.at("num_attention_heads").get<int>();
+  config.num_kv_heads = json.at("num_key_value_heads").get<int>();
+  config.head_dim = json.value("head_dim", 0);
+  if (auto it = json.find("eos_token_id"); it != json.end() && it->is_array()) {
+    config.eos_token_ids = it->get<std::vector<int32_t>>();
+  } else {
+    config.eos_token_ids = {
+        json.value("eos_token_id", static_cast<int32_t>(config.vocab_size - 1))};
   }
 }
 
@@ -69,4 +92,33 @@ ModelLoader::EncoderWeight ModelLoader::loadEncoderLayerWeight(int layer_idx) {
   return w;
 }
 
-}  // namespace ginfer::core::model
+void LlamaArchModelLoader::loadLlamaArchModelConfig(LlamaArchModelConfig& config,
+                                                    const nlohmann::json& json) {
+  loadModelConfig(config, json);
+  config.hidden_size = json.at("hidden_size").get<int>();
+  config.intermediate_size = json.at("intermediate_size").get<int>();
+  config.rms_norm_eps = json.value("rms_norm_eps", 1e-6f);
+  config.rope_theta = json.value("rope_theta", 10000.0f);
+  config.tie_word_embeddings = json.value("tie_word_embeddings", false);
+  if (config.head_dim == 0) {
+    config.head_dim = config.hidden_size / config.num_heads;
+  }
+}
+
+ModelLoader::EncoderWeight LlamaArchModelLoader::loadEncoderLayerWeight(int layer_idx) {
+  std::string prefix = "model.layers." + std::to_string(layer_idx);
+  auto [q_bias, k_bias, v_bias, o_bias] = getAttentionBiasConfig();
+  auto attn = loadAttentionWeight(prefix, q_bias, k_bias, v_bias, o_bias);
+  auto mlp = loadFeedForwardWeight(prefix);
+
+  EncoderWeight w = {
+      .attn = attn,
+      .mlp = mlp,
+      .attn_norm = weight_loader.getTensor(prefix + ".input_layernorm.weight"),
+      .mlp_norm = weight_loader.getTensor(prefix + ".post_attention_layernorm.weight"),
+  };
+
+  return w;
+}
+
+}  // namespace ginfer::model

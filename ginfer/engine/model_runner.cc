@@ -1,19 +1,18 @@
 #include "ginfer/engine/model_runner.h"
+#include <glog/logging.h>
 #include <algorithm>
 #include <ranges>
 #include <tuple>
 #include <vector>
 #include "ginfer/core/memory/allocator_factory.h"
-#include "ginfer/core/model/model_factory.h"
 #include "ginfer/core/tensor/dtype.h"
 #include "ginfer/core/tensor/tensor.h"
 #include "ginfer/core/tensor/tensor_writer.h"
+#include "ginfer/model/model_factory.h"
 
 namespace ginfer::engine {
 
-ModelRunner::ModelRunner(Config config) : config_(std::move(config)) {
-  allocator_ = core::memory::getDefaultDeviceAllocator(config_.device_type);
-  pooled_allocator_ = core::memory::getDeviceAllocator(config_.device_type, core::memory::kPooled);
+ModelRunner::ModelRunner(const Config& config) : config_(config) {
   loadModel();
   warmupModel();
   allocateWorkspace();
@@ -22,45 +21,63 @@ ModelRunner::ModelRunner(Config config) : config_(std::move(config)) {
 
 void ModelRunner::loadModel() {
   const auto& cfg = config_;
-  auto loader = core::model::ModelFactory::createLoader(cfg.model_path);
+  auto loader = model::ModelFactory::createLoader(cfg.model_path);
   model_ = loader->load();
+  model_->setRuntimeConfig({
+      .max_seq_len = cfg.max_seq_len,
+      .max_batch_size = cfg.max_num_seqs,
+  });
   model_->toDevice(cfg.device_type);
-  model_->setMaxSeqLen(cfg.max_seq_len);
 }
 
 void ModelRunner::warmupModel() {
+  using core::tensor::DataType;
+
   auto dev_type = model_->getDeviceType();
-  auto dtype = model_->getDtype();
-  DECLARE_OR_THROW(input_ids, Tensor::create(dtype, {1}, DeviceType::kDeviceCPU));
-  THROW_ON_ERR(input_ids->toDevice(dev_type));
-  DECLARE_OR_THROW(positions, Tensor::create(dtype, {1}, DeviceType::kDeviceCPU));
-  THROW_ON_ERR(positions->toDevice(dev_type));
+  auto dtype = model_->getConfig().dtype;
+  DECLARE_OR_THROW(input_ids,
+                   Tensor::create(DataType::kDataTypeInt32, {1}, DeviceType::kDeviceCPU));
+  input_ids->data<int32_t>()[0] = 0;  // dummy token id
+  ASSIGN_OR_THROW(input_ids, input_ids->toDevice(dev_type));
+  DECLARE_OR_THROW(positions,
+                   Tensor::create(DataType::kDataTypeInt32, {1}, DeviceType::kDeviceCPU));
+  positions->data<int32_t>()[0] = 0;  // dummy position
+  ASSIGN_OR_THROW(positions, positions->toDevice(dev_type));
   auto ctx = core::InferContext().setDeviceContext(common::DeviceContext::create(dev_type));
   THROW_ON_ERR(model_->predict(ctx, input_ids, positions));
+  LOG(INFO) << "Model warmup completed.";
 }
 
 void ModelRunner::allocateKVCache() {
   auto dev_type = model_->getDeviceType();
   auto mem_info = core::memory::getDefaultDeviceAllocator(dev_type)->getMemInfo();
-  auto [num_heads, num_kv_heads, head_dim] = model_->getAttentionConfig();
-  auto dtype = model_->getDtype();
-  auto n_layer = model_->getNumLayers();
 
-  size_t block_bytes = 2 * num_kv_heads * head_dim * core::tensor::dTypeSize(dtype) * n_layer;
-  int64_t num_kvcache_blocks = mem_info.free / block_bytes;
+  auto& cfg = model_->getConfig();
+  int num_kv_heads = cfg.num_kv_heads, head_dim = cfg.head_dim;
+  auto n_layer = cfg.nlayer;
+  int block_size = config_.kvcache_block_size;
+
+  size_t block_bytes =
+      2 * num_kv_heads * head_dim * core::tensor::dTypeSize(cfg.dtype) * n_layer * block_size;
+  int64_t num_kvcache_blocks = static_cast<int64_t>(static_cast<float>(mem_info.free) *
+                                                    config_.gpu_memory_utilization / block_bytes);
+  LOG(INFO) << "Estimated number of KV cache blocks that can fit in memory: " << num_kvcache_blocks
+            << " (free memory: " << mem_info.free / (1024.0 * 1024.0)
+            << " MB, block size in bytes: " << block_bytes << " bytes)";
   this->num_kvcache_blocks_ = num_kvcache_blocks;
 
   CHECK(num_kvcache_blocks > 0) << "Not enough memory for KV cache";
 
   DECLARE_OR_THROW(
-      kv_cache,
-      Tensor::create(dtype, {2, n_layer, num_kvcache_blocks, num_kv_heads, head_dim}, dev_type));
-  auto k_cache =
-      kv_cache->slice(0, 0, 1)->reshape({n_layer, num_kvcache_blocks, num_kv_heads, head_dim});
-  auto v_cache =
-      kv_cache->slice(0, 1, 2)->reshape({n_layer, num_kvcache_blocks, num_kv_heads, head_dim});
+      kv_cache, Tensor::create(cfg.dtype,
+                               {2, n_layer, num_kvcache_blocks, block_size, num_kv_heads, head_dim},
+                               dev_type));
+  auto k_cache = kv_cache->slice(0, 0, 1)->reshape(
+      {n_layer, num_kvcache_blocks, block_size, num_kv_heads, head_dim});
+  auto v_cache = kv_cache->slice(0, 1, 2)->reshape(
+      {n_layer, num_kvcache_blocks, block_size, num_kv_heads, head_dim});
 
-  auto layer_kv_shape = core::tensor::Shape{num_kvcache_blocks, num_kv_heads, head_dim};
+  auto layer_kv_shape = core::tensor::Shape{num_kvcache_blocks, block_size, num_kv_heads, head_dim};
   for (int i = 0; i < n_layer; ++i) {
     auto layer_k_cache = k_cache->slice(0, i, i + 1)->reshape(layer_kv_shape);
     auto layer_v_cache = v_cache->slice(0, i, i + 1)->reshape(layer_kv_shape);
@@ -83,47 +100,45 @@ int ModelRunner::getMaxBlocksPerSeq() const {
 }
 
 void ModelRunner::allocateWorkspace() {
-  auto* host_allocator =
-      core::memory::getDeviceAllocator(DeviceType::kDeviceCPU, core::memory::kPinned);
-  auto* dev_allocator = pooled_allocator_;
   int max_blocks_per_seq = getMaxBlocksPerSeq();
 
-  DECLARE_OR_THROW(host_input_ids,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_batched_tokens}, host_allocator));
-  DECLARE_OR_THROW(host_positions,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_batched_tokens}, host_allocator));
-  DECLARE_OR_THROW(host_cu_seqlens_q, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                     {config_.max_num_seqs + 1}, host_allocator));
-  DECLARE_OR_THROW(host_cu_seqlens_kv, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                      {config_.max_num_seqs + 1}, host_allocator));
-  DECLARE_OR_THROW(host_slot_mapping,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_batched_tokens}, host_allocator));
-  DECLARE_OR_THROW(host_block_tables,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_seqs, max_blocks_per_seq}, host_allocator));
+  auto max_num_seqs = config_.max_num_seqs;
+  auto max_num_batched_tokens = config_.max_num_batched_tokens;
 
-  DECLARE_OR_THROW(dev_input_ids, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                 {config_.max_num_batched_tokens}, dev_allocator));
-  DECLARE_OR_THROW(dev_positions, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                 {config_.max_num_batched_tokens}, dev_allocator));
-  DECLARE_OR_THROW(dev_cu_seqlens_q, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                    {config_.max_num_seqs + 1}, dev_allocator));
-  DECLARE_OR_THROW(dev_cu_seqlens_kv, Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                                     {config_.max_num_seqs + 1}, dev_allocator));
-  DECLARE_OR_THROW(dev_slot_mapping,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_batched_tokens}, dev_allocator));
-  DECLARE_OR_THROW(dev_block_tables,
-                   Tensor::create(core::tensor::DataType::kDataTypeInt32,
-                                  {config_.max_num_seqs, max_blocks_per_seq}, dev_allocator));
+  auto host_allocator =
+      core::memory::getDeviceAllocator(DeviceType::kDeviceCPU, core::memory::kPooled);
+  auto dev_allocator = core::memory::getDefaultDeviceAllocator(config_.device_type);
 
-  host_workspace_ = {host_input_ids,     host_positions,    host_cu_seqlens_q,
-                     host_cu_seqlens_kv, host_slot_mapping, host_block_tables};
-  dev_workspace_ = {dev_input_ids,     dev_positions,    dev_cu_seqlens_q,
-                    dev_cu_seqlens_kv, dev_slot_mapping, dev_block_tables};
+  auto& host = host_workspace_;
+  auto& dev = dev_workspace_;
+
+  ASSIGN_OR_THROW(host.input_ids, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                 {max_num_batched_tokens}, host_allocator));
+  ASSIGN_OR_THROW(host.positions, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                 {max_num_batched_tokens}, host_allocator));
+  ASSIGN_OR_THROW(host.cu_seqlens_q, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                    {max_num_seqs + 1}, host_allocator));
+  ASSIGN_OR_THROW(host.cu_seqlens_kv, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                     {max_num_seqs + 1}, host_allocator));
+  ASSIGN_OR_THROW(host.slot_mapping, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                    {max_num_batched_tokens}, host_allocator));
+  ASSIGN_OR_THROW(host.block_tables,
+                  Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                 {max_num_seqs, max_blocks_per_seq}, host_allocator));
+
+  ASSIGN_OR_THROW(dev.input_ids, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                {max_num_batched_tokens}, dev_allocator));
+  ASSIGN_OR_THROW(dev.positions, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                {max_num_batched_tokens}, dev_allocator));
+  ASSIGN_OR_THROW(dev.cu_seqlens_q, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                   {max_num_seqs + 1}, dev_allocator));
+  ASSIGN_OR_THROW(dev.cu_seqlens_kv, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                    {max_num_seqs + 1}, dev_allocator));
+  ASSIGN_OR_THROW(dev.slot_mapping, Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                                   {max_num_batched_tokens}, dev_allocator));
+  ASSIGN_OR_THROW(dev.block_tables,
+                  Tensor::create(core::tensor::DataType::kDataTypeInt32,
+                                 {max_num_seqs, max_blocks_per_seq}, dev_allocator));
 }
 
 ModelRunner::Workspace ModelRunner::prepareWorkspace(ModelRunner::Workspace& from,
@@ -219,7 +234,7 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
   int max_seqlen_q = 0;
   for (const auto& seq : seqs) {
     int seqlen_q = seq->num_tokens - seq->num_cached_tokens;
-    CHECK_GE(seqlen_q, 0) << "invalid uncached token count";
+    CHECK_GT(seqlen_q, 0) << "invalid uncached token count";
     total_q_tokens += seqlen_q;
     max_seqlen_q = std::max(max_seqlen_q, seqlen_q);
   }
@@ -287,7 +302,8 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
 
 Result<std::vector<int32_t>, std::string> ModelRunner::run(std::vector<Sequence::Ptr>& seqs,
                                                            bool is_prefill) {
-  auto ctx = core::InferContext().setDeviceContext(common::DeviceContext::create(config_.device_type));
+  auto ctx =
+      core::InferContext().setDeviceContext(common::DeviceContext::create(config_.device_type));
 
   std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> inputs;
   if (is_prefill) {
@@ -301,5 +317,7 @@ Result<std::vector<int32_t>, std::string> ModelRunner::run(std::vector<Sequence:
   resetContext(ctx);
   return result;
 }
+
+size_t ModelRunner::getNumKVCacheBlocks() const { return num_kvcache_blocks_; }
 
 }  // namespace ginfer::engine

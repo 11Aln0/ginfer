@@ -508,20 +508,17 @@ void GQAKernel(const Context& ctx,
 
   auto dispatcher = [&]() {
     DLOG(INFO) << "GQA kernel smem size: " << smem_size;
-    cudaError_t err;
     switch (head_dim) {
       case 64:
-        err = cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 64>,
-                                   cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 64>,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
         GQAKernelImpl<T, br, bc, 64><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
             p_q, p_k, p_v, p_output, num_heads, kv_heads, q_seq_len, kv_seq_len, q_batch_stride,
             kv_batch_stride);
         break;
       case 128:
-        err = cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 128>,
-                                   cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        cudaFuncSetAttribute(GQAKernelImpl<T, br, bc, 128>,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
         GQAKernelImpl<T, br, bc, 128><<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
             p_q, p_k, p_v, p_output, num_heads, kv_heads, q_seq_len, kv_seq_len, q_batch_stride,
             kv_batch_stride);

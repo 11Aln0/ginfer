@@ -10,7 +10,7 @@
 #include <vector>
 #include "ginfer/core/tensor/tensor.h"
 
-namespace ginfer::core::model {
+namespace ginfer::model {
 
 struct SafeTensorMeta {
   std::string dtype;
@@ -27,12 +27,12 @@ class SafeTensorLoader {
 
   void load(const std::string& filepath);
 
-  std::shared_ptr<tensor::Tensor> getTensor(const std::string& name) const;
+  std::shared_ptr<core::tensor::Tensor> getTensor(const std::string& name) const;
 
  private:
   void parseHeader(const std::string& json_str);
 
-  tensor::DataType parseDataType(const std::string& dtype_str) const;
+  core::tensor::DataType parseDataType(const std::string& dtype_str) const;
 
  private:
   char* mapped_data_ = nullptr;
@@ -41,4 +41,4 @@ class SafeTensorLoader {
   std::unordered_map<std::string, SafeTensorMeta> metadata_;
 };
 
-}  // namespace ginfer::core::model
+}  // namespace ginfer::model

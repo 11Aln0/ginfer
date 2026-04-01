@@ -36,6 +36,27 @@ endif()
 
 # options
 option(WITH_CUDA "Build with CUDA" OFF)
+option(DEBUG_CUDA "Enable CUDA debug flags" OFF)
+
+if(DEBUG_CUDA)
+    # 清除所有配置中的优化 flag，避免与 -O1 冲突
+    foreach(_cuda_flags_var
+        CMAKE_CUDA_FLAGS
+        CMAKE_CUDA_FLAGS_DEBUG
+        CMAKE_CUDA_FLAGS_RELEASE
+        CMAKE_CUDA_FLAGS_RELWITHDEBINFO
+        CMAKE_CUDA_FLAGS_MINSIZEREL)
+        string(REGEX REPLACE "-O[0-9sg]" "" ${_cuda_flags_var} "${${_cuda_flags_var}}")
+        # 清除 nvcc 默认注入的 --optimize 长参数（如有）
+        string(REGEX REPLACE "--optimize[ =][0-9]+" "" ${_cuda_flags_var} "${${_cuda_flags_var}}")
+        string(STRIP "${${_cuda_flags_var}}" ${_cuda_flags_var})
+    endforeach()
+
+    # 注入到全局 flag，对所有构建类型生效
+    string(APPEND CMAKE_CUDA_FLAGS " -G -O1")
+
+    message(STATUS "CUDA debug mode: -G -O1 enabled, optimizations suppressed")
+endif()
 
 add_subdirectory(ginfer)
 add_subdirectory(python)

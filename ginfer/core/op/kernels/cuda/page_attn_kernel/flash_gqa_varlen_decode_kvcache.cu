@@ -375,21 +375,18 @@ void GQAVarlenDecodeKernel(const Context& ctx,
 
   auto dispatcher = [&]() {
     DLOG(INFO) << "GQA decode kernel smem size: " << smem_size;
-    cudaError_t err;
     switch (head_dim) {
       case 64:
-        err = cudaFuncSetAttribute(GQAVarlenDecodeKernelImpl<T, bc, 64, block_dim>,
-                                   cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        cudaFuncSetAttribute(GQAVarlenDecodeKernelImpl<T, bc, 64, block_dim>,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
         GQAVarlenDecodeKernelImpl<T, bc, 64, block_dim>
             <<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
                 p_q, p_k, p_v, p_output, p_cu_seqlens_kv, p_block_tables, num_heads, kv_heads,
                 block_table_len, paged_block_size);
         break;
       case 128:
-        err = cudaFuncSetAttribute(GQAVarlenDecodeKernelImpl<T, bc, 128, block_dim>,
-                                   cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
-        CHECK(err == cudaSuccess) << "Failed to set cudaFuncAttributeMaxDynamicSharedMemorySize";
+        cudaFuncSetAttribute(GQAVarlenDecodeKernelImpl<T, bc, 128, block_dim>,
+                             cudaFuncAttributeMaxDynamicSharedMemorySize, smem_size);
         GQAVarlenDecodeKernelImpl<T, bc, 128, block_dim>
             <<<grid_dim, block_dim, smem_size, cuda_ctx.getStream()>>>(
                 p_q, p_k, p_v, p_output, p_cu_seqlens_kv, p_block_tables, num_heads, kv_heads,

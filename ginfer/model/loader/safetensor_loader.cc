@@ -1,8 +1,8 @@
-#include "ginfer/core/model/loader/safetensor_loader.h"
+#include "ginfer/model/loader/safetensor_loader.h"
 #include <nlohmann/json.hpp>
 #include "ginfer/common/errors.h"
 
-namespace ginfer::core::model {
+namespace ginfer::model {
 
 SafeTensorLoader::~SafeTensorLoader() {
   if (mapped_data_ && mapped_data_ != MAP_FAILED) {
@@ -41,8 +41,8 @@ void SafeTensorLoader::parseHeader(const std::string& json_str) {
   }
 }
 
-tensor::DataType SafeTensorLoader::parseDataType(const std::string& dtype_str) const {
-  using tensor::DataType;
+core::tensor::DataType SafeTensorLoader::parseDataType(const std::string& dtype_str) const {
+  using core::tensor::DataType;
   if (dtype_str == "I8") {
     return DataType::kDataTypeInt8;
   } else if (dtype_str == "BF16") {
@@ -56,7 +56,8 @@ tensor::DataType SafeTensorLoader::parseDataType(const std::string& dtype_str) c
   }
 }
 
-tensor::TensorRef SafeTensorLoader::getTensor(const std::string& name) const {
+core::tensor::TensorRef SafeTensorLoader::getTensor(const std::string& name) const {
+  using namespace core;
   auto it = metadata_.find(name);
   CHECK_THROW(it != metadata_.end(), "Tensor not found: {}", name);
   const auto& meta = it->second;
@@ -79,4 +80,4 @@ tensor::TensorRef SafeTensorLoader::getTensor(const std::string& name) const {
   return res.value();
 }
 
-}  // namespace ginfer::core::model
+}  // namespace ginfer::model

@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include "ginfer/common/device.h"
+#include "ginfer/model/model.h"
 
 namespace ginfer::engine {
 
@@ -15,6 +16,8 @@ struct Config {
 
   float gpu_memory_utilization;
   int kvcache_block_size;
+
+  model::ModelConfig model_config;
 };
 
 }  // namespace ginfer::engine

@@ -9,3 +9,5 @@ core.[0-9][0-9]*
 set_env.sh
 *.db
 *.nsys-rep
+/Testing
+CLAUDE.md
