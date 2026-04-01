@@ -206,6 +206,7 @@ std::string test_model_infer_cuda(const std::string& model_path, const std::stri
   auto tokenizer = std::make_unique<model::tokenizer::AutoTokenizer>(model_path);
   auto conversation = nlohmann::json::array({{{"role", "user"}, {"content", prompt}}});
   auto input_content = tokenizer->applyChatTemplate(conversation);
+  // LOG(INFO) << "Input content after applying chat template: " << input_content;
   auto input_ids_vec = tokenizer->encode(input_content);
 
   DECLARE_OR_THROW(buf,

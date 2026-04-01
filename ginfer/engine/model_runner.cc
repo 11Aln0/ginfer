@@ -314,6 +314,9 @@ Result<std::vector<int32_t>, std::string> ModelRunner::run(std::vector<Sequence:
 
   auto [input_ids, positions] = inputs;
   auto result = model_->predict(ctx, input_ids, positions);
+  for (auto token_ids : result.value()) {
+    LOG(INFO) << "Predicted token id: " << token_ids;
+  }
   resetContext(ctx);
   return result;
 }

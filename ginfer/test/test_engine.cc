@@ -34,7 +34,7 @@ TEST(EngineTest, GenerateReturnsOneOutputPerPrompt) {
 
   engine::Engine engine(makeEngineConfig(model_path));
 
-  const std::vector<std::string> prompts = {"who are you?"};
+  const std::vector<std::string> prompts = {"Who are you?"};
   auto start = std::chrono::high_resolution_clock::now();
   auto outputs = engine.generate(prompts);
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(

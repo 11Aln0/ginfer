@@ -68,7 +68,7 @@ def hf_infer(
 
 def test_model_generate_cuda():
     # <｜User｜>Who are you?<｜Assistant｜><think>
-    input_ids = np.array([151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
+    input_ids = np.array([151646, 151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
     
     hf_model, _, = load_hf_model(MODEL_PATH, device_name="cuda:0")
     ref_token_ids = hf_generate(torch.tensor([input_ids], device="cuda:0"), hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0).tolist()
@@ -79,7 +79,7 @@ def test_model_generate_cuda():
     np.testing.assert_array_equal(token_ids, ref_token_ids)
 
 def test_model_infer_cuda():
-    prompt = "Who are you?"
+    prompt = "who are you?"
     hf_model, hf_tokenizer = load_hf_model(MODEL_PATH, device_name="cuda:0")
     ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=128, top_p = 1.0, top_k = 1, temperature = 1.0)
     

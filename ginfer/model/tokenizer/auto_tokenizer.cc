@@ -19,6 +19,13 @@ void AutoTokenizer::constructChatTemplate() {
   auto tok_cfg_json = nlohmann::json::parse(tok_cfg_blob.value());
   std::string chat_template_str = tok_cfg_json["chat_template"];
   chat_template_ = std::make_unique<jinja::Template>(chat_template_str);
+  if (tok_cfg_json.contains("bos_token")) {
+    if (tok_cfg_json["bos_token"].contains("content")) {
+      bos_token_ = tok_cfg_json["bos_token"]["content"].get<std::string>();
+    } else {
+      bos_token_ = tok_cfg_json.value("bos_token", "");
+    }
+  }
 }
 
 void AutoTokenizer::constructTokenizer() {
@@ -105,7 +112,9 @@ std::vector<std::string> AutoTokenizer::decodeBatch(const std::vector<int32_t>& 
 std::string AutoTokenizer::applyChatTemplate(const json& conversation,
                                              bool add_generation_prompt,
                                              const json& tools) {
-  return chat_template_->apply_chat_template(conversation, add_generation_prompt, tools);
+  auto result = chat_template_->apply_chat_template(conversation, add_generation_prompt, tools);
+  result.insert(0, bos_token_);
+  return result;
 }
 
 }  // namespace ginfer::model::tokenizer

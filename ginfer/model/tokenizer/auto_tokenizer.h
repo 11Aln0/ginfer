@@ -30,6 +30,7 @@ class AutoTokenizer {
 
  private:
   std::string model_path_;
+  std::string bos_token_;
   std::unordered_set<int32_t> special_token_ids_;
   std::unique_ptr<tokenizers::Tokenizer> tokenizer_;
   std::unique_ptr<jinja::Template> chat_template_;
