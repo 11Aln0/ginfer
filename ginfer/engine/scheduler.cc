@@ -24,11 +24,12 @@ std::tuple<std::vector<Sequence::Ptr>, bool> Scheduler::schedule() {
   // prefill first
   while (!waiting.empty() && num_seqs < max_num_seqs) {
     auto& seq = waiting.front();
-    if (num_batched_tokens + seq->num_tokens > max_num_batched_tokens ||
+    int uncached_tokens = seq->num_tokens - seq->num_cached_tokens;
+    if (num_batched_tokens + uncached_tokens > max_num_batched_tokens ||
         !block_mgr.canAllocate(seq))
       break;
     num_seqs++;
-    num_batched_tokens += seq->num_tokens - seq->num_cached_tokens;
+    num_batched_tokens += uncached_tokens;
     seq->state = SequenceState::kRunning;
     block_mgr.allocate(seq);
     running.push_back(seq);
@@ -81,7 +82,7 @@ bool Scheduler::isEosToken(int32_t token_id) const {
 
 void Scheduler::postprocess(std::vector<Sequence::Ptr>& seqs,
                             const std::vector<int32_t>& token_ids) {
-  CHECK(seqs.size() == token_ids.size())
+  CHECK_EQ(seqs.size(), token_ids.size())
       << "The number of sequences and token ids must be the same";
   for (size_t i = 0; i < seqs.size(); i++) {
     auto& seq = seqs[i];

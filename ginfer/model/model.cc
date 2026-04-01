@@ -197,12 +197,12 @@ Result<std::vector<int32_t>, std::string> LlamaArchModel::predict(
   CHECK(token_ids->dtype() == DataType::kDataTypeInt32) << "token_ids dtype must be int32.";
 
   int batch_size = 1;
-  if (ctx.block_tables.has_value()) {
+  if (ctx.slot_mapping.has_value()) {
     CHECK(ctx.cu_seqlens_kv.has_value()) << "cu_seqlens_kv are required in InferContext.";
     if (ctx.is_prefill) {
       CHECK(ctx.cu_seqlens_q.has_value()) << "cu_seqlens_q are required in InferContext.";
     }
-    batch_size = ctx.block_tables.value()->shape()[0];
+    batch_size = ctx.cu_seqlens_kv.value()->shape()[0] - 1;
   }
 
   CHECK_LE(batch_size, rt_cfg.max_batch_size) << "Batch size exceeds max_batch_size.";

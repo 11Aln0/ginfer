@@ -202,7 +202,7 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
     int token_idx = seq->num_tokens - 1;
     int block_idx = token_idx / block_size;
     int block_offset = token_idx % block_size;
-    CHECK_LT(block_idx, static_cast<int>(seq->block_table.size()))
+    CHECK_LT(block_idx, seq->block_table.size())
         << "decode token block index exceeds block table size";
     int slot = seq->block_table[block_idx] * block_size + block_offset;
     slot_mapping.append(slot);
@@ -243,6 +243,7 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
       << "batched token count exceeds workspace capacity";
 
   auto host = prepareWorkspace(host_workspace_, total_q_tokens, seqs.size());
+  auto dev = prepareWorkspace(dev_workspace_, total_q_tokens, seqs.size());
 
   auto input_ids = core::tensor::bindTensor<int32_t>(host.input_ids);
   auto positions = core::tensor::bindTensor<int32_t>(host.positions);
@@ -277,11 +278,7 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
     }
   }
 
-  if (cu_seqlens_q.back() < cu_seqlens_kv.back()) {
-    prepareBlockTables(seqs, host.block_tables);
-  }
-
-  auto dev = prepareWorkspace(dev_workspace_, total_q_tokens, seqs.size());
+  prepareBlockTables(seqs, host.block_tables);
 
   dev.input_ids->copyFrom(host.input_ids, true);
   dev.positions->copyFrom(host.positions, true);
@@ -314,9 +311,10 @@ Result<std::vector<int32_t>, std::string> ModelRunner::run(std::vector<Sequence:
 
   auto [input_ids, positions] = inputs;
   auto result = model_->predict(ctx, input_ids, positions);
-  for (auto token_ids : result.value()) {
-    LOG(INFO) << "Predicted token id: " << token_ids;
-  }
+  // auto v = result.value();
+  // for (int i = 0; i < v.size(); ++i) {
+  //   LOG(INFO) << i << ":Predicted token id: " << v[i];
+  // }
   resetContext(ctx);
   return result;
 }

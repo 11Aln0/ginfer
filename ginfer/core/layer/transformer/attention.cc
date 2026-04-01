@@ -28,7 +28,7 @@ Result<void, std::string> AttentionLayer::forwardWithKVCache(const core::InferCo
   CHECK(ctx.slot_mapping.has_value())
       << "slot_mapping is required in InferContext for AttentionLayer.";
   // TODO Context CHECK
-
+  // TODO optional block_table
   RETURN_ON_ERR(store_kv_op.run(
       ctx, {k.get(), v.get(), k_cache_.get(), v_cache_.get(), ctx.slot_mapping.value().get()}, {}));
   return gqa_varlen_op.run(ctx, {q.get(), k_cache_.get(), v_cache_.get()}, {output.get()});
@@ -82,7 +82,7 @@ Result<void, std::string> AttentionLayer::forward(const core::InferContext& ctx,
   RETURN_ON_ERR(
       rope_op.run(ctx, {k.get(), positions.get(), sin_cache.get(), cos_cache.get()}, {k.get()}));
 
-  if (ctx.block_tables.has_value()) {
+  if (ctx.slot_mapping.has_value()) {
     RETURN_ON_ERR(forwardWithKVCache(ctx, q, k, v, gqa_out));
   } else {
     RETURN_ON_ERR(forwardWithoutKVCache(ctx, q, k, v, gqa_out));

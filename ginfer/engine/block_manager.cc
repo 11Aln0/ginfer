@@ -52,7 +52,7 @@ Block& BlockManager::allocateBlock(int block_id) {
 }
 
 void BlockManager::releaseBlock(int block_id) {
-  auto blk = blocks_[block_id];
+  auto& blk = blocks_[block_id];
   blk.ref_cnt--;
   if (blk.ref_cnt == 0) {
     used_block_ids_.erase(block_id);
@@ -89,6 +89,7 @@ void BlockManager::allocate(Sequence::Ptr& seq) {
       block_id = free_block_ids_.front();
       allocateBlock(block_id);
     } else {
+      LOG(INFO) << "Cache hit for block " << block_id << " with hash " << h.value();
       seq->num_cached_tokens += block_size_;
       if (used_block_ids_.find(block_id) != used_block_ids_.end()) {
         blocks_[block_id].ref_cnt++;
@@ -144,7 +145,6 @@ void BlockManager::append(Sequence::Ptr& seq) {
     blocks_[last_block_id].update(hash, token_ids);  // TODO: only insert token_id to back
     hash_to_block_id_[hash] = last_block_id;
   }
-  seq->num_tokens++;
 }
 
 };  // namespace ginfer::engine

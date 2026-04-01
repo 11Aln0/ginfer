@@ -17,10 +17,10 @@ engine::Config makeEngineConfig(const std::string& model_path) {
   return {
       .model_path = model_path,
       .device_type = common::DeviceType::kDeviceCUDA,
-      .max_num_batched_tokens = 512,
+      .max_num_batched_tokens = 2048,
       .max_num_seqs = 4,
       .max_seq_len = 512,
-      .gpu_memory_utilization = 0.8f,
+      .gpu_memory_utilization = 0.4f,
       .kvcache_block_size = 16,
       .model_config = model_cfg,
   };
@@ -34,7 +34,8 @@ TEST(EngineTest, GenerateReturnsOneOutputPerPrompt) {
 
   engine::Engine engine(makeEngineConfig(model_path));
 
-  const std::vector<std::string> prompts = {"Who are you?"};
+  const std::vector<std::string> prompts = {"who are you?", "1+1 equals?",
+                                            "what is the capital of France?"};
   auto start = std::chrono::high_resolution_clock::now();
   auto outputs = engine.generate(prompts);
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
