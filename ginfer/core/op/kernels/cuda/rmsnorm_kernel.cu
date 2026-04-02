@@ -88,7 +88,7 @@ void rmsNormKernel(const Context& ctx,
   const T* gamma_data = gamma.data<T>();
   T* out_data = output.data<T>();
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   const int block_dim = 256;
   const int grid_dim = batch_size;
   if (cuda_ctx.getStream() == nullptr) {

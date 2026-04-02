@@ -19,5 +19,5 @@ file(GLOB SRC_LIST "kernels/*.cc")
 list(APPEND LIB_SRC_LIST ${SRC_LIST})
 
 
-add_lib_with_deps(kernel "${LIB_SRC_LIST}" tensor)
+add_lib_with_deps(kernel "${LIB_SRC_LIST}" tensor CUDA::cublas CUDA::cublasLt)
 add_pathlib_with_deps(op ./ kernel)

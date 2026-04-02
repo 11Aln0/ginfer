@@ -101,7 +101,7 @@ template <typename InT, typename OutT, typename Context>
 void argmaxKernel(const Context& ctx, const tensor::Tensor& input, tensor::Tensor& output_idx) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "argmaxKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   constexpr int vec_size = DefaultVecSize<InT>::value;
 

@@ -474,7 +474,7 @@ void GQAKernel(const Context& ctx,
                tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "GQAKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& q_shape = q.shape();
   const auto& q_strides = q.strides();

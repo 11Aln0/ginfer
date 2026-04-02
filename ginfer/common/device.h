@@ -3,6 +3,8 @@
 #include <cuda_runtime.h>
 #include <iostream>
 #include <memory>
+#include <cstddef>
+#include <cstdint>
 
 namespace ginfer::common {
 
@@ -45,14 +47,21 @@ class CPUDeviceContext : public DeviceContext {
 
 class CUDADeviceContext : public DeviceContext {
  public:
-  CUDADeviceContext(cudaStream_t stream = nullptr);
+  static constexpr size_t kDefaultWorkspaceSize = 1 << 22;
+
+  CUDADeviceContext(cudaStream_t stream = nullptr,
+                    size_t workspace_size = kDefaultWorkspaceSize);
 
   ~CUDADeviceContext() override;
 
   cudaStream_t getStream() const;
+  void* getWorkspace() const;
+  size_t getWorkspaceSize() const;
 
  private:
   cudaStream_t stream_ = nullptr;
+  void* workspace_ = nullptr;
+  size_t workspace_size_ = 0;
 };
 
 template <DeviceType Device>

@@ -38,7 +38,7 @@ void swigluKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "addKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   int64_t numel = output.size();
 

@@ -38,7 +38,7 @@ void selectLastTokenKernel(const Context& ctx,
   CHECK(cu_seqlen_q.dtype() == tensor::DataType::kDataTypeInt32)
       << "cu_seqlen_q dtype must be int32.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   auto batch_size = static_cast<int>(cu_seqlen_q.shape()[0]) - 1;
   auto hidden_dim = input.shape()[1];
 

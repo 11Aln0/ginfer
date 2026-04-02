@@ -52,7 +52,7 @@ void storeKVCacheKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "embeddingKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   const auto& k_shape = k.shape();
   const auto& k_stride = k.strides();
 

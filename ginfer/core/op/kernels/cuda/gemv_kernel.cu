@@ -66,7 +66,7 @@ void gemvKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "gemvKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& shape = mat.shape();
   const auto& strides = mat.strides();

@@ -111,7 +111,7 @@ void RotaryEmbeddingKernel(const Context& ctx,
                            float rope_theta) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "RotaryEmbeddingKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& shape = sin_cache.shape();
 
@@ -142,7 +142,7 @@ void Llama3RotaryEmbeddingKernel(const Context& ctx,
                                  int old_ctx_len) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "RotaryEmbeddingKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& shape = sin_cache.shape();
 
@@ -172,7 +172,7 @@ void ROPEKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "ROPEKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& input_shape = input.shape();
   int shape_dim = input_shape.ndim();

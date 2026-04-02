@@ -42,7 +42,7 @@ void addKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "addKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   size_t n = a.size();
   const T* a_data = a.data<T>();
   const T* b_data = b.data<T>();

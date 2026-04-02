@@ -55,12 +55,14 @@ void CUDADeviceAllocator::memcpy(
       LOG(FATAL) << "Unsupported MemcpyKind.";
   }
 
+  cudaError_t err;
   if (async) {
     cudaStream_t stream = stream_ ? static_cast<cudaStream_t>(stream_) : cudaStreamDefault;
-    cudaMemcpyAsync(dst, src, size, cu_kind, stream);
+    err = cudaMemcpyAsync(dst, src, size, cu_kind, stream);
   } else {
-    cudaMemcpy(dst, src, size, cu_kind);
+    err = cudaMemcpy(dst, src, size, cu_kind);
   }
+  CHECK(err == cudaSuccess) << "cudaMemcpy failed: " << cudaGetErrorString(err);
 }
 
 DeviceMemInfo CUDADeviceAllocator::getMemInfo() const {

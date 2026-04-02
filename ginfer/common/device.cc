@@ -1,5 +1,7 @@
 #include "device.h"
 
+#include <glog/logging.h>
+
 namespace ginfer::common {
 
 bool isHostDevice(DeviceType dev_type) { return dev_type == DeviceType::kDeviceCPU; }
@@ -21,15 +23,29 @@ DeviceType DeviceContext::getDeviceType() const { return dev_type_; }
 
 CPUDeviceContext::CPUDeviceContext() : DeviceContext(DeviceType::kDeviceCPU) {}
 
-CUDADeviceContext::CUDADeviceContext(cudaStream_t stream)
-    : DeviceContext(DeviceType::kDeviceCUDA), stream_(stream) {}
+CUDADeviceContext::CUDADeviceContext(cudaStream_t stream, size_t workspace_size)
+    : DeviceContext(DeviceType::kDeviceCUDA), stream_(stream), workspace_size_(workspace_size) {
+  if (workspace_size_ > 0) {
+    auto status = cudaMalloc(&workspace_, workspace_size_);
+    CHECK(status == cudaSuccess) << "Failed to allocate CUDA workspace.";
+  }
+}
 
 CUDADeviceContext::~CUDADeviceContext() {
+  if (workspace_ != nullptr) {
+    cudaFree(workspace_);
+    workspace_ = nullptr;
+  }
   if (stream_) {
     cudaStreamDestroy(stream_);
+    stream_ = nullptr;
   }
 }
 
 cudaStream_t CUDADeviceContext::getStream() const { return stream_; }
+
+void* CUDADeviceContext::getWorkspace() const { return workspace_; }
+
+size_t CUDADeviceContext::getWorkspaceSize() const { return workspace_size_; }
 
 }  // namespace ginfer::common

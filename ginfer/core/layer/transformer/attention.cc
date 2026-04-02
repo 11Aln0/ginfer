@@ -53,29 +53,18 @@ Result<void, std::string> AttentionLayer::forward(const core::InferContext& ctx,
 
   int64_t seq_len = hidden_state->shape()[0];
 
-  const TensorRef q = intermediates_.q_proj_out->slice(0, 0, seq_len)
-                          ->reshape({
-                              seq_len,
-                              num_heads_,
-                              head_dim_,
-                          });
-  const TensorRef k = intermediates_.k_proj_out->slice(0, 0, seq_len)
-                          ->reshape({
-                              seq_len,
-                              num_kv_heads_,
-                              head_dim_,
-                          });
-  const TensorRef v = intermediates_.v_proj_out->slice(0, 0, seq_len)
-                          ->reshape({
-                              seq_len,
-                              num_kv_heads_,
-                              head_dim_,
-                          });
+  TensorRef q = intermediates_.q_proj_out->slice(0, 0, seq_len);
+  TensorRef k = intermediates_.k_proj_out->slice(0, 0, seq_len);
+  TensorRef v = intermediates_.v_proj_out->slice(0, 0, seq_len);
   TensorRef gqa_out = intermediates_.gqa_out->slice(0, 0, seq_len);
 
   RETURN_ON_ERR(q_proj.forward(ctx, {hidden_state}, q));
   RETURN_ON_ERR(k_proj.forward(ctx, {hidden_state}, k));
   RETURN_ON_ERR(v_proj.forward(ctx, {hidden_state}, v));
+
+  q = q->reshape({seq_len, num_heads_, head_dim_});
+  k = k->reshape({seq_len, num_kv_heads_, head_dim_});
+  v = v->reshape({seq_len, num_kv_heads_, head_dim_});
 
   RETURN_ON_ERR(
       rope_op.run(ctx, {q.get(), positions.get(), sin_cache.get(), cos_cache.get()}, {q.get()}));

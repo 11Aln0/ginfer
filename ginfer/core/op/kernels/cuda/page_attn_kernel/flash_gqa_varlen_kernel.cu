@@ -526,7 +526,7 @@ void GQAVarlenKernel(const Context& ctx,
                      tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "GQAVarlenKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   auto cu_seqlens_q_cpu = cu_seqlens_q;
   cu_seqlens_q_cpu.toDevice(common::DeviceType::kDeviceCPU);

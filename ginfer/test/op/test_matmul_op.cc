@@ -1,3 +1,4 @@
+#include <cuda_runtime.h>
 #include <glog/logging.h>
 #include "ginfer/core/context.h"
 #include "ginfer/core/op/op.h"

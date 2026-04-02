@@ -32,7 +32,7 @@ void embeddingKernel(const Context& ctx,
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "embeddingKernel only supports CUDA device type.";
 
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
   const auto& input_shape = input.shape();
   const auto& weight_shape = weight.shape();
   size_t num_indices =

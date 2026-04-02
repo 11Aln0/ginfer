@@ -347,7 +347,7 @@ void GQAVarlenDecodeKernel(const Context& ctx,
                            tensor::Tensor& output) {
   CHECK(ctx.getDeviceType() == common::DeviceType::kDeviceCUDA)
       << "GQAVarlenDecodeKernel only supports CUDA device type.";
-  auto cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
+  const auto& cuda_ctx = static_cast<const common::CUDADeviceContext&>(ctx);
 
   const auto& q_shape = q.shape();
   const int num_heads = q_shape[1];
