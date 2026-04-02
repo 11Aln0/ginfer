@@ -186,6 +186,7 @@ std::vector<int32_t> model_generate(const std::string& model_path, TensorRef inp
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
   LOG(INFO) << "ginfer generate time: " << duration.count() << " ms";
+  LOG(INFO) << "output token count: " << new_token_ids.size();
 
   return new_token_ids;
 }

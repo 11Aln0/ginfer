@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <span>
@@ -15,6 +16,8 @@ enum class SequenceState {
 
 struct Sequence {
   using Ptr = std::shared_ptr<Sequence>;
+  using TimePoint = std::chrono::steady_clock::time_point;
+
   std::vector<int32_t> token_ids;
   SequenceState state;
 
@@ -24,6 +27,9 @@ struct Sequence {
   int num_cached_tokens;
   const int block_size;
   std::vector<int> block_table;
+  TimePoint req_ts;
+  TimePoint first_token_ts;
+  TimePoint finish_ts;
 
   static Sequence::Ptr create(std::vector<int32_t> token_ids, int block_size) {
     return Sequence::Ptr(new Sequence(counter.fetch_add(1, std::memory_order_relaxed),

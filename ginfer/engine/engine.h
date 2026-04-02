@@ -16,6 +16,7 @@ class Engine {
 
  private:
   void addRequest(const std::string& input);
+  void updateSequenceStats(const std::vector<Sequence::Ptr>& seqs);
 
  private:
   Config cfg_;
