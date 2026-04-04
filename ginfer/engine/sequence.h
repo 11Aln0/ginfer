@@ -5,6 +5,7 @@
 #include <memory>
 #include <span>
 #include <vector>
+#include "ginfer/engine/sampling_params.h"
 
 namespace ginfer::engine {
 
@@ -25,15 +26,19 @@ struct Sequence {
   int num_tokens;
   int num_prompt_tokens;
   int num_cached_tokens;
+  int max_tokens;
   const int block_size;
   std::vector<int> block_table;
   TimePoint req_ts;
   TimePoint first_token_ts;
   TimePoint finish_ts;
 
-  static Sequence::Ptr create(std::vector<int32_t> token_ids, int block_size) {
-    return Sequence::Ptr(new Sequence(counter.fetch_add(1, std::memory_order_relaxed),
-                                      std::move(token_ids), block_size));
+  static Sequence::Ptr create(TimePoint req_ts,
+                              std::vector<int32_t> token_ids,
+                              int block_size,
+                              const SamplingParams& sampling_params) {
+    return Sequence::Ptr(new Sequence(counter.fetch_add(1, std::memory_order_relaxed), req_ts,
+                                      std::move(token_ids), block_size, sampling_params));
   }
 
   int numBlocks() const { return (num_tokens + block_size - 1) / block_size; }
@@ -52,13 +57,18 @@ struct Sequence {
   }
 
  private:
-  Sequence(int seq_id, std::vector<int32_t> token_ids, const int block_size)
-      : seq_id(seq_id), block_size(block_size) {
+  Sequence(int seq_id,
+           TimePoint req_ts,
+           std::vector<int32_t> token_ids,
+           const int block_size,
+           const SamplingParams& sampling_params)
+      : req_ts(req_ts), seq_id(seq_id), block_size(block_size) {
     this->num_tokens = token_ids.size();
     this->token_ids = std::move(token_ids);
     this->state = SequenceState::kWaiting;
     this->num_prompt_tokens = this->num_tokens;
     this->num_cached_tokens = 0;
+    this->max_tokens = sampling_params.max_tokens;
   }
 
  private:

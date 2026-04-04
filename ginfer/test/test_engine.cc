@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 #include <cstdlib>
+#include <random>
+#include <string>
+#include <vector>
 
 #include "ginfer/common/device.h"
 #include "ginfer/engine/config.h"
@@ -8,36 +11,38 @@
 
 namespace ginfer::test {
 
-namespace {
-
-engine::Config makeEngineConfig(const std::string& model_path) {
+TEST(EngineTest, Generate) {
+  const char* model_path = std::getenv("MODEL_PATH");
+  ASSERT_NE(model_path, nullptr) << "MODEL_PATH environment variable not set";
   auto loader = model::ModelFactory::createLoader(model_path);
   const auto& model_cfg = loader->getModelConfig();
 
-  return {
+  engine::Config config = {
       .model_path = model_path,
       .device_type = common::DeviceType::kDeviceCUDA,
       .max_num_batched_tokens = 2048,
-      .max_num_seqs = 4,
+      .max_num_seqs = 40,
       .max_seq_len = 512,
-      .gpu_memory_utilization = 0.4f,
+      .gpu_memory_utilization = 0.7f,
       .kvcache_block_size = 16,
       .model_config = model_cfg,
   };
-}
+  engine::Engine eng(config);
 
-}  // namespace
-
-TEST(EngineTest, GenerateReturnsOneOutputPerPrompt) {
-  const char* model_path = std::getenv("MODEL_PATH");
-  ASSERT_NE(model_path, nullptr) << "MODEL_PATH environment variable not set";
-
-  engine::Engine engine(makeEngineConfig(model_path));
-
-  const std::vector<std::string> prompts = {"who are you?", "1+1 equals?",
-                                            "what is the capital of France?"};
+  const std::vector<std::string> prompts = {
+      "Explain the difference between supervised and unsupervised learning.",
+      "Write a short story about a robot who discovers it can feel emotions.",
+      "What are the main causes of the French Revolution?",
+      "Summarize the key principles of object-oriented programming.",
+      "Describe the process of photosynthesis in simple terms.",
+      "What would happen if humans could photosynthesize like plants?",
+      "Compare and contrast TCP and UDP protocols.",
+      "Write a Python function that checks if a string is a palindrome.",
+      "What are the ethical implications of artificial general intelligence?",
+      "Explain how black holes form and what happens at the event horizon.",
+  };
   auto start = std::chrono::high_resolution_clock::now();
-  auto outputs = engine.generate(prompts);
+  auto outputs = eng.generate(prompts, engine::SamplingParams{.max_tokens = 1024});
   auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
       std::chrono::high_resolution_clock::now() - start);
   LOG(INFO) << "ginfer generate time: " << duration.count() << " ms";
@@ -47,6 +52,63 @@ TEST(EngineTest, GenerateReturnsOneOutputPerPrompt) {
     EXPECT_FALSE(output.empty());
     LOG(INFO) << "Generated output: " << output;
   }
+}
+
+TEST(EngineTest, BenchmarkGenerate) {
+  const char* model_path = std::getenv("MODEL_PATH");
+  ASSERT_NE(model_path, nullptr) << "MODEL_PATH environment variable not set";
+  auto loader = model::ModelFactory::createLoader(model_path);
+  const auto& model_cfg = loader->getModelConfig();
+
+  constexpr int kNumSeqs = 256;
+  constexpr int kMaxInputLen = 512;
+  constexpr int kMaxOutputTokens = 512;
+
+  engine::Config config = {
+      .model_path = model_path,
+      .device_type = common::DeviceType::kDeviceCUDA,
+      .max_num_batched_tokens = 16384,
+      .max_num_seqs = kNumSeqs,
+      .max_seq_len = 16384,
+      .gpu_memory_utilization = 0.8f,
+      .kvcache_block_size = 16,
+      .model_config = model_cfg,
+  };
+  engine::Engine eng(config);
+
+  std::mt19937 rng(0);
+  std::uniform_int_distribution<int> prompt_len_dist(100, kMaxInputLen);
+  std::uniform_int_distribution<int32_t> token_id_dist(0, 10000);
+
+  std::vector<std::vector<int32_t>> prompt_token_ids;
+  prompt_token_ids.reserve(kNumSeqs);
+  for (int i = 0; i < kNumSeqs; ++i) {
+    int prompt_len = prompt_len_dist(rng);
+    auto& token_ids = prompt_token_ids.emplace_back();
+    token_ids.reserve(prompt_len);
+    for (int j = 0; j < prompt_len; ++j) {
+      token_ids.push_back(token_id_dist(rng));
+    }
+  }
+
+  eng.generate({std::vector<std::string>{"Benchmark warmup."}},
+               engine::SamplingParams{.max_tokens = 64});
+
+  auto start = std::chrono::steady_clock::now();
+  auto outputs =
+      eng.generate(prompt_token_ids, engine::SamplingParams{.max_tokens = kMaxOutputTokens});
+  auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(
+      std::chrono::steady_clock::now() - start);
+
+  ASSERT_EQ(outputs.size(), prompt_token_ids.size());
+  for (const auto& output : outputs) {
+    EXPECT_FALSE(output.empty());
+  }
+
+  auto total_target_tokens = static_cast<int64_t>(kNumSeqs) * kMaxOutputTokens;
+  auto throughput = total_target_tokens / duration.count();
+  LOG(INFO) << "Benchmark total target tokens: " << total_target_tokens
+            << ", time: " << duration.count() << " s, throughput: " << throughput << " tok/s";
 }
 
 }  // namespace ginfer::test

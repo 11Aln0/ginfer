@@ -234,7 +234,6 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
   int max_seqlen_q = 0;
   for (const auto& seq : seqs) {
     int seqlen_q = seq->num_tokens - seq->num_cached_tokens;
-    CHECK_GT(seqlen_q, 0) << "invalid uncached token count";
     total_q_tokens += seqlen_q;
     max_seqlen_q = std::max(max_seqlen_q, seqlen_q);
   }

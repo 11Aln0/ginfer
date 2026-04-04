@@ -88,7 +88,7 @@ void Scheduler::postprocess(std::vector<Sequence::Ptr>& seqs,
     auto& seq = seqs[i];
     int32_t token_id = token_ids[i];
     seq->appendToken(token_id);
-    if (isEosToken(token_id)) {
+    if (isEosToken(token_id) || seq->num_tokens >= seq->max_tokens) {
       block_mgr.release(seq);
       seq->state = SequenceState::kFinished;
       running.erase(std::find_if(running.begin(), running.end(),
