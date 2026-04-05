@@ -54,21 +54,21 @@ TEST(EngineTest, Generate) {
   }
 }
 
-TEST(EngineTest, BenchmarkGenerate) {
+TEST(EngineTest, Benchmark) {
   const char* model_path = std::getenv("MODEL_PATH");
   ASSERT_NE(model_path, nullptr) << "MODEL_PATH environment variable not set";
   auto loader = model::ModelFactory::createLoader(model_path);
   const auto& model_cfg = loader->getModelConfig();
 
-  constexpr int kNumSeqs = 256;
-  constexpr int kMaxInputLen = 512;
-  constexpr int kMaxOutputTokens = 512;
+  constexpr int numSeqs = 256;
+  constexpr int inputLen = 512;
+  constexpr int outputLen = 128;
 
   engine::Config config = {
       .model_path = model_path,
       .device_type = common::DeviceType::kDeviceCUDA,
       .max_num_batched_tokens = 16384,
-      .max_num_seqs = kNumSeqs,
+      .max_num_seqs = numSeqs,
       .max_seq_len = 16384,
       .gpu_memory_utilization = 0.8f,
       .kvcache_block_size = 16,
@@ -77,13 +77,13 @@ TEST(EngineTest, BenchmarkGenerate) {
   engine::Engine eng(config);
 
   std::mt19937 rng(0);
-  std::uniform_int_distribution<int> prompt_len_dist(100, kMaxInputLen);
+  // std::uniform_int_distribution<int> prompt_len_dist(100, kMaxInputLen);
   std::uniform_int_distribution<int32_t> token_id_dist(0, 10000);
 
   std::vector<std::vector<int32_t>> prompt_token_ids;
-  prompt_token_ids.reserve(kNumSeqs);
-  for (int i = 0; i < kNumSeqs; ++i) {
-    int prompt_len = prompt_len_dist(rng);
+  prompt_token_ids.reserve(numSeqs);
+  for (int i = 0; i < numSeqs; ++i) {
+    int prompt_len = inputLen;
     auto& token_ids = prompt_token_ids.emplace_back();
     token_ids.reserve(prompt_len);
     for (int j = 0; j < prompt_len; ++j) {
@@ -95,8 +95,8 @@ TEST(EngineTest, BenchmarkGenerate) {
                engine::SamplingParams{.max_tokens = 64});
 
   auto start = std::chrono::steady_clock::now();
-  auto outputs =
-      eng.generate(prompt_token_ids, engine::SamplingParams{.max_tokens = kMaxOutputTokens});
+  auto outputs = eng.generate(prompt_token_ids,
+                              engine::SamplingParams{.max_tokens = outputLen, .ignore_eos = true});
   auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(
       std::chrono::steady_clock::now() - start);
 
@@ -105,7 +105,7 @@ TEST(EngineTest, BenchmarkGenerate) {
     EXPECT_FALSE(output.empty());
   }
 
-  auto total_target_tokens = static_cast<int64_t>(kNumSeqs) * kMaxOutputTokens;
+  auto total_target_tokens = static_cast<int64_t>(numSeqs) * (inputLen + outputLen);
   auto throughput = total_target_tokens / duration.count();
   LOG(INFO) << "Benchmark total target tokens: " << total_target_tokens
             << ", time: " << duration.count() << " s, throughput: " << throughput << " tok/s";

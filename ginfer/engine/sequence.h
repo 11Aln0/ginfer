@@ -27,8 +27,11 @@ struct Sequence {
   int num_prompt_tokens;
   int num_cached_tokens;
   int max_tokens;
+  bool ignore_eos;
+
   const int block_size;
   std::vector<int> block_table;
+
   TimePoint req_ts;
   TimePoint first_token_ts;
   TimePoint finish_ts;
@@ -69,6 +72,7 @@ struct Sequence {
     this->num_prompt_tokens = this->num_tokens;
     this->num_cached_tokens = 0;
     this->max_tokens = sampling_params.max_tokens;
+    this->ignore_eos = sampling_params.ignore_eos;
   }
 
  private:

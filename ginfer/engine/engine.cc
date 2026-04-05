@@ -1,5 +1,6 @@
 #include "ginfer/engine/engine.h"
 #include <chrono>
+#include <cmath>
 #include <map>
 #include "ginfer/utils/variant.h"
 
@@ -57,10 +58,10 @@ void Engine::logSeqPerfStats(const Sequence::Ptr& seq) {
   auto ttft_us =
       std::chrono::duration_cast<std::chrono::microseconds>(seq->first_token_ts - seq->req_ts)
           .count();
-  LOG(INFO) << "output_token_count=" << output_token_count;
   auto decode_latency_us =
       std::chrono::duration_cast<std::chrono::microseconds>(seq->finish_ts - seq->first_token_ts);
-  auto tpot_us = decode_latency_us.count() / output_token_count;
+  auto tpot_us =
+      output_token_count == 0 ? NAN : decode_latency_us.count() / (output_token_count - 1);
 
   LOG(INFO) << "seq_id=" << seq->seq_id << " prompt_tokens=" << seq->num_prompt_tokens
             << " output_tokens=" << output_token_count << " TTFT=" << (float)ttft_us / 1000.0
