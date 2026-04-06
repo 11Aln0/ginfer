@@ -28,7 +28,8 @@
 
 ## Benchmark
 
-测试环境：NVIDIA A40；vllm 0.19.0；CUDA 12.6；
+- 测试环境：NVIDIA A40；vllm 0.19.0；CUDA 12.6
+- 测试模型：DeepSeek-R1-Distill-Qwen-1.5B
 
 ### TTFT/TPOT
 
