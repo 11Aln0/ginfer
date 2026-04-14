@@ -13,6 +13,7 @@
 namespace ginfer::engine {
 
 ModelRunner::ModelRunner(const Config& config) : config_(config) {
+  ctx = core::InferContext().setDeviceContext(common::DeviceContext::create(config.device_type));
   loadModel();
   warmupModel();
   allocateWorkspace();
@@ -298,9 +299,6 @@ std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> ModelRunner::prepar
 
 Result<std::vector<int32_t>, std::string> ModelRunner::run(std::vector<Sequence::Ptr>& seqs,
                                                            bool is_prefill) {
-  auto ctx =
-      core::InferContext().setDeviceContext(common::DeviceContext::create(config_.device_type));
-
   std::tuple<core::tensor::TensorRef, core::tensor::TensorRef> inputs;
   if (is_prefill) {
     inputs = preparePrefill(ctx, seqs);

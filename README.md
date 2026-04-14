@@ -36,18 +36,30 @@
 NumPrompts=10；MaxOutputLen=1024
 
 * ginfer：AVG_TTFT：26.625 ms；AVG_TPOT：9.888 ms
+
 	![ginfer_ttft_tpot](media/ginfer_ttft_tpot.png)
-* VLLM：AVG_TTFT：75.014 ms；AVG_TPOT：9.569 ms
-	![vllm_ttft_tpot](media/vllm_ttft_tpot.png)
+* VLLM：AVG_TTFT：18.742 ms；AVG_TPOT：9.569 ms
+  * TTFT 通过设置output_len=1测试
+
+    ![vllm_ttft](media/vllm_ttft.png)
+  * TPOT (通过serve API测试)
+
+	  ![vllm_ttft_tpot](media/vllm_ttft_tpot.png)
 
 ### Prefill/Decode Throughput
 
 NumPrompts=256；InputLen=512；OutputLen=128
 
-* ginfer：Prefill：31590 tok/s；Decode：5457 tok/s
+* ginfer：Prefill：31590 tok/s；Decode：5457 tok/s (有误，理论上应该比vLLM低)
+
 	![ginfer_throughput](media/ginfer_throughput.png)
-* VLLM：Prefill：21202 toks/s；Decode：5300 toks/s
-	![vllm_throughput](media/vllm_throughput.png)
+* VLLM：Prefill：34851 toks/s；Decode：4826 toks/s (vllm bench throughput)
+  * Prefill 吞吐通过设置output_len=1测试
+
+    ![vllm_prefill_throughput](media/vllm_prefill_throughput.png)
+  * Decode 吞吐
+  
+	  ![vllm_throughput](media/vllm_throughput.png)
 
 ## Build & Test
 

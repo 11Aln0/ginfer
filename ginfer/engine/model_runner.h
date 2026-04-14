@@ -58,6 +58,8 @@ class ModelRunner {
   Config config_;
   Workspace host_workspace_;
   Workspace dev_workspace_;
+
+  core::InferContext ctx;
 };
 
 }  // namespace ginfer::engine
