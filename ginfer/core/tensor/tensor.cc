@@ -66,6 +66,8 @@ bool Tensor::isContiguous() const {
 
 Result<TensorRef, std::string> Tensor::toDeviceDense(memory::DeviceAllocator* allocator,
                                                      bool async) {
+  CHECK(isContiguous()) << "Dense device copy requires a contiguous tensor.";
+
   auto dtype_size = dTypeSize(dtype_);
   DECLARE_OR_RETURN(new_buffer, memory::Buffer::create(size_ * dtype_size, allocator));
   new_buffer->copyFrom(buffer_, 0, offset_ * dtype_size, size_ * dtype_size, async);
@@ -73,8 +75,8 @@ Result<TensorRef, std::string> Tensor::toDeviceDense(memory::DeviceAllocator* al
   return Ok(new_tensor);
 }
 
-Result<TensorRef, std::string> Tensor::toDevicePreserveLayout(memory::DeviceAllocator* allocator,
-                                                              bool async) {
+Result<TensorRef, std::string> Tensor::toDeviceStrided(memory::DeviceAllocator* allocator,
+                                                       bool async) {
   if (buffer_->allocator() == allocator) {
     return Ok(shared_from_this());
   }
@@ -89,28 +91,21 @@ Result<TensorRef, std::string> Tensor::toDevicePreserveLayout(memory::DeviceAllo
   return Ok(new_tensor);
 }
 
-Result<TensorRef, std::string> Tensor::toDevice(memory::DeviceAllocator* allocator,
-                                                bool preserveLayout,
-                                                bool async) {
+Result<TensorRef, std::string> Tensor::toDevice(memory::DeviceAllocator* allocator, bool async) {
   CHECK_NE(buffer_, nullptr);
   CHECK_NE(allocator, nullptr);
   CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
-  // only continuous or non-slice tensor can be copied for now
-  CHECK(isContiguous() || buffer_->size() == size_ * dTypeSize(dtype_))
-      << "Only contiguous tensors are supported for now.";
 
-  if (preserveLayout) {
-    return toDevicePreserveLayout(allocator, async);
-  } else {
+  if (isContiguous()) {
     return toDeviceDense(allocator, async);
   }
+  return toDeviceStrided(allocator, async);
 }
 
 Result<TensorRef, std::string> Tensor::toDevice(DeviceType dev_type,
                                                 uint8_t alloc_flags,
-                                                bool preserveLayout,
                                                 bool async) {
-  return toDevice(memory::getDeviceAllocator(dev_type, alloc_flags), preserveLayout, async);
+  return toDevice(memory::getDeviceAllocator(dev_type, alloc_flags), async);
 }
 
 void Tensor::copyFrom(const TensorRef& src, bool async) {

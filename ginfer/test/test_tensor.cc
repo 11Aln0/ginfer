@@ -4,6 +4,7 @@
 
 #include "ginfer/core/memory/allocator_factory.h"
 #include "ginfer/core/tensor/tensor.h"
+#include "ginfer/core/tensor/tensor_dump.h"
 #include "ginfer/core/tensor/tensor_writer.h"
 
 namespace ginfer::test::tensor {
@@ -273,6 +274,65 @@ TEST(TensorTest, reshape) {
   // ASSERT_THROW(tensor.reshape(ginfer::core::tensor::Shape{5, 5}), std::exception);
 }
 
+TEST(TensorTest, tensorDumpFloat32) {
+  auto tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeFloat32, ginfer::core::tensor::Shape{2, 3},
+      ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto* ptr = tensor->data<float>();
+  for (int i = 0; i < 6; ++i) {
+    ptr[i] = static_cast<float>(i) + 0.5f;
+  }
+
+  auto dump = ginfer::core::tensor::dumpTensor(tensor, {.max_elements = 4});
+  EXPECT_NE(dump.find("shape: [2, 3]"), std::string::npos);
+  EXPECT_NE(dump.find("dtype: Float32"), std::string::npos);
+  EXPECT_NE(dump.find("device: DeviceCPU"), std::string::npos);
+  EXPECT_NE(dump.find("strides: [3, 1]"), std::string::npos);
+  EXPECT_NE(dump.find("contiguous: true"), std::string::npos);
+  EXPECT_NE(dump.find("0.5, 1.5, 2.5, 3.5"), std::string::npos);
+  EXPECT_NE(dump.find("4/6 elements shown"), std::string::npos);
+}
+
+TEST(TensorTest, tensorDumpInt32) {
+  auto tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeInt32, ginfer::core::tensor::Shape{4},
+      ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto* ptr = tensor->data<int32_t>();
+  ptr[0] = 7;
+  ptr[1] = -3;
+  ptr[2] = 42;
+  ptr[3] = 0;
+
+  auto dump = ginfer::core::tensor::dumpTensor(tensor);
+  EXPECT_NE(dump.find("dtype: Int32"), std::string::npos);
+  EXPECT_NE(dump.find("data: [7, -3, 42, 0] 4/4 elements shown"), std::string::npos);
+}
+
+TEST(TensorTest, tensorDumpSliceMetadata) {
+  auto tensor_res = ginfer::core::tensor::Tensor::create(
+      ginfer::core::tensor::DataType::kDataTypeFloat32, ginfer::core::tensor::Shape{4, 3, 2},
+      ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto* ptr = tensor->data<float>();
+  for (int i = 0; i < 24; ++i) {
+    ptr[i] = static_cast<float>(i);
+  }
+
+  auto sliced = tensor->slice(0, 1, 3);
+  auto dump = ginfer::core::tensor::dumpTensor(sliced, {.max_elements = 3});
+  EXPECT_NE(dump.find("shape: [2, 3, 2]"), std::string::npos);
+  EXPECT_NE(dump.find("strides: [6, 2, 1]"), std::string::npos);
+  EXPECT_NE(dump.find("contiguous: true"), std::string::npos);
+  EXPECT_NE(dump.find("6, 7, 8"), std::string::npos);
+}
 TEST(TensorTest, tensorWriter) {
   auto tensor_res = ginfer::core::tensor::Tensor::create(
       ginfer::core::tensor::DataType::kDataTypeInt32, ginfer::core::tensor::Shape{6},
@@ -295,7 +355,10 @@ TEST(TensorTest, tensorWriter) {
   ASSERT_EQ(ptr[3], 4);
   ASSERT_EQ(ptr[4], 5);
 
-  EXPECT_THROW(writer.append(6), std::runtime_error);
+  writer.append(6);
+  ASSERT_EQ(writer.size(), 6);
+  ASSERT_EQ(ptr[5], 6);
+  EXPECT_THROW(writer.append(7), std::runtime_error);
 }
 
 TEST(TensorTest, tensorWriter2D) {

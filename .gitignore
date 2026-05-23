@@ -12,3 +12,6 @@ set_env.sh
 /Testing
 CLAUDE.md
 /*.sqlite
+.claude
+/models
+.codex

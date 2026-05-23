@@ -23,7 +23,7 @@ def load_hf_model(model_path=None, device_name="cpu"):
 
 
 def hf_generate(
-    inputs, model, max_new_tokens=128, top_p=0.8, top_k=50, temperature=0.8
+    inputs, model, max_new_tokens=128,
 ):
     compiled_model = torch.compile(model, mode="reduce-overhead")
     
@@ -32,9 +32,10 @@ def hf_generate(
         compiled_model.generate(
             inputs,
             max_new_tokens=max_new_tokens,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature,
+            top_k=1,
+            top_p=1.0,
+            temperature=1.0,
+            do_sample=False
         )
         
         torch.cuda.synchronize()
@@ -43,9 +44,10 @@ def hf_generate(
         outputs = compiled_model.generate(
             inputs,
             max_new_tokens=max_new_tokens,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature,
+            top_k=1,
+            top_p=1.0,
+            temperature=1.0,
+            do_sample=False
         )
         
         torch.cuda.synchronize()
@@ -67,11 +69,11 @@ def hf_infer(
     return result
 
 def test_model_generate_cuda():
-    # <｜User｜>Who are you?<｜Assistant｜><think>
-    input_ids = np.array([151646, 151646, 151644, 15191, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
+    # <｜User｜>How are you?<｜Assistant｜><think>
+    input_ids = np.array([151646, 151646, 151644, 4340, 525, 498, 30, 151645, 151648, 198], dtype=np.int32)
     
     hf_model, _, = load_hf_model(MODEL_PATH, device_name="cuda:0")
-    ref_token_ids = hf_generate(torch.tensor([input_ids], device="cuda:0"), hf_model, max_new_tokens=1024, top_p = 1.0, top_k = 1, temperature = 1.0).tolist()
+    ref_token_ids = hf_generate(torch.tensor([input_ids], device="cuda:0"), hf_model, max_new_tokens=1024).tolist()
     
     next_token_ids = ginfer_test.test_model_generate_cuda(MODEL_PATH, input_ids)
     token_ids = np.concatenate([input_ids, next_token_ids])
@@ -81,7 +83,7 @@ def test_model_generate_cuda():
 def test_model_infer_cuda():
     prompt = "13.8 and 13.11, which one is larger?"
     hf_model, hf_tokenizer = load_hf_model(MODEL_PATH, device_name="cuda:0")
-    ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=1024, top_p = 1.0, top_k = 1, temperature = 1.0)
+    ref_result = hf_infer(prompt, hf_tokenizer, hf_model, max_new_tokens=1024)
     
     result = ginfer_test.test_model_infer_cuda(MODEL_PATH, prompt)
     
