@@ -2,12 +2,12 @@
 
 #include <algorithm>
 #include <cstdint>
-#include <iomanip>
 #include <ostream>
 #include <sstream>
 #include <vector>
 
 #include "ginfer/common/device.h"
+#include "ginfer/common/type.h"
 #include "ginfer/core/memory/allocator.h"
 
 namespace ginfer::core::tensor {
@@ -59,33 +59,18 @@ const char* dataTypeName(DataType dtype) {
   }
 }
 
-template <typename T>
+template <DataType dtype>
 void appendValues(std::ostringstream& os, const TensorRef& tensor, size_t count) {
-  const auto* data = tensor->data<T>();
-  for (size_t i = 0; i < count; ++i) {
-    if (i != 0) {
-      os << ", ";
-    }
-    if constexpr (std::is_same_v<T, int8_t>) {
-      os << static_cast<int>(data[i]);
-    } else {
-      os << data[i];
-    }
-  }
-}
+  using SrcType = typename TypeOf<dtype>::type;
+  using DisplayType = typename DisplayTypeOf<SrcType>::type;
 
-void appendRaw16Values(std::ostringstream& os, const TensorRef& tensor, size_t count) {
-  const auto* data = tensor->data<uint16_t>();
-  auto flags = os.flags();
-  auto fill = os.fill();
+  const auto* data = tensor->data<SrcType>();
   for (size_t i = 0; i < count; ++i) {
     if (i != 0) {
       os << ", ";
     }
-    os << "0x" << std::hex << std::setw(4) << std::setfill('0') << data[i] << std::dec;
+    os << type::TypeConverter<SrcType, DisplayType>::convert(data[i]);
   }
-  os.flags(flags);
-  os.fill(fill);
 }
 
 void appendData(std::ostringstream& os, const TensorRef& tensor, size_t max_elements) {
@@ -93,20 +78,22 @@ void appendData(std::ostringstream& os, const TensorRef& tensor, size_t max_elem
   os << "  data: [";
   switch (tensor->dtype()) {
     case DataType::kDataTypeFloat32:
-      appendValues<float>(os, tensor, shown);
+      appendValues<DataType::kDataTypeFloat32>(os, tensor, shown);
       break;
     case DataType::kDataTypeFloat16:
+      appendValues<DataType::kDataTypeFloat16>(os, tensor, shown);
+      break;
     case DataType::kDataTypeBFloat16:
-      appendRaw16Values(os, tensor, shown);
+      appendValues<DataType::kDataTypeBFloat16>(os, tensor, shown);
       break;
     case DataType::kDataTypeInt64:
-      appendValues<int64_t>(os, tensor, shown);
+      appendValues<DataType::kDataTypeInt64>(os, tensor, shown);
       break;
     case DataType::kDataTypeInt32:
-      appendValues<int32_t>(os, tensor, shown);
+      appendValues<DataType::kDataTypeInt32>(os, tensor, shown);
       break;
     case DataType::kDataTypeInt8:
-      appendValues<int8_t>(os, tensor, shown);
+      appendValues<DataType::kDataTypeInt8>(os, tensor, shown);
       break;
     case DataType::kDataTypeVoid:
     default:
@@ -154,14 +141,14 @@ std::string dumpTensor(const TensorRef& tensor, const TensorDumpOptions& options
       return os.str();
     }
 
-    auto cpu_res = tensor->toDevice(common::DeviceType::kDeviceCPU, memory::kDefault, false);
+    auto cpu_res = tensor->toDevice(common::DeviceType::kDeviceCPU, memory::kDefault);
     if (!cpu_res.ok()) {
-      os << "  data: failed to copy tensor to contiguous CPU buffer: " << cpu_res.err() << "\n";
+      os << "  data: failed to copy tensor to CPU buffer: " << cpu_res.err() << "\n";
       os << "}\n";
       return os.str();
     }
     readable = std::move(cpu_res).value();
-    os << "  data_source: copied to contiguous CPU buffer\n";
+    os << "  data_source: copied to CPU buffer\n";
   }
 
   appendData(os, readable, options.max_elements);

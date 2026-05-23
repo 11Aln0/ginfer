@@ -53,11 +53,9 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   Result<TensorRef, std::string> toDevice(DeviceType dev_type,
                                           uint8_t alloc_flags = memory::kDefault,
-                                          bool preserveLayout = true,
                                           bool async = false);
 
   Result<TensorRef, std::string> toDevice(memory::DeviceAllocator* allocator,
-                                          bool preserveLayout = true,
                                           bool async = false);
 
   void copyFrom(const TensorRef& src, bool async = false);
@@ -88,8 +86,8 @@ class Tensor : public std::enable_shared_from_this<Tensor> {
 
   Result<TensorRef, std::string> toDeviceDense(memory::DeviceAllocator* allocator,
                                                bool async = false);
-  Result<TensorRef, std::string> toDevicePreserveLayout(memory::DeviceAllocator* allocator,
-                                                        bool async = false);
+  Result<TensorRef, std::string> toDeviceStrided(memory::DeviceAllocator* allocator,
+                                                 bool async = false);
 
  private:
   DataType dtype_ = DataType::kDataTypeVoid;

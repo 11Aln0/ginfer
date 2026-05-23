@@ -4,6 +4,7 @@
 #include <cuda_fp16.h>
 #include <cstdint>
 #include <iostream>
+#include <type_traits>
 #include "ginfer/common/device.h"
 #include "ginfer/common/type.h"
 
@@ -104,6 +105,30 @@ struct DataTypeOf<type::Int32> {
 template <>
 struct DataTypeOf<type::Int8> {
   static constexpr DataType dtype = DataType::kDataTypeInt8;
+};
+
+template <typename T>
+struct IsIntegerType : std::bool_constant<std::is_integral_v<T>> {};
+
+template <>
+struct IsIntegerType<type::Float16> : std::true_type {};
+
+template <>
+struct IsIntegerType<type::BFloat16> : std::true_type {};
+
+template <typename T>
+struct DisplayTypeOf {
+  using type = std::conditional_t<IsIntegerType<T>::value, int64_t, float>;
+};
+
+template <>
+struct DisplayTypeOf<type::Float16> {
+  using type = type::Float32;
+};
+
+template <>
+struct DisplayTypeOf<type::BFloat16> {
+  using type = type::Float32;
 };
 
 }  // namespace ginfer::core::tensor
