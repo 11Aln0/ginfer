@@ -355,7 +355,10 @@ TEST(TensorTest, tensorWriter) {
   ASSERT_EQ(ptr[3], 4);
   ASSERT_EQ(ptr[4], 5);
 
-  EXPECT_THROW(writer.append(6), std::runtime_error);
+  writer.append(6);
+  ASSERT_EQ(writer.size(), 6);
+  ASSERT_EQ(ptr[5], 6);
+  EXPECT_THROW(writer.append(7), std::runtime_error);
 }
 
 TEST(TensorTest, tensorWriter2D) {

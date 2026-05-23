@@ -3,10 +3,10 @@
 #include <algorithm>
 #include <cstddef>
 #include <iterator>
+#include <stdexcept>
 #include <type_traits>
 
-#include <glog/logging.h>
-
+#include "ginfer/common/errors.h"
 #include "ginfer/core/tensor/dtype.h"
 #include "ginfer/core/tensor/tensor.h"
 
@@ -36,7 +36,7 @@ class TensorWriter {
   }
 
   T& back() const {
-    CHECK(size_ > 0) << "TensorWriter back() requires non-empty writer";
+    CHECK_THROW(size_ > 0, "TensorWriter back() requires non-empty writer");
     return ptr_[size_ - 1];
   }
 
@@ -45,18 +45,23 @@ class TensorWriter {
 
  private:
   void validateTensor() const {
-    CHECK(tensor_ != nullptr) << "TensorWriter requires a non-null tensor";
-    CHECK(tensor_->devType() == DeviceType::kDeviceCPU) << "TensorWriter requires a CPU tensor";
-    CHECK(tensor_->shape().ndim() == 1) << "TensorWriter requires a 1D tensor";
-    CHECK(tensor_->isContiguous()) << "TensorWriter requires a contiguous tensor";
-    CHECK(tensor_->dtype() ==
-          (DataTypeOf<typename type::TypeOf<DeviceType::kDeviceCPU, T>::type>::dtype))
-        << "TensorWriter tensor dtype mismatch";
+    CHECK_THROW(tensor_ != nullptr, "TensorWriter requires a non-null tensor");
+    CHECK_THROW(tensor_->devType() == DeviceType::kDeviceCPU,
+                "TensorWriter requires a CPU tensor");
+    CHECK_THROW(tensor_->shape().ndim() == 1, "TensorWriter requires a 1D tensor");
+    CHECK_THROW(tensor_->isContiguous(), "TensorWriter requires a contiguous tensor");
+    CHECK_THROW(
+        tensor_->dtype() ==
+            (DataTypeOf<typename type::TypeOf<DeviceType::kDeviceCPU, T>::type>::dtype),
+        "TensorWriter tensor dtype mismatch");
   }
 
   void ensureCapacity(size_t n) const {
-    CHECK(size_ + n <= capacity_) << "TensorWriter capacity exceeded: size " << size_ << " + n "
-                                  << n << " > capacity " << capacity_;
+    CHECK_THROW(size_ + n <= capacity_,
+                "TensorWriter capacity exceeded: size {} + n {} > capacity {}",
+                size_,
+                n,
+                capacity_);
   }
 
  private:
@@ -83,11 +88,11 @@ class TensorWriter2D {
 
   template <typename InputIt>
   void appendRow(InputIt first, InputIt last, size_t padToLen, T padVal = static_cast<T>(-1)) {
-    CHECK(rowCount_ < rows_) << "TensorWriter2D row capacity exceeded";
-    CHECK(padToLen <= cols_) << "TensorWriter2D padToLen exceeds tensor width";
+    CHECK_THROW(rowCount_ < rows_, "TensorWriter2D row capacity exceeded");
+    CHECK_THROW(padToLen <= cols_, "TensorWriter2D padToLen exceeds tensor width");
 
     const auto len = static_cast<size_t>(std::distance(first, last));
-    CHECK(len <= padToLen) << "TensorWriter2D row length exceeds padToLen";
+    CHECK_THROW(len <= padToLen, "TensorWriter2D row length exceeds padToLen");
 
     T* rowPtr = ptr_ + rowCount_ * cols_;
     size_t i = 0;
@@ -104,13 +109,15 @@ class TensorWriter2D {
 
  private:
   void validateTensor() const {
-    CHECK(tensor_ != nullptr) << "TensorWriter2D requires a non-null tensor";
-    CHECK(tensor_->devType() == DeviceType::kDeviceCPU) << "TensorWriter requires a CPU tensor";
-    CHECK(tensor_->shape().ndim() == 2) << "TensorWriter2D requires a 2D tensor";
-    CHECK(tensor_->isContiguous()) << "TensorWriter2D requires a contiguous tensor";
-    CHECK(tensor_->dtype() ==
-          (DataTypeOf<typename type::TypeOf<DeviceType::kDeviceCPU, T>::type>::dtype))
-        << "TensorWriter2D tensor dtype mismatch";
+    CHECK_THROW(tensor_ != nullptr, "TensorWriter2D requires a non-null tensor");
+    CHECK_THROW(tensor_->devType() == DeviceType::kDeviceCPU,
+                "TensorWriter2D requires a CPU tensor");
+    CHECK_THROW(tensor_->shape().ndim() == 2, "TensorWriter2D requires a 2D tensor");
+    CHECK_THROW(tensor_->isContiguous(), "TensorWriter2D requires a contiguous tensor");
+    CHECK_THROW(
+        tensor_->dtype() ==
+            (DataTypeOf<typename type::TypeOf<DeviceType::kDeviceCPU, T>::type>::dtype),
+        "TensorWriter2D tensor dtype mismatch");
   }
 
  private:
