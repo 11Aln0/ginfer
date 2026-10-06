@@ -10,7 +10,8 @@ __forceinline__ __device__ void warp_reduce_argmax(float& val, int64_t& idx) {
   for (int offset = 16; offset > 0; offset /= 2) {
     float other_val = __shfl_down_sync(0xFFFFFFFF, val, offset);
     int64_t other_idx = __shfl_down_sync(0xFFFFFFFF, idx, offset);
-    if (other_val > val) {
+    // 与 torch.argmax 对齐：值更大者胜；平局时取更小 idx
+    if (other_val > val || (other_val == val && other_idx < idx)) {
       val = other_val;
       idx = other_idx;
     }

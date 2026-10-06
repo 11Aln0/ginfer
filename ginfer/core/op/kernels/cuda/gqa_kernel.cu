@@ -338,7 +338,7 @@ __device__ void storeOTile(
     T* gptr = p_output + row * seq_len_stride + col;
 
     auto vec = *reinterpret_cast<const AccessType*>(sptr);
-    float inv_l = __fdividef(1.0f, p_l[row]);
+    float inv_l = 1.0f / p_l[row];
 #pragma unroll
     for (int i = 0; i < vec_size; i++) {
       vec.val[i] = NumericTraits::toFloat(vec.val[i]) * inv_l;
