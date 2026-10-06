@@ -135,6 +135,53 @@ TEST(TensorTest, toDev) {
   // ASSERT_EQ(cpu_tensor.shape)
 }
 
+TEST(TensorTest, toDeviceReturnsSelfForSameAllocator) {
+  auto tensor_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeInt32,
+                                           ginfer::core::tensor::Shape{4, 3, 2},
+                                           ginfer::common::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto same_res = tensor->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(same_res.ok()) << same_res.err();
+  ASSERT_EQ(same_res.value().get(), tensor.get());
+
+  auto sliced = tensor->slice(0, 1, 3);
+  auto same_slice_res = sliced->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(same_slice_res.ok()) << same_slice_res.err();
+  ASSERT_EQ(same_slice_res.value().get(), sliced.get());
+}
+
+TEST(TensorTest, toDeviceDenseCopiesContiguousSliceAcrossAllocators) {
+  auto tensor_res =
+      ginfer::core::tensor::Tensor::create(ginfer::core::tensor::DataType::kDataTypeInt32,
+                                           ginfer::core::tensor::Shape{4, 3, 2},
+                                           ginfer::common::DeviceType::kDeviceCPU,
+                                           ginfer::core::memory::kPooled);
+  ASSERT_TRUE(tensor_res.ok());
+  auto tensor = tensor_res.value();
+
+  auto* data = tensor->data<int32_t>();
+  for (int i = 0; i < 24; ++i) {
+    data[i] = i;
+  }
+
+  auto sliced = tensor->slice(0, 1, 3);
+  ASSERT_TRUE(sliced->isContiguous());
+
+  auto copied_res = sliced->toDevice(ginfer::core::memory::DeviceType::kDeviceCPU);
+  ASSERT_TRUE(copied_res.ok()) << copied_res.err();
+  auto copied = copied_res.value();
+
+  ASSERT_NE(copied.get(), sliced.get());
+  ASSERT_EQ(copied->nbytes(), 12 * sizeof(int32_t));
+  auto* copied_data = copied->data<int32_t>();
+  for (int i = 0; i < 12; ++i) {
+    ASSERT_EQ(copied_data[i], i + 6);
+  }
+}
+
 TEST(TensorTest, strides) {
   auto cpu_allocator = ginfer::core::memory::getDefaultDeviceAllocator(ginfer::core::memory::DeviceType::kDeviceCPU);
   ASSERT_NE(cpu_allocator, nullptr);

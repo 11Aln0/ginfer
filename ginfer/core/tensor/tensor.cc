@@ -70,16 +70,13 @@ Result<TensorRef, std::string> Tensor::toDeviceDense(memory::DeviceAllocator* al
 
   auto dtype_size = dTypeSize(dtype_);
   DECLARE_OR_RETURN(new_buffer, memory::Buffer::create(size_ * dtype_size, allocator));
-  new_buffer->copyFrom(buffer_, 0, offset_ * dtype_size, size_ * dtype_size, async);
+  new_buffer->copyFrom(buffer_, offset_ * dtype_size, 0, size_ * dtype_size, async);
   auto new_tensor = std::shared_ptr<Tensor>(new Tensor(dtype_, shape_, new_buffer));
   return Ok(new_tensor);
 }
 
 Result<TensorRef, std::string> Tensor::toDeviceStrided(memory::DeviceAllocator* allocator,
                                                        bool async) {
-  if (buffer_->allocator() == allocator) {
-    return Ok(shared_from_this());
-  }
   auto dtype_size = dTypeSize(dtype_);
   DECLARE_OR_RETURN(new_buffer, memory::Buffer::create(buffer_->size(), allocator));
   new_buffer->copyFrom(buffer_, async);
@@ -95,6 +92,10 @@ Result<TensorRef, std::string> Tensor::toDevice(memory::DeviceAllocator* allocat
   CHECK_NE(buffer_, nullptr);
   CHECK_NE(allocator, nullptr);
   CHECK_NE(buffer_->devType(), DeviceType::kDeviceUnknown);
+
+  if (buffer_->allocator() == allocator) {
+    return Ok(shared_from_this());
+  }
 
   if (isContiguous()) {
     return toDeviceDense(allocator, async);
