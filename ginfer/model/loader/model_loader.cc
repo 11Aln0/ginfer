@@ -51,45 +51,28 @@ void ModelLoader::loadModelConfig(ModelConfig& config, const nlohmann::json& jso
   }
 }
 
-ModelLoader::AttentionWeight ModelLoader::loadAttentionWeight(
-    const std::string& prefix, bool q_bias, bool k_bias, bool v_bias, bool o_bias) {
-  std::string attn_prefix = prefix + ".self_attn";
-  AttentionWeight w = {
-      .q_w = weight_loader.getTensor(attn_prefix + ".q_proj.weight"),
-      .k_w = weight_loader.getTensor(attn_prefix + ".k_proj.weight"),
-      .v_w = weight_loader.getTensor(attn_prefix + ".v_proj.weight"),
-      .o_w = weight_loader.getTensor(attn_prefix + ".o_proj.weight"),
-  };
-  if (q_bias) w.q_b = weight_loader.getTensor(attn_prefix + ".q_proj.bias");
-  if (k_bias) w.k_b = weight_loader.getTensor(attn_prefix + ".k_proj.bias");
-  if (v_bias) w.v_b = weight_loader.getTensor(attn_prefix + ".v_proj.bias");
-  if (o_bias) w.o_b = weight_loader.getTensor(attn_prefix + ".o_proj.bias");
-  return w;
+std::string ModelLoader::ckptKey(const std::string& layer_name,
+                                 const std::string& suffix) const {
+  // HF keeps everything except lm_head under the `model` submodule.
+  const std::string prefix = layer_name == "lm_head" ? "" : "model.";
+  return prefix + layer_name + "." + suffix;
 }
 
-ModelLoader::FeedForwardWeight ModelLoader::loadFeedForwardWeight(const std::string& prefix) {
-  std::string mlp_prefix = prefix + ".mlp";
-  FeedForwardWeight w = {
-      .gate_w = weight_loader.getTensor(mlp_prefix + ".gate_proj.weight"),
-      .up_w = weight_loader.getTensor(mlp_prefix + ".up_proj.weight"),
-      .down_w = weight_loader.getTensor(mlp_prefix + ".down_proj.weight"),
-  };
-  return w;
+void ModelLoader::loadLinear(core::layer::LinearLayer& layer, bool has_bias) {
+  layer.setWeight(weight_loader.getTensor(ckptKey(layer.name(), "weight")));
+  if (has_bias) {
+    layer.setBias(weight_loader.getTensor(ckptKey(layer.name(), "bias")));
+  }
 }
 
-ModelLoader::EncoderWeight ModelLoader::loadEncoderLayerWeight(int layer_idx) {
-  std::string prefix = "model.layers." + std::to_string(layer_idx);
-  auto attn = loadAttentionWeight(prefix, true, true, true, true);
-  auto mlp = loadFeedForwardWeight(prefix);
+void ModelLoader::loadRMSNorm(core::layer::RMSNormLayer& layer) {
+  layer.setWeight(weight_loader.getTensor(ckptKey(layer.name(), "weight")));
+}
 
-  EncoderWeight w = {
-      .attn = attn,
-      .mlp = mlp,
-      .attn_norm = weight_loader.getTensor(prefix + ".input_layernorm.weight"),
-      .mlp_norm = weight_loader.getTensor(prefix + ".post_attention_layernorm.weight"),
-  };
-
-  return w;
+core::tensor::TensorRef ModelLoader::loadEmbedding(core::layer::EmbeddingLayer& layer) {
+  auto weight = weight_loader.getTensor(ckptKey(layer.name(), "weight"));
+  layer.setWeight(weight);
+  return weight;
 }
 
 void LlamaArchModelLoader::loadLlamaArchModelConfig(LlamaArchModelConfig& config,
@@ -105,20 +88,38 @@ void LlamaArchModelLoader::loadLlamaArchModelConfig(LlamaArchModelConfig& config
   }
 }
 
-ModelLoader::EncoderWeight LlamaArchModelLoader::loadEncoderLayerWeight(int layer_idx) {
-  std::string prefix = "model.layers." + std::to_string(layer_idx);
+void LlamaArchModelLoader::loadAttention(core::layer::transformer::AttentionLayer& layer) {
   auto [q_bias, k_bias, v_bias, o_bias] = getAttentionBiasConfig();
-  auto attn = loadAttentionWeight(prefix, q_bias, k_bias, v_bias, o_bias);
-  auto mlp = loadFeedForwardWeight(prefix);
+  loadLinear(layer.qProj(), q_bias);
+  loadLinear(layer.kProj(), k_bias);
+  loadLinear(layer.vProj(), v_bias);
+  loadLinear(layer.oProj(), o_bias);
+}
 
-  EncoderWeight w = {
-      .attn = attn,
-      .mlp = mlp,
-      .attn_norm = weight_loader.getTensor(prefix + ".input_layernorm.weight"),
-      .mlp_norm = weight_loader.getTensor(prefix + ".post_attention_layernorm.weight"),
-  };
+void LlamaArchModelLoader::loadFeedForward(core::layer::transformer::FeedForwardLayer& layer) {
+  loadLinear(layer.gateProj(), false);
+  loadLinear(layer.upProj(), false);
+  loadLinear(layer.downProj(), false);
+}
 
-  return w;
+void LlamaArchModelLoader::loadEncoderLayer(core::layer::transformer::EncoderLayer& layer) {
+  loadRMSNorm(layer.getAttnNormLayer());
+  loadAttention(layer.getAttentionLayer());
+  loadRMSNorm(layer.getMLPNormLayer());
+  loadFeedForward(layer.getFeedForwardLayer());
+}
+
+void LlamaArchModelLoader::loadWeights(LlamaArchModel& model, const LlamaArchModelConfig& config) {
+  auto embed_weight = loadEmbedding(model.embed_tokens);
+  for (auto& encoder : model.encoder_layers) {
+    loadEncoderLayer(encoder);
+  }
+  loadRMSNorm(model.final_rmsnorm);
+  if (config.tie_word_embeddings) {
+    model.lm_head.setWeight(embed_weight);
+  } else {
+    model.lm_head.setWeight(weight_loader.getTensor(ckptKey(model.lm_head.name(), "weight")));
+  }
 }
 
 }  // namespace ginfer::model

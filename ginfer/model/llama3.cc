@@ -29,20 +29,7 @@ std::unique_ptr<Model> Llama3ModelLoader::load() {
   auto m = std::make_unique<Llama3Model>(config);
 
   weight_loader.load(model_path_ + "/model.safetensors");  // TODO multi-part safetensors
-
-  auto embed_weight = weight_loader.getTensor("model.embed_tokens.weight");
-  m->embed_tokens.setWeight(embed_weight);
-  for (int i = 0; i < config.nlayer; i++) {
-    auto& encoder = m->encoder_layers[i];
-    encoder.setWeight(loadEncoderLayerWeight(i));
-  }
-
-  m->final_rmsnorm.setWeight(weight_loader.getTensor("model.norm.weight"));
-  if (config.tie_word_embeddings) {
-    m->lm_head.setWeight(embed_weight);
-  } else {
-    m->lm_head.setWeight(weight_loader.getTensor("lm_head.weight"));
-  }
+  loadWeights(*m, config);
 
   return m;
 }

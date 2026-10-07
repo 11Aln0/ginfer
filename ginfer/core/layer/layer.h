@@ -23,6 +23,9 @@ class BaseLayer {
 
   DeviceType getDeviceType() const;
 
+  // Full path of the layer in the model, e.g. "layers.3.self_attn.q_proj".
+  const std::string& name() const;
+
   virtual Result<void, std::string> forward(const core::InferContext& ctx,
                                             const std::vector<TensorRef>& inputs,
                                             TensorRef output) = 0;

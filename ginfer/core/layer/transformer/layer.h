@@ -8,17 +8,6 @@ namespace ginfer::core::layer::transformer {
 
 class AttentionLayer : public Layer {
  public:
-  struct Weight {
-    TensorRef q_w;  // [hidden_size, num_heads * head_dim]
-    TensorRef q_b;
-    TensorRef k_w;  // [hidden_size, num_kv_heads * head_dim]
-    TensorRef k_b;
-    TensorRef v_w;  // [hidden_size, num_kv_heads * head_dim]
-    TensorRef v_b;
-    TensorRef o_w;  // [hidden_size, num_heads * head_dim]
-    TensorRef o_b;
-  };
-
   struct Intermediates {
     TensorRef q_proj_out;  // [max_seq_len, num_heads * head_dim]
     TensorRef k_proj_out;  // [max_seq_len, num_kv_heads * head_dim]
@@ -37,11 +26,14 @@ class AttentionLayer : public Layer {
 
   Result<void, std::string> toDevice(DeviceType dev_type) override;
 
-  void setWeight(const Weight& weight);
-
   void setIntermediates(const Intermediates& intermediates);
 
   void setKVCache(TensorRef& k_cache, TensorRef& v_cache);
+
+  LinearLayer& qProj();
+  LinearLayer& kProj();
+  LinearLayer& vProj();
+  LinearLayer& oProj();
 
  private:
   Result<void, std::string> forwardWithKVCache(const core::InferContext& ctx,
@@ -79,12 +71,6 @@ class AttentionLayer : public Layer {
 
 class FeedForwardLayer : public Layer {
  public:
-  struct Weight {
-    TensorRef gate_w;  // [intermediate_size, hidden_size]
-    TensorRef up_w;    // [intermediate_size, hidden_size]
-    TensorRef down_w;  // [hidden_size, intermediate_size]
-  };
-
   struct Intermediates {
     TensorRef gate_out;    // [max_seq_len, intermediate_size]
     TensorRef up_out;      // [max_seq_len, intermediate_size]
@@ -100,9 +86,11 @@ class FeedForwardLayer : public Layer {
 
   Result<void, std::string> toDevice(DeviceType dev_type) override;
 
-  void setWeight(const Weight& weight);
-
   void setIntermediates(const Intermediates& intermediates);
+
+  LinearLayer& gateProj();
+  LinearLayer& upProj();
+  LinearLayer& downProj();
 
  private:
   Intermediates intermediates_;
@@ -115,13 +103,6 @@ class FeedForwardLayer : public Layer {
 
 class EncoderLayer : public Layer {
  public:
-  struct Weight {
-    AttentionLayer::Weight attn;
-    FeedForwardLayer::Weight mlp;
-    TensorRef attn_norm;
-    TensorRef mlp_norm;
-  };
-
   struct Intermediates {
     AttentionLayer::Intermediates attn;
     FeedForwardLayer::Intermediates mlp;
@@ -142,8 +123,6 @@ class EncoderLayer : public Layer {
                                     TensorRef output) override;
 
   Result<void, std::string> toDevice(DeviceType dev_type) override;
-
-  void setWeight(const Weight& weight);
 
   void setIntermediates(const Intermediates& intermediates);
 

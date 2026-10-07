@@ -10,10 +10,12 @@ EncoderLayer::EncoderLayer(DeviceType dev_type,
                            int num_kv_heads,
                            int head_dim)
     : Layer(dev_type, std::move(layer_name)),
-      self_attn(dev_type, "self_attn", num_heads, num_kv_heads, head_dim),
-      mlp(dev_type, "mlp"),
-      mlp_norm(dev_type, "mlp_norm", rms_norm_eps),
-      attn_norm(dev_type, "attn_norm", rms_norm_eps),
+      // Child names are full paths (HF-style); name() is valid here because the base
+      // class is constructed before any member.
+      self_attn(dev_type, name() + ".self_attn", num_heads, num_kv_heads, head_dim),
+      mlp(dev_type, name() + ".mlp"),
+      mlp_norm(dev_type, name() + ".post_attention_layernorm", rms_norm_eps),
+      attn_norm(dev_type, name() + ".input_layernorm", rms_norm_eps),
       add(dev_type) {}
 
 Result<void, std::string> EncoderLayer::forward(const core::InferContext& ctx,
@@ -37,14 +39,6 @@ Result<void, std::string> EncoderLayer::forward(const core::InferContext& ctx,
   RETURN_ON_ERR(mlp.forward(ctx, {norm_out}, output));
 
   return add.run(ctx, {attn_out.get(), output.get()}, {output.get()});
-}
-
-void EncoderLayer::setWeight(const Weight& weight) {
-  auto w = weight;
-  self_attn.setWeight(w.attn);
-  mlp.setWeight(w.mlp);
-  attn_norm.setWeight(w.attn_norm);
-  mlp_norm.setWeight(w.mlp_norm);
 }
 
 void EncoderLayer::setIntermediates(const Intermediates& intermediates) {

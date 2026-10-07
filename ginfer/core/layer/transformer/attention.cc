@@ -12,10 +12,10 @@ AttentionLayer::AttentionLayer(
       gqa_op(dev_type),
       gqa_varlen_op(dev_type, 16 /* TODO: hardcoded paged_block_size */),
       store_kv_op(dev_type),
-      q_proj(dev_type, "q_proj"),
-      k_proj(dev_type, "k_proj"),
-      v_proj(dev_type, "v_proj"),
-      o_proj(dev_type, "o_proj"),
+      q_proj(dev_type, name() + ".q_proj"),
+      k_proj(dev_type, name() + ".k_proj"),
+      v_proj(dev_type, name() + ".v_proj"),
+      o_proj(dev_type, name() + ".o_proj"),
       num_heads_(num_heads),
       num_kv_heads_(num_kv_heads),
       head_dim_(head_dim) {}
@@ -83,16 +83,10 @@ Result<void, std::string> AttentionLayer::forward(const core::InferContext& ctx,
 
 // void AttentionLayer::reset() { kv_cache_.offset = 0; }
 
-void AttentionLayer::setWeight(const Weight& weight) {
-  auto w = weight;
-  q_proj.setWeight(w.q_w);
-  q_proj.setBias(w.q_b);
-  k_proj.setWeight(w.k_w);
-  k_proj.setBias(w.k_b);
-  v_proj.setWeight(w.v_w);
-  v_proj.setBias(w.v_b);
-  o_proj.setWeight(w.o_w);
-}
+LinearLayer& AttentionLayer::qProj() { return q_proj; }
+LinearLayer& AttentionLayer::kProj() { return k_proj; }
+LinearLayer& AttentionLayer::vProj() { return v_proj; }
+LinearLayer& AttentionLayer::oProj() { return o_proj; }
 
 void AttentionLayer::setIntermediates(const Intermediates& intermediates) {
   intermediates_ = intermediates;

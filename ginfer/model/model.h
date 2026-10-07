@@ -67,6 +67,8 @@ class Model {
   common::DeviceType dev_type_;
 };
 
+class LlamaArchModelLoader;
+
 struct LlamaArchModelConfig : public ModelConfig {
   int hidden_size;
   int intermediate_size;
@@ -123,6 +125,9 @@ class LlamaArchModel : public Model {
   bool pos_embedding_initialized_ = false;
 
   virtual core::op::Op& getRotaryEmbeddingOp() = 0;
+
+  // the loader fills the weights of the layers below
+  friend class LlamaArchModelLoader;
 
  protected:
   core::op::ArgmaxOp argmax_op;

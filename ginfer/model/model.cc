@@ -34,13 +34,13 @@ void Model::setRuntimeConfig(ModelRuntimeConfig runtime_config) {
 LlamaArchModel::LlamaArchModel(LlamaArchModelConfig config, common::DeviceType dev_type)
     : config_(config),
       embed_tokens(dev_type, "embed_tokens"),
-      final_rmsnorm(dev_type, "final_rmsnorm", config.rms_norm_eps),
+      final_rmsnorm(dev_type, "norm", config.rms_norm_eps),
       lm_head(dev_type, "lm_head"),
       argmax_op(dev_type),
       Model(config, dev_type) {
   // initialize encoder layers
   for (size_t i = 0; i < config.nlayer; ++i) {
-    encoder_layers.emplace_back(dev_type, "encoder_layer_" + std::to_string(i), config.rms_norm_eps,
+    encoder_layers.emplace_back(dev_type, "layers." + std::to_string(i), config.rms_norm_eps,
                                 config.num_heads, config.num_kv_heads, config.head_dim);
   }
 }

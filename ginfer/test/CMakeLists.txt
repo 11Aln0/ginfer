@@ -14,6 +14,7 @@ add_gtest(test_3rd_party fmt::fmt nlohmann_json::nlohmann_json tokenizers_cpp ji
 add_gtest(test_memory memory)
 add_gtest(test_tensor memory tensor)
 add_gtest(test_op memory tensor op)
+add_gtest(test_layer_names model)
 add_gtest(test_engine model engine)
 
 # add pybind test

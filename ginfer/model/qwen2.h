@@ -39,7 +39,6 @@ class Qwen2Model : public LlamaArchModel {
 
  protected:
   core::op::Op& getRotaryEmbeddingOp() override { return rotary_emb; }
-  friend class Qwen2ModelLoader;
 
  private:
   core::op::RotaryEmbeddingOp rotary_emb;

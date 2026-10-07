@@ -5,7 +5,7 @@ namespace ginfer::core::layer::transformer {
 
 LMHeadLayer::LMHeadLayer(DeviceType dev_type, std::string layer_name)
     : Layer(dev_type, std::move(layer_name)),
-      lm_head_proj(dev_type, "lm_head_proj"),
+      lm_head_proj(dev_type, name()),
       token_select_op(dev_type) {}
 
 Result<void, std::string> LMHeadLayer::forwardWithKVCache(const core::InferContext& ctx,

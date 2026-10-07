@@ -4,10 +4,10 @@ namespace ginfer::core::layer::transformer {
 
 FeedForwardLayer::FeedForwardLayer(DeviceType dev_type, std::string layer_name)
     : Layer(dev_type, std::move(layer_name)),
-      gate_proj(dev_type, "gate_proj"),
-      up_proj(dev_type, "up_proj"),
+      gate_proj(dev_type, name() + ".gate_proj"),
+      up_proj(dev_type, name() + ".up_proj"),
       swiglu_op(dev_type),
-      down_proj(dev_type, "down_proj") {}
+      down_proj(dev_type, name() + ".down_proj") {}
 
 Result<void, std::string> FeedForwardLayer::forward(const core::InferContext& ctx,
                                                     const std::vector<TensorRef>& inputs,
@@ -29,12 +29,9 @@ void FeedForwardLayer::setIntermediates(const Intermediates& intermediates) {
   intermediates_ = intermediates;
 }
 
-void FeedForwardLayer::setWeight(const Weight& weight) {
-  auto w = weight;
-  gate_proj.setWeight(w.gate_w);
-  up_proj.setWeight(w.up_w);
-  down_proj.setWeight(w.down_w);
-}
+LinearLayer& FeedForwardLayer::gateProj() { return gate_proj; }
+LinearLayer& FeedForwardLayer::upProj() { return up_proj; }
+LinearLayer& FeedForwardLayer::downProj() { return down_proj; }
 
 Result<void, std::string> FeedForwardLayer::toDevice(DeviceType dev_type) {
   RETURN_ON_ERR(gate_proj.toDevice(dev_type));

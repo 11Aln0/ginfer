@@ -46,7 +46,6 @@ class Llama3Model : public LlamaArchModel {
 
  protected:
   core::op::Op& getRotaryEmbeddingOp() override { return rotary_emb; }
-  friend class Llama3ModelLoader;
 
  private:
   core::op::Llama3RotaryEmbeddingOp rotary_emb;

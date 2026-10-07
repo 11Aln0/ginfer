@@ -9,6 +9,8 @@ BaseLayer::BaseLayer(DeviceType dev_type, std::string layer_name)
 
 DeviceType BaseLayer::getDeviceType() const { return dev_type_; }
 
+const std::string& BaseLayer::name() const { return layer_name_; }
+
 Result<void, std::string> BaseLayer::toDevice(DeviceType dev_type) {
   dev_type_ = dev_type;
   return Ok<void>();
